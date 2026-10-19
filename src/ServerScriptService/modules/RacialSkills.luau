@@ -26,7 +26,7 @@ local FXFolder = Assets:WaitForChild("FX")
 local function playSound(char: Instance, soundTemplate: Sound?)
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then
-		wait("No HRP found!")
+		warn(`[RacialSkills] {char.Name} has no HumanoidRootPart for a sound.`)
 		return
 	end
 
@@ -1174,7 +1174,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 					-- fixed chip damage.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
-						attacker = attackerChar,
+						attacker = character,
 						target = targetChar,
 						attackerHRP = attackerHRP,
 						targetHRP = targetHRP,
@@ -1190,7 +1190,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 						AnimationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 						doAttack(-4, 5)
 					else
-						BlockResolver.OnAttackerLandedHit(attackerChar)
+						BlockResolver.OnAttackerLandedHit(character)
 						doAttack(-4, 5)
 						playSound(targetChar, ReplicatedStorage.assets.sounds.BlockingHit2)
 						local parryE =

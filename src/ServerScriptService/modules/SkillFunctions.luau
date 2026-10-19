@@ -24,7 +24,7 @@ local module = {}
 local function playSound(char, soundIdOrObj)
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then
-		wait("No HRP found!")
+		warn(`[SkillFunctions] {char.Name} has no HumanoidRootPart for a sound.`)
 		return
 	end
 
