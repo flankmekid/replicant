@@ -455,7 +455,7 @@ function Icon.new()
 		end
 		if self.playerlistWasPreviouslyActive then
 			self.playerlistWasPreviouslyActive = nil
-			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, false)
+			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
 		end
 	end)
 	
