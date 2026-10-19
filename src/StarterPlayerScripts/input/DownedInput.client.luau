@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Execute (B) and carry or drop (N) for a downed player within SEARCH_RADIUS, with the
+-- prompt on the DownedInteractionHUD.
+
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -6,17 +11,15 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Wait for Remotes
 local Remotes = ReplicatedStorage:WaitForChild("remotes")
 local InteractionRemote = Remotes:WaitForChild("DownedInteraction")
 
--- Wait for the GUI we just created
 local interactionGui = playerGui:WaitForChild("DownedInteractionHUD", 10)
 local promptLabel = interactionGui and interactionGui.Container.PromptText
 
 local SEARCH_RADIUS = 5
 
--- [[ HELPER: Find Target ]] --
+-- Returns the nearest downed player within SEARCH_RADIUS, or nil.
 local function GetNearestDownedPlayer()
 	local char = player.Character
 	if not char then
@@ -35,7 +38,6 @@ local function GetNearestDownedPlayer()
 			local pChar = otherPlayer.Character
 			local pRoot = pChar:FindFirstChild("HumanoidRootPart")
 
-			-- Check Attribute set by StateHandler
 			local isDowned = pChar:GetAttribute("Downed") == true
 
 			if pRoot and isDowned then
@@ -51,36 +53,31 @@ local function GetNearestDownedPlayer()
 	return nearestChar
 end
 
--- [[ INPUT LISTENER ]] --
 UserInputService.InputBegan:Connect(function(input, processed)
 	if processed then
 		return
 	end
 
-	-- EXECUTE (B)
 	if input.KeyCode == Enum.KeyCode.B then
 		local target = GetNearestDownedPlayer()
 		if target then
 			InteractionRemote:FireServer("Execute", target)
 		end
-
-		-- CARRY (N)
 	elseif input.KeyCode == Enum.KeyCode.N then
-		-- Check if WE are currently carrying someone
+		-- N drops the body the player carries, or picks up the nearest one.
 		local isCarrying = player.Character and player.Character:GetAttribute("Carrying")
 
 		if isCarrying then
-			InteractionRemote:FireServer("Carry", nil) -- Drop
+			InteractionRemote:FireServer("Carry", nil)
 		else
 			local target = GetNearestDownedPlayer()
 			if target then
-				InteractionRemote:FireServer("Carry", target) -- Pickup
+				InteractionRemote:FireServer("Carry", target)
 			end
 		end
 	end
 end)
 
--- [[ UI UPDATE LOOP ]] --
 RunService.RenderStepped:Connect(function()
 	if not interactionGui or not promptLabel then
 		return
@@ -91,7 +88,6 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	-- Check 1: Are we carrying someone?
 	local isCarrying = char:GetAttribute("Carrying")
 	if isCarrying then
 		interactionGui.Enabled = true
@@ -99,7 +95,6 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	-- Check 2: Is a downed player nearby?
 	local target = GetNearestDownedPlayer()
 	if target then
 		interactionGui.Enabled = true
