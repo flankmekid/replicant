@@ -91,7 +91,6 @@
       "ReplicatedStorage/faces",
       "ReplicatedStorage/effects",
       "ReplicatedStorage/Skyboxes",
-      "ServerScriptService/OLDSCRIPTS",
       "ServerScriptService/modules/QuestServerBACKUP",
       "StarterPlayer/StarterCharacterScripts/QuestClientBACKUP",
       "StarterPlayer/StarterCharacterScripts/Movement/DashOLD"
