@@ -44,6 +44,40 @@ Completion is per family, not per weapon: buying either fist weapon completes
 `ClassQuest_Fists_10`. A player who ignores the quest marker and finds the Oni alone
 still gets credit. The quest is a hint, not a rail, and the UI never shows Akuma.
 
-Completing the quest hands control back to the quest reconciler. A player who is
-already past level 15 gets the next checkpoint at once, without waiting for a level-up
-that already happened.
+Completing the quest hands control back to the class quest reconciler (below). A
+player who is already past level 15 gets the next checkpoint at once, without waiting
+for a level-up that already happened.
+
+## Class quest reconciler
+
+Class quest state is a function of the profile, not a reaction to a level-up event.
+The reconciler (`QuestServer.ReconcileClassQuests`) asks one question per weapon
+family: "Given this family's mastery and the class quests already completed, what is
+the lowest unearned checkpoint at or below the current level?" It runs on login, on
+mastery gain, and on quest completion, so no checkpoint can be skipped or stranded,
+in any order.
+
+A one-shot level-up signal fails in two ways:
+
+- Crossing two milestones (for example 10 and 15) in one XP award assigns the second
+  quest while the first is still active. The prerequisite check drops it, and nothing
+  fires it again.
+- Completing a checkpoint late (for example `_10` at mastery 22) never shows `_15` or
+  `_20`, because the level-ups that would trigger them are in the past.
+
+Only one class quest per family is open at a time: the player visits the trainer
+before the next checkpoint unlocks. Class quests do not chain through `NextQuest`.
+Completing one runs the reconciler, which opens the next earned checkpoint.
+
+On login, `RestoreSession` runs the reconciler for every family before it sends the
+quest list, so a checkpoint lost in an earlier session comes back.
+
+## Hybrid skills
+
+Hybrid weapons (Guandao, Scythe) have no class quests and no XP bar of their own. Each
+of their three skills unlocks when both parent families reach a level: 15/15 for Z,
+20/20 for X, 25/25 for C. The lower parent level decides. The hybrid trainer, who is
+found in the world, hands over the weapon itself. The reconciler does not grant it, and
+a player who holds a Guandao has already done eight class quests and needs no marker.
+`UnlockSpell` does nothing for a skill the player already has, so the hybrid
+reconciler is safe to run any number of times.

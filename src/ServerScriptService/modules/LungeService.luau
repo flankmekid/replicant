@@ -1,39 +1,8 @@
--- LungeService: server-authoritative lunge for the running attack.
+-- SPDX-License-Identifier: MIT
 --
--- [[ THE RULE ]] --
---
--- The BOOST always fires. It is the move: a forward burst, then the animation plays,
--- then the swing lands. Unconditional, no target needed, works into empty air.
---
--- The CHASE only engages when the target is RUNNING AWAY. If they are facing you and
--- holding ground, you get the plain step-in and you have to actually reach them. If
--- they turn tail, the lunge sticks to them so the running attack does what a running
--- attack is for.
---
--- That split matters. A chase that engages against someone standing their ground is
--- just magnetism: it drags you onto a target who never tried to escape, and it makes
--- spacing meaningless. Fleeing is the only case that needs the correction.
---
--- [[ WHY THE OLD ONE FAILED ]] --
---
--- Not the impulse. The setSpeed slow was eating it:
---   * Boost closes ~15 studs (50 * 0.3s).
---   * Then setSpeed pinned the attacker at walkspeed 4 for the whole windup.
---   * A sprinting target does ~28.
---   * Over the ~0.6s from boost-end to hitbox they took back 13-15 studs.
--- Net displacement against a runner: about zero. Every stud the lunge bought was
--- handed straight back. (Fixed in CombatCore: the running attack skips setSpeed.)
---
--- [[ TARGETING ]] --
--- Mirrors StarterCharacterScripts.LockOn:
---   * Locked on -> that target. The client publishes it as the LockTarget attribute;
---     we RE-VALIDATE here, so a forged attribute buys nothing.
---   * Not locked -> the same nearest-valid-target-in-a-cone search the lock-on runs.
---
--- The runner can still win. Steering is rate-limited (MAX_TURN_RATE_DEG), so cutting
--- hard across the attacker's facing breaks the track. And a dodge or parry at the
--- right time beats it outright, because the lunge only closes DISTANCE. The hitbox
--- still has to land.
+-- Runs the running-attack lunge on the server: a forward boost that always fires, and
+-- a chase that follows the target only while they run away. The design is in
+-- docs/combat-design.md.
 
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -45,54 +14,36 @@ local LungeService = {}
 
 local TARGET_FOLDER = Workspace:WaitForChild("plrManager"):WaitForChild("alive")
 
--- [[ TUNING ]] --
-local MAX_ACQUIRE_DIST = 60 -- lock-on allows 100, but a lunge across 100 studs is
--- a teleport
-local ACQUIRE_CONE_DEG = 60 -- how far off your facing a target can sit and still
--- be picked up when NOT locked on
+-- The lock-on reaches 100 studs, but a lunge across 100 studs is a teleport.
+local MAX_ACQUIRE_DIST = 60
+-- How far off the attacker's facing, in degrees, a target can be without a lock-on.
+local ACQUIRE_CONE_DEG = 60
 
--- The burst length: the step-in, which fires whether or not anyone is there. It lives
--- in DashConfig with every other weapon dash. Passing no weapon returns the M1Lunge
--- default, and the life is uniform across weapons anyway.
---
--- The old BURST_MULT of 1.35 is gone. DashConfig holds the final lunge speeds now, so
--- there is nothing left to scale here. Tune M1Lunge in that table instead.
+-- The boost length comes from the M1Lunge entry in DashConfig. The fallback matters only
+-- if M1Lunge is disabled, and then CombatCore never calls Start.
 local _, BOOST_TIME = DashConfig.Get("M1Lunge")
-BOOST_TIME = BOOST_TIME or 0.3 -- only reachable if M1Lunge is ever disabled outright,
--- in which case CombatCore never calls Start anyway
+BOOST_TIME = BOOST_TIME or 0.3
 
--- [[ WHAT COUNTS AS "RUNNING AWAY" ]] --
--- Two independent tests, either one is enough:
---   1. FACING: they are turned away from us (their look vector points away).
---   2. MOVING: they are physically travelling away from us.
--- A player backpedalling while facing us is NOT fleeing (they are spacing, which is
--- legitimate defence). A player sprinting away with their back turned is.
-local FLEE_FACING_DOT = -0.15 -- their lookVector vs the direction from them to us.
--- Below this they are turned away from us.
-local FLEE_SPEED_MIN = 8 -- studs/sec of AWAY-from-us velocity before we call
--- it fleeing. Filters out strafing and jitter.
+-- The target's lookVector dotted with the direction to the attacker. Below this, they
+-- are turned away.
+local FLEE_FACING_DOT = -0.15
+-- Speed away from the attacker, in studs per second, that counts as fleeing. Filters
+-- out strafing and jitter.
+local FLEE_SPEED_MIN = 8
 
--- [[ THE CHASE ]] --
-local SPRINT_MULT = 1.75 -- mirrors Movement.Running: sprint = walkspeed * this
+-- The same multiplier as Movement.Running: sprint = WalkSpeed * SPRINT_MULT.
+local SPRINT_MULT = 1.75
 local BASE_SPRINT = 16 * SPRINT_MULT
-local CHASE_SPRINT_MULT = 1.35 -- how much faster than THEIR sprint we close. Keyed
--- to the target, not to the boost speed: the 35-speed
--- weapons would otherwise "chase" at 19 against a
--- 28 sprint, i.e. slower than running away. Raised from
--- 1.15 so the follow actually welds to a fleeing target
--- (author: "stuck behind the one running away") instead
--- of trailing a step behind. Still capped by the boost
--- velocity below, so it cannot exceed the weapon's reach.
-local MAX_TURN_RATE_DEG = 280 -- deg/sec of steering. THE SKILL DIAL: high = homing
--- missile, low = trivially juked. Raised from 220 so a
--- runner cutting angles is tracked harder; a HARD cut
--- across the attacker's facing still breaks it.
-local STOP_DIST = 5 -- stop driving inside this, so you land NEXT to them
--- rather than clipping through
-local MIN_FLAT_DIST = 1.5 -- below this the XZ vector is degenerate and .Unit
--- returns NaN (the trap the lock-on camera hit)
+-- How much faster than the target's sprint the chase closes.
+local CHASE_SPRINT_MULT = 1.35
+-- Steering in degrees per second. High makes a homing missile, low is easy to juke.
+local MAX_TURN_RATE_DEG = 280
+-- Stop driving inside this distance, so the attacker lands next to the target.
+local STOP_DIST = 5
+-- Below this distance the flat vector is degenerate and .Unit returns NaN.
+local MIN_FLAT_DIST = 1.5
 
--- [[ VALIDITY (mirrors LockOn.isValidTarget) ]] --
+-- The same rules as LockOn.isValidTarget.
 local function isValidTarget(enemy, attacker)
 	if not enemy or not enemy.Parent then
 		return false
@@ -144,16 +95,14 @@ local function flatDir(fromPos, toPos)
 	return u, mag
 end
 
--- [[ IS THIS TARGET RUNNING AWAY FROM US? ]] --
--- This is the gate on the whole chase. Returns false for someone facing us, someone
--- standing still, and someone backpedalling to make space while still facing us.
+-- The gate on the chase. False for a target who faces us, stands still, or backs up
+-- while facing us.
 local function isFleeing(target, myRoot)
 	local tRoot = target:FindFirstChild("HumanoidRootPart")
 	if not tRoot then
 		return false
 	end
 
-	-- Direction from THEM to US, flattened.
 	local toUs =
 		Vector3.new(myRoot.Position.X - tRoot.Position.X, 0, myRoot.Position.Z - tRoot.Position.Z)
 	if toUs.Magnitude < MIN_FLAT_DIST then
@@ -164,24 +113,20 @@ local function isFleeing(target, myRoot)
 		return false
 	end
 
-	-- 1. FACING: is their back to us?
 	local look = tRoot.CFrame.LookVector
 	local flatLook = Vector3.new(look.X, 0, look.Z)
 	if flatLook.Magnitude > 0.01 then
 		flatLook = flatLook.Unit
-		-- Dot of their facing with the direction TO us. Near +1 = looking straight at
-		-- us. Negative = turned away.
+		-- Near +1 means looking straight at us. Negative means turned away.
 		if flatLook:Dot(toUs) < FLEE_FACING_DOT then
 			return true
 		end
 	end
 
-	-- 2. MOVING: are they physically travelling away from us, fast enough to count?
-	-- We project their velocity onto the AWAY-from-us axis. Strafing contributes
-	-- nothing; only genuine retreat does.
+	-- Project their velocity on the axis away from us. Strafing adds nothing.
 	local vel = tRoot.AssemblyLinearVelocity
 	local flatVel = Vector3.new(vel.X, 0, vel.Z)
-	local awaySpeed = flatVel:Dot(-toUs) -- positive = moving away from us
+	local awaySpeed = flatVel:Dot(-toUs)
 	if awaySpeed >= FLEE_SPEED_MIN then
 		return true
 	end
@@ -189,7 +134,6 @@ local function isFleeing(target, myRoot)
 	return false
 end
 
--- [[ ACQUISITION ]] --
 local function getLockedTarget(char)
 	local name = char:GetAttribute("LockTarget")
 	if type(name) ~= "string" then
@@ -209,7 +153,7 @@ local function getLockedTarget(char)
 		return nil
 	end
 
-	-- Range gate. A forged attribute naming someone across the map gets nothing.
+	-- A forged attribute that names someone across the map gets nothing.
 	if (enemy.HumanoidRootPart.Position - myRoot.Position).Magnitude > MAX_ACQUIRE_DIST then
 		return nil
 	end
@@ -249,6 +193,11 @@ local function getConeTarget(char)
 	return best
 end
 
+-- LungeService.AcquireTarget() - pick the lunge target for a character
+-- @char: the attacking character
+--
+-- Return: the locked target if it is valid and in range, otherwise the nearest valid
+-- target in the cone, or nil.
 function LungeService.AcquireTarget(char)
 	if not char then
 		return nil
@@ -256,7 +205,7 @@ function LungeService.AcquireTarget(char)
 	return getLockedTarget(char) or getConeTarget(char)
 end
 
--- Rotate `current` toward `desired` by at most `maxStep` radians, in the XZ plane.
+-- Rotates current toward desired by at most maxStep radians in the XZ plane.
 local function steer(current, desired, maxStep)
 	local dot = math.clamp(current:Dot(desired), -1, 1)
 	local angle = math.acos(dot)
@@ -278,14 +227,15 @@ local function steer(current, desired, maxStep)
 	return current
 end
 
--- [[ THE LUNGE ]] --
+-- LungeService.Start() - start a lunge
+-- @char: the attacking character
+-- @speed: the boost velocity, from DashConfig
+-- @chaseUntil: how long the drive may last if a chase engages. Pass windupDelay plus
+--              lungeWait so the chase covers the whole animation. Without a chase, the
+--              drive ends at BOOST_TIME.
+-- @token: CombatCore's attack token. A parry or a stun ends the lunge.
 --
---   speed      : boost velocity, already resolved from DashConfig by the caller
---   chaseUntil : how long the drive MAY last, if a chase engages. Pass
---                windupDelay + lungeWait so the follow covers the whole animation.
---                With no chase, the drive always ends at BOOST_TIME.
---   token      : CombatCore's attack token. A parry or stun kills the lunge instead
---                of dragging the attacker onward.
+-- Return: nothing.
 function LungeService.Start(char, speed, chaseUntil, token)
 	if not char then
 		return
@@ -307,14 +257,13 @@ function LungeService.Start(char, speed, chaseUntil, token)
 	end
 	currentDir = currentDir.Unit
 
-	-- THE BOOST ALWAYS FIRES. No target required, no conditions. This is the move.
+	-- The boost always fires, with or without a target.
 	local BV = Instance.new("BodyVelocity")
 	BV.Name = "LungeVelocity"
 	BV.MaxForce = Vector3.new(25000, 0, 25000)
 	BV.Velocity = currentDir * speed
 	BV.Parent = root
 
-	-- The chase is a separate question, re-asked every frame.
 	local target = LungeService.AcquireTarget(char)
 	local chasing = false
 
@@ -344,21 +293,19 @@ function LungeService.Start(char, speed, chaseUntil, token)
 				return
 			end
 
-			-- A target that dies, goes down, or gets carried mid-lunge stops being one.
+			-- A target that dies, goes down, or is carried during the lunge stops being one.
 			if target and not isValidTarget(target, char) then
 				target = nil
 				chasing = false
 			end
 
-			-- Re-evaluate the chase every frame. Someone who turns to FACE us mid-lunge
-			-- stops being chased: the tracking drops and we coast on our current
-			-- heading. Someone who turns to RUN mid-lunge starts being chased.
-			-- Standing your ground beats the magnet; only fleeing invites it.
+			-- Check the chase every frame. A target who turns to face us stops being chased,
+			-- and one who turns to run starts being chased.
 			if target then
 				chasing = isFleeing(target, root)
 			end
 
-			-- Drive ends at BOOST_TIME unless a chase is actively engaged.
+			-- The drive ends at BOOST_TIME unless a chase is engaged.
 			local limit = chasing and math.max(BOOST_TIME, chaseUntil) or BOOST_TIME
 			if elapsed >= limit then
 				stop()
@@ -372,9 +319,7 @@ function LungeService.Start(char, speed, chaseUntil, token)
 				if tRoot then
 					local desired, dist = flatDir(root.Position, tRoot.Position)
 					if desired and dist then
-						-- Close enough: stop driving. Overshooting is what makes a
-						-- lunge feel like it clips THROUGH someone instead of landing
-						-- on them. This is the "almost welded to their back" moment.
+						-- Stop when close, so the lunge lands on the target, not through them.
 						if dist <= STOP_DIST then
 							stop()
 							return
@@ -383,9 +328,8 @@ function LungeService.Start(char, speed, chaseUntil, token)
 						currentDir = steer(currentDir, desired, math.rad(MAX_TURN_RATE_DEG) * dt)
 					end
 
-					-- After the burst, hold a follow speed keyed to THEIR sprint, so it
-					-- works identically on a 35-velocity Dagger and a 50-velocity
-					-- Katana, and auto-adapts to a target whose Stamina makes them fast.
+					-- After the burst, follow at a speed based on the target's sprint, so it works
+					-- the same for every weapon and adapts to a fast target.
 					if elapsed > BOOST_TIME then
 						local tHum = target:FindFirstChild("Humanoid")
 						local theirSprint = BASE_SPRINT
@@ -405,6 +349,10 @@ function LungeService.Start(char, speed, chaseUntil, token)
 	end)
 end
 
+-- LungeService.Stop() - end a character's lunge
+-- @char: the character
+--
+-- Return: nothing.
 function LungeService.Stop(char)
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	local BV = root and root:FindFirstChild("LungeVelocity")

@@ -1,27 +1,8 @@
--- SpeedService: the single authority for a character's WalkSpeed.
+-- SPDX-License-Identifier: MIT
 --
--- The problem this replaces: every system that changed WalkSpeed (block, M1/M2/E
--- slow, stun, hitstop, skill self-slows, Null Gaze) did its own stash-and-restore
--- and restored to ITS OWN idea of "default" (a remembered value or GetBaseWalkSpeed).
--- Those stashes were single-slot and didn't know about each other, so layering two
--- effects (block under an M1, a hit while blocking, etc.) made whichever restore ran
--- last clobber the still-correct speed of the one still active. Symptoms: blocking at
--- full speed after an M1, returning to base (not block) after being hit mid-block.
---
--- The fix: nobody writes Humanoid.WalkSpeed directly for a transient effect anymore.
--- Each effect PUSHES a modifier (source key + priority + speed) and POPS it when done.
--- After every push/pop we RECOMPUTE the humanoid's WalkSpeed from the live stack, so
--- push/pop ORDER stops mattering: whoever runs last computes the same correct answer.
---
--- Resolution: highest priority wins (override semantics, NOT additive: a stun pins
--- you, it does not stack with block). Ties broken by most-recent push (handles
--- refresh/re-application like beam ticks). With no modifiers, speed is the live base
--- (GetBaseWalkSpeed * SpeedBoost), so stamina respecs and race boosts flow through
--- for free and there is never a stale "16" baked in anywhere.
---
--- SCOPE: this module owns WalkSpeed only. JumpPower / JumpHeight / AutoRotate stay
--- with their existing owners (hitstop, stun); far fewer writers touch them, so they
--- are not part of this race. Fold them in later if they ever start conflicting.
+-- Owns every write to Humanoid.WalkSpeed. Other scripts request a speed
+-- change here and never write WalkSpeed directly. The reasons are in
+-- docs/combat-design.md.
 
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -30,23 +11,27 @@ local StatScaling = require(RS.modules.StatScaling)
 
 local SpeedService = {}
 
--- Priority bands. Higher wins. Leave gaps so new effects can slot between.
+-- Priority bands. The highest priority wins. Gaps leave room for new effects.
 SpeedService.Priority = {
-	PIN = 100, -- Downed / hard root: absolute, speed 0
-	STUN = 80, -- stun + hitstop: can't-walk-out hit reactions
-	SKILL = 60, -- self-slow during a cast / skill windup
-	BLOCK = 50, -- holding block
-	DEBUFF = 40, -- external slows (Null Gaze etc.)
+	PIN = 100, -- Downed or rooted, speed 0.
+	STUN = 80, -- Stun and hitstop.
+	SKILL = 60, -- Self-slow during a cast or windup.
+	BLOCK = 50, -- Holding block.
+	DEBUFF = 40, -- Slows from others, such as Null Gaze.
 }
 
--- [char] = { [sourceKey] = { speed = n, priority = n, seq = n } }
+-- Layout: stacks[char][source] = { speed, priority, seq }.
 local stacks = setmetatable({}, { __mode = "k" })
--- monotonic counter so ties resolve to the most recently pushed modifier
+-- Ties go to the most recent push.
 local seqCounter = 0
 
--- Live full speed for a character: stamina-scaled base * race SpeedBoost. This is
--- exactly what mainGameHandler.updateSpeed considers "default", so a character with
--- no active modifiers resolves to the same number that system would set.
+-- SpeedService.GetFullSpeed() - get a character's speed with no modifiers
+-- @char: the character
+--
+-- This is the stamina-scaled base times the race SpeedBoost, the same value that
+-- mainGameHandler treats as the default.
+--
+-- Return: the WalkSpeed.
 function SpeedService.GetFullSpeed(char)
 	local base = StatScaling.GetBaseWalkSpeed(char)
 	local player = Players:GetPlayerFromCharacter(char)
@@ -56,9 +41,12 @@ function SpeedService.GetFullSpeed(char)
 	return base * boost
 end
 
--- Compute the speed that SHOULD apply right now from the live stack, and write it.
--- Called after every push/pop; also safe to call on its own (e.g. when base speed
--- changes) to re-settle a character to the correct value.
+-- SpeedService.Resolve() - write the WalkSpeed from the live modifier stack
+-- @char: the character
+--
+-- Push and Pop call this. Call it directly when the base speed changes.
+--
+-- Return: nothing.
 function SpeedService.Resolve(char)
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if not hum then
@@ -86,9 +74,15 @@ function SpeedService.Resolve(char)
 	end
 end
 
--- Push (or refresh) a modifier. source is a stable string key ("Block", "M1Slow",
--- "Stun", "Hitstop", "NullGaze", ...). Re-pushing the same source updates it in place
--- and bumps its recency, which is exactly the refresh semantics the beam ticks want.
+-- SpeedService.Push() - add or refresh a speed modifier
+-- @char: the character
+-- @source: a stable key, such as "Block", "Stun", or "Hitstop"
+-- @speed: the WalkSpeed while the modifier wins
+-- @priority: a value from SpeedService.Priority
+--
+-- Pushing the same source again updates it and makes it the most recent.
+--
+-- Return: nothing.
 function SpeedService.Push(char, source, speed, priority)
 	if not char or not source then
 		return
@@ -105,8 +99,14 @@ function SpeedService.Push(char, source, speed, priority)
 	SpeedService.Resolve(char)
 end
 
--- Pop a modifier and re-settle. Popping a source that isn't present is a safe no-op,
--- so a double-clear (e.g. a timer firing after a manual clear) can't drive speed wrong.
+-- SpeedService.Pop() - remove a speed modifier
+-- @char: the character
+-- @source: the key used in Push
+--
+-- Popping a source that is not there is safe, so a timer that fires after a manual
+-- clear cannot set a wrong speed.
+--
+-- Return: nothing.
 function SpeedService.Pop(char, source)
 	if not char or not source then
 		return
@@ -121,14 +121,23 @@ function SpeedService.Pop(char, source)
 	SpeedService.Resolve(char)
 end
 
--- Is a given source currently applied?
+-- SpeedService.Has() - check whether a modifier is active
+-- @char: the character
+-- @source: the key used in Push
+--
+-- Return: true if the modifier is active.
 function SpeedService.Has(char, source)
 	local stack = stacks[char]
 	return stack ~= nil and stack[source] ~= nil
 end
 
--- Drop everything for a character (respawn / death / disconnect). Does NOT write speed
--- (the humanoid is usually gone); the fresh character starts with an empty stack.
+-- SpeedService.Clear() - drop every modifier of a character
+-- @char: the character
+--
+-- Does not write WalkSpeed, because on respawn, death, or leave the humanoid is
+-- usually gone.
+--
+-- Return: nothing.
 function SpeedService.Clear(char)
 	stacks[char] = nil
 end

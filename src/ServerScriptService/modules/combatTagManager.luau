@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Owns the combat tag of each player: who attacked them, when the tag expires, and the
+-- CombatLogExpiry attribute and HUD state that other scripts read.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -6,7 +10,7 @@ local CombatManager = {}
 local ActiveTags = {}
 local TAG_DURATION = 30
 
--- Create Remote for Visuals
+-- Create the HUD remote if the place does not have it.
 local Events = ReplicatedStorage:FindFirstChild("remotes")
 if not Events then
 	Events = Instance.new("Folder")
@@ -20,7 +24,7 @@ if not CombatEvent then
 	CombatEvent.Parent = Events
 end
 
--- Fully clears a victim's tag (internal table, attribute, visuals, character flag)
+-- Clears the table entry, the attribute, the HUD, and the character flag.
 local function clearTag(victim)
 	ActiveTags[victim] = nil
 	if victim then
@@ -32,6 +36,13 @@ local function clearTag(victim)
 	end
 end
 
+-- CombatManager.TagPlayer() - tag a player as in combat
+-- @victim: the player who was hit
+-- @attacker: the player who hit them, or nil
+--
+-- Refreshes the expiry if the victim is already tagged.
+--
+-- Return: nothing.
 function CombatManager.TagPlayer(victim, attacker)
 	if not victim or not victim:IsA("Player") then
 		return
@@ -41,7 +52,7 @@ function CombatManager.TagPlayer(victim, attacker)
 	local currentTag = ActiveTags[victim]
 
 	if currentTag then
-		-- Already tagged: refresh expiry, add this attacker to the set
+		-- Already tagged: refresh the expiry and add this attacker.
 		currentTag.Expiry = expiryTime
 		if attacker and attacker:IsA("Player") and attacker ~= victim then
 			currentTag.Attackers[attacker] = true
@@ -57,23 +68,28 @@ function CombatManager.TagPlayer(victim, attacker)
 		}
 	end
 
-	-- Attribute so DataManager can check combat status without this module
+	-- DataManager reads this attribute, so it does not need this module.
 	victim:SetAttribute("CombatLogExpiry", expiryTime)
 
-	-- Visuals
 	CombatEvent:FireClient(victim, true, TAG_DURATION)
 
-	-- Character Attribute (for other scripts/NPCs)
+	-- Other scripts and NPCs read InCombat.
 	if victim.Character then
 		victim.Character:SetAttribute("InCombat", true)
 	end
 end
 
+-- CombatManager.SetTagDuration() - shorten a player's combat tag
+-- @player: the tagged player
+-- @duration: the new time left in seconds
+--
+-- Never extends the tag.
+--
+-- Return: nothing.
 function CombatManager.SetTagDuration(player, duration)
 	local currentTag = ActiveTags[player]
 	if currentTag then
 		local newExpiry = os.clock() + duration
-		-- Only reduce the tag, never accidentally extend it
 		if newExpiry < currentTag.Expiry then
 			currentTag.Expiry = newExpiry
 			player:SetAttribute("CombatLogExpiry", newExpiry)
@@ -95,36 +111,51 @@ local function removeAttackerFromAll(attacker)
 	end
 end
 
--- Kept the original name for compatibility; now respects the multi-attacker set
+-- CombatManager.UntagIfAttackerDied() - remove a dead player as an attacker
+-- @deadPlayer: the player who died
+--
+-- Untags a victim only when no other attacker is left.
+--
+-- Return: nothing.
 function CombatManager.UntagIfAttackerDied(deadPlayer)
 	removeAttackerFromAll(deadPlayer)
 end
 
--- Fully clears a single player's OWN tag (used on death, so dying ends your
--- combat state immediately: stops combat music, clears InCombat, drops aggro, etc).
+-- CombatManager.ClearPlayerTag() - clear a player's own combat tag
+-- @player: the player
+--
+-- Called on death, so dying ends combat at once: combat music, InCombat, and aggro.
+--
+-- Return: nothing.
 function CombatManager.ClearPlayerTag(player)
-	-- clearTag also resets the visual/attribute flags even if there's no table entry.
+	-- This also resets the HUD and the attributes when there is no table entry.
 	clearTag(player)
 end
 
--- Call this from DataManager's leave handling (PlayerRemoving lives there
--- to avoid the race condition). Removes the leaver as an attacker everywhere,
--- and also clears their own tag entry if they had one.
+-- CombatManager.HandlePlayerLeft() - clean up after a player leaves
+-- @player: the player who left
+--
+-- DataManager calls this from its own PlayerRemoving handler to avoid a race.
+--
+-- Return: nothing.
 function CombatManager.HandlePlayerLeft(player)
 	removeAttackerFromAll(player)
 	if ActiveTags[player] then
-		-- They left; no point keeping their own tag table around
 		ActiveTags[player] = nil
 	end
 end
 
--- Called when a player types "mb" in chat. Removes every tag THEY handed out.
--- Does not touch their own tag.
+-- CombatManager.ClearMyTags() - remove every tag a player handed out
+-- @player: the player who typed "mb" in chat
+--
+-- Does not touch the player's own tag.
+--
+-- Return: nothing.
 function CombatManager.ClearMyTags(player)
 	removeAttackerFromAll(player)
 end
 
--- Check loop to remove tags naturally on expiry
+-- Clear expired tags once per second.
 task.spawn(function()
 	while true do
 		task.wait(1)

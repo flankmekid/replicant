@@ -1,28 +1,23 @@
---[[
-	ParryService
-	Server-authoritative parry cooldown.
-
-	Model:
-	- Pressing parry starts the FULL cooldown immediately (BASE_COOLDOWN).
-	- Landing a parry shortens it to RESET_COOLDOWN (partial reset, keeps the dance going).
-	- A whiffed parry never gets shortened, so it stays at the full lockout. No whiff
-	  detection needed: the lockout is just the default that a land pulls back.
-	- Getting parried does NOT touch your cooldown. That is the trade.
-
-	Authority lives here. Clients keep a local mirror for input feel only.
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- Owns the parry cooldown on the server. Clients keep a local copy only for input
+-- feel. The cooldown model is in docs/combat-design.md.
 
 local Players = game:GetService("Players")
 
 local ParryService = {}
 
-local BASE_COOLDOWN = 5 -- full lockout, applied on every parry press
-local RESET_COOLDOWN = 1 -- partial reset applied when a parry lands
+-- Every parry press starts the full cooldown. A landed parry shortens it.
+local BASE_COOLDOWN = 5
+local RESET_COOLDOWN = 1
 
--- per-player timestamp (os.clock based) of when the player may parry again
+-- The os.clock() time when each player may parry again.
 local nextParryTime = {}
 
--- Returns true if the player is allowed to parry right now.
+-- ParryService.CanParry() - check whether a player may parry now
+-- @plr: the player
+--
+-- Return: true if the cooldown is over, false otherwise or when plr is nil.
 function ParryService.CanParry(plr)
 	if not plr then
 		return false
@@ -34,7 +29,10 @@ function ParryService.CanParry(plr)
 	return os.clock() >= readyAt
 end
 
--- Called when a parry is ATTEMPTED (on press). Starts the full cooldown.
+-- ParryService.StartCooldown() - start the full cooldown on a parry press
+-- @plr: the player who pressed parry
+--
+-- Return: nothing.
 function ParryService.StartCooldown(plr)
 	if not plr then
 		return
@@ -42,8 +40,12 @@ function ParryService.StartCooldown(plr)
 	nextParryTime[plr] = os.clock() + BASE_COOLDOWN
 end
 
--- Called when a parry LANDS. Shortens the cooldown to the partial reset.
--- Only ever shortens; never extends an already-shorter cooldown.
+-- ParryService.ResetParry() - shorten the cooldown after a landed parry
+-- @plr: the player whose parry landed
+--
+-- Never extends a cooldown that is already shorter.
+--
+-- Return: nothing.
 function ParryService.ResetParry(plr)
 	if not plr then
 		return
@@ -55,7 +57,10 @@ function ParryService.ResetParry(plr)
 	end
 end
 
--- Optional helper for the client mirror / UI if you ever want to query remaining time.
+-- ParryService.GetRemaining() - get the time left on a player's cooldown
+-- @plr: the player
+--
+-- Return: the seconds left, or 0.
 function ParryService.GetRemaining(plr)
 	if not plr then
 		return 0

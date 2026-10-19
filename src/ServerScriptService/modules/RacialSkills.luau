@@ -1,9 +1,11 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The racial skill of each race. Every skill is a function named after the race, and
+-- processHit resolves the hits of most of them.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Debris = game:GetService("Debris")
 
--- [[ MODULES ]] --
--- Adjust paths as necessary for your game structure
 local modules = ReplicatedStorage:WaitForChild("modules")
 local SSSmodules = ServerScriptService:WaitForChild("modules")
 local HitboxClass = require(modules:WaitForChild("hitboxClass"))
@@ -11,17 +13,15 @@ local StateHandler = require(modules:WaitForChild("stateHandler"))
 local AnimationHandler = require(modules:WaitForChild("animationHandler"))
 local RagdollManager = require(SSSmodules:WaitForChild("ragdollManager"))
 local VFX = require(game.ServerScriptService.modules.VFXModule)
-local dmgCalculator = require(game.ServerScriptService.modules.damageCalculator) -- If you have one
+local dmgCalculator = require(game.ServerScriptService.modules.damageCalculator)
 local SpeedService = require(SSSmodules:WaitForChild("SpeedService"))
 
 local RacialSkills = {}
 
--- [[ ASSETS ]] --
 local Assets = ReplicatedStorage:WaitForChild("assets")
 local SoundFolder = Assets:WaitForChild("sounds"):WaitForChild("skills")
 local FXFolder = Assets:WaitForChild("FX")
 
--- [[ HELPER: SOUND ]] --
 local function playSound(char: Instance, soundTemplate: Sound?)
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then
@@ -45,13 +45,10 @@ local function playSound(char: Instance, soundTemplate: Sound?)
 	else
 		s.RollOffMaxDistance = s.RollOffMaxDistance
 	end
-	print(s.RollOffMaxDistance)
 	s:Play()
 	Debris:AddItem(s, s.TimeLength + 1)
 end
 
--- [[ HELPER: KNOCKBACK ]] --
--- Simple body velocity knockback
 local function applyKnockback(
 	targetChar: Model,
 	direction: Vector3,
@@ -63,7 +60,6 @@ local function applyKnockback(
 		return
 	end
 
-	-- Reset existing velocity
 	hrp.AssemblyLinearVelocity = Vector3.zero
 
 	local att = Instance.new("Attachment")
@@ -71,7 +67,7 @@ local function applyKnockback(
 
 	local lv = Instance.new("LinearVelocity")
 	lv.MaxForce = 999999
-	lv.VectorVelocity = (direction * force) + Vector3.new(0, 5, 0) -- Slight upward lift
+	lv.VectorVelocity = (direction * force) + Vector3.new(0, 5, 0)
 	lv.Attachment0 = att
 	lv.Parent = hrp
 
@@ -79,24 +75,25 @@ local function applyKnockback(
 	Debris:AddItem(lv, duration)
 end
 
--- [[ CORE: HIT PROCESSING ]] --
--- This handles the complex combat triangle (Hit -> Dodge -> Block -> Parry)
-
+-- Resolves a skill hit on each target: dodge, then parry, block, or a clean hit.
+-- weaponType picks special VFX, and specialProperties carries effects such as
+-- GuardBreak, Silence, Root, and Slow.
 local function processHit(
 	attackerPlayer: Player,
 	attackerChar: Model,
 	hitCharsTable: { Model },
 	alreadyHit: { [Model]: boolean },
 	damage: number,
-	weaponType: string?, -- Optional, for specific VFX
+	weaponType: string?,
 	knockbackDist: number?,
 	stunTime: number?,
 	ragdollTime: number?,
 	originPart: BasePart?,
-	specialProperties: { [string]: any }? -- For guard breaks, silence, etc.
+	specialProperties: { [string]: any }?
 )
 	local attackerHRP = attackerChar:FindFirstChild("HumanoidRootPart") :: BasePart
-	-- Use originPart for projectiles, otherwise attacker HRP
+	-- A projectile passes originPart, which replaces the attacker HRP for direction and
+	-- facing.
 	local originPosition = (originPart and originPart.Position)
 		or (attackerHRP and attackerHRP.Position)
 
@@ -104,7 +101,7 @@ local function processHit(
 		return
 	end
 
-	-- Attacker shouldn't deal damage if they got stunned mid-swing
+	-- An attacker stunned during the swing deals no damage.
 	if StateHandler.IsInterrupted(attackerChar) then
 		return
 	end
@@ -115,7 +112,6 @@ local function processHit(
 			continue
 		end
 
-		-- prevent self-hit and duplicate hits
 		local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 		if (isPlayer and isPlayer == attackerPlayer) or alreadyHit[targetChar] then
 			continue
@@ -126,11 +122,9 @@ local function processHit(
 			continue
 		end
 
-		-- [[ 1. DODGE CHECK ]] --
 		if StateHandler.GetState(targetChar, "Dodging") then
 			playSound(targetHRP, ReplicatedStorage.assets.sounds:FindFirstChild("Dodged"))
 
-			-- Visual Ghost Effect
 			for _, part in pairs(targetChar:GetChildren()) do
 				if
 					part:IsA("BasePart")
@@ -145,19 +139,16 @@ local function processHit(
 					end)
 				end
 			end
-			continue -- Skip this target
+			continue
 		end
 
-		-- Internal function to apply damage
 		local function applyFinalDamage(modDamage: number, modKnockback: number)
 			local direction = (targetHRP.Position - originPosition).Unit
 
-			-- Animation
 			local animID = (math.random() > 0.5) and "rbxassetid://96311777205911"
 				or "rbxassetid://111089735892609"
 			AnimationHandler.LoadAnim(targetChar, "Hit", animID, nil, false)
 
-			-- Stats
 			applyKnockback(targetChar, direction, modKnockback or 0, 0.2)
 			if stunTime and stunTime > 0 then
 				StateHandler.SetStun(targetChar, true, stunTime, 2)
@@ -167,8 +158,6 @@ local function processHit(
 			end
 
 			dmgCalculator.CalculateDamage(attackerChar, targetChar, modDamage, 0, false, "Racial")
-
-			-- Sound & VFX
 
 			local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 			h1.Parent = attackerChar
@@ -187,7 +176,6 @@ local function processHit(
 				Debris:AddItem(clone, 1)
 			end
 
-			-- Apply Special Properties (Silence, Root, etc)
 			if specialProperties then
 				if specialProperties.Silence then
 					StateHandler.SetState(
@@ -226,49 +214,35 @@ local function processHit(
 					end)
 				end
 				if specialProperties.Slow then
-					-- Genuine movement slow (target can still move). Refreshing rather
-					-- than stacking: store the pre-slow speed once, lower it, and push
-					-- the restore out on each re-application so overlapping beam ticks
-					-- keep the target slowed for the full duration without compounding.
+					-- A real slow: the target can still move. Each beam tick refreshes it
+					-- instead of stacking.
 					local targetHum = targetChar:FindFirstChild("Humanoid")
 					if targetHum then
 						local slowSpeed = specialProperties.SlowSpeed or 6
 						local slowDuration = specialProperties.SlowDuration or 1
-						-- DEBUFF priority through SpeedService. Re-pushing the same "NullGaze"
-						-- source on each beam tick refreshes it (bumps recency) without
-						-- stacking, and it correctly loses to a stun/hitstop pin but overrides
-						-- the target's base/block speed. The old NullGazeOrigSpeed attribute
-						-- stash is gone: the stack owns the restore.
+						-- Pushing the same source again refreshes the slow. A stun still wins,
+						-- and the slow overrides base and block speed.
 						SpeedService.Push(
 							targetChar,
 							"NullGaze",
 							slowSpeed,
 							SpeedService.Priority.DEBUFF
 						)
-						-- Stop dashes too. WalkSpeed alone does nothing to a dash (it
-						-- runs on a LinearVelocity that overrides WalkSpeed), so a slowed
-						-- target could otherwise just dash out. DashLocked is read by the
-						-- Dash LocalScript; cleared in the same token-guarded restore below
-						-- so it releases exactly when the slow ends.
+						-- Also lock dashes. A dash uses a LinearVelocity that ignores WalkSpeed,
+						-- so a slowed target could dash out. The Dash LocalScript reads DashLocked.
 						targetChar:SetAttribute("DashLocked", true)
 						local token = (targetChar:GetAttribute("NullGazeSlowToken") or 0) + 1
 						targetChar:SetAttribute("NullGazeSlowToken", token)
 						task.delay(slowDuration, function()
-							-- only the most recent application restores, so an earlier
-							-- tick's timer can't snap speed back while the beam is ongoing
+							-- Only the timer of the latest tick releases the slow and dash lock.
 							if not targetChar or not targetChar.Parent then
 								return
 							end
 							if targetChar:GetAttribute("NullGazeSlowToken") ~= token then
 								return
 							end
-							-- Pop the debuff and let SpeedService recompute (base, or a still-live
-							-- higher-priority pin). Token guard still ensures only the latest
-							-- beam tick's timer performs the release.
 							SpeedService.Pop(targetChar, "NullGaze")
 							targetChar:SetAttribute("NullGazeSlowToken", nil)
-							-- release the dash lock exactly when the slow ends (token-guarded,
-							-- so an earlier tick can't drop it mid-beam)
 							targetChar:SetAttribute("DashLocked", nil)
 						end)
 					end
@@ -330,15 +304,14 @@ local function processHit(
 			alreadyHit[targetChar] = true
 		end
 
-		-- [[ 2. BLOCK/PARRY CHECK ]] --
 		local isBlocking = StateHandler.GetState(targetChar, "Blocking")
 		local isParrying = StateHandler.GetState(targetChar, "Parrying")
 
-		-- Calculate angle (Dot product)
 		local toAttacker = (originPosition - targetHRP.Position).Unit
 		local forward = targetHRP.CFrame.LookVector
 		local dot = forward:Dot(toAttacker)
-		local isFacing = dot > 0.5 -- 60 degree cone roughly
+		-- Within 60 degrees of the target's facing.
+		local isFacing = dot > 0.5
 
 		if isParrying then
 			local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
@@ -372,7 +345,7 @@ local function processHit(
 			game.Debris:AddItem(parryE, 0.7)
 			game.Debris:AddItem(effect2, 0.7)
 
-			-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+			-- A parry beats hyper armor: clear it so the punish stun lands.
 			attackerChar:SetAttribute("HyperArmor", nil)
 			StateHandler.SetStun(attackerChar, true, 0.5, 2)
 			StateHandler.SetState(attackerChar, "CantAnything", true, 0.5)
@@ -385,10 +358,10 @@ local function processHit(
 				nil,
 				false
 			)
-			return -- No damage to target
+			return
 		elseif isBlocking then
-			-- Route through BlockResolver (single chokepoint + guard bar). Racial
-			-- skills may carry their own GuardBreak via specialProperties.
+			-- BlockResolver decides the block. A racial skill can guard-break through
+			-- specialProperties.GuardBreak.
 			local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 			local verdict = BlockResolver.Resolve({
 				attacker = attackerChar,
@@ -406,12 +379,11 @@ local function processHit(
 				if verdict.broke then
 					applyFinalDamage(verdict.chipDamage, verdict.knockback)
 				else
-					applyFinalDamage(damage, knockbackDist) -- Full damage
+					applyFinalDamage(damage, knockbackDist)
 				end
 			elseif verdict.outcome == "Bypass" then
 				applyFinalDamage(damage, knockbackDist)
 			else
-				-- BLOCKED (chip + frame advantage applied by resolver)
 				BlockResolver.OnAttackerLandedHit(attackerChar)
 				playSound(targetHRP, Assets.sounds:FindFirstChild("Block"))
 				local spark = Assets.FX["parry/blocked"].parry:Clone()
@@ -420,18 +392,16 @@ local function processHit(
 				applyFinalDamage(verdict.chipDamage, verdict.knockback)
 			end
 		else
-			-- CLEAN HIT
 			applyFinalDamage(damage, knockbackDist)
 		end
 	end
 end
 
--- ============================================================================
--- [[ RACIAL SKILLS IMPLEMENTATION ]]
--- ============================================================================
-
--- [[ 1. VERMEER (Human) ]] --
--- Skill: Adrenaline Surge (Self Buff)
+-- RacialSkills.Human() - Adrenaline Surge: trade 15 HP for 1.3x damage for 20 seconds
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Human(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid") :: Humanoid
@@ -441,12 +411,10 @@ function RacialSkills.Human(player: Player, character: Model)
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
-	-- Animation
 	AnimationHandler.LoadAnim(character, "Skill", "rbxassetid://126568014162974", nil, false)
 
 	task.wait(0.5)
 
-	-- Sound
 	playSound(character, SoundFolder:FindFirstChild("PunchHit"))
 
 	local aura = ReplicatedStorage.assets.FX.adrenalineSurgePart
@@ -471,15 +439,12 @@ function RacialSkills.Human(player: Player, character: Model)
 		end
 	end
 
-	-- Logic: Self Damage & Buff
 	if hum.Health > hum.MaxHealth / 7 then
 		hum:TakeDamage(15)
 	end
 
-	-- Apply Buff Attribute (Read by your DamageCalculator)
 	character:SetAttribute("AttackBuff", (character:GetAttribute("AttackBuff") or 1) * 1.3)
 
-	-- VFX
 	local highlight = Instance.new("Highlight")
 	highlight.FillColor = Color3.fromRGB(255, 50, 50)
 	highlight.OutlineColor = Color3.fromRGB(150, 0, 0)
@@ -488,7 +453,6 @@ function RacialSkills.Human(player: Player, character: Model)
 	highlight.Parent = character
 	Debris:AddItem(highlight, 20)
 
-	-- Remove Buff
 	task.delay(20, function()
 		if character then
 			character:SetAttribute("AttackBuff", (character:GetAttribute("AttackBuff") or 1) / 1.3)
@@ -496,8 +460,11 @@ function RacialSkills.Human(player: Player, character: Model)
 	end)
 end
 
--- [[ 2. ALBIN (Elezen) ]] --
--- Skill: Arcane Siphon (Counter)
+-- RacialSkills.Elezen() - Arcane Siphon: refill the caster's mana
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Elezen(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -506,7 +473,6 @@ function RacialSkills.Elezen(player: Player, character: Model)
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
-	-- Animation: Channeling pose
 	AnimationHandler.LoadAnim(character, "Skill", "rbxassetid://117886434655481", nil, false)
 
 	hrp.Anchored = true
@@ -527,17 +493,19 @@ function RacialSkills.Elezen(player: Player, character: Model)
 		end
 	end
 
-	-- Sound
 	playSound(character, SoundFolder:FindFirstChild("ManaCharge"))
 
-	-- Logic: Set Counter State
-	-- If they get hit while this state is active, your DamageHandler should check for "ManaCounter", negate dmg, and give mana
+	-- TODO: Add the counter: while ManaCounter is set, a hit deals no damage and gives
+	-- mana. The skill only refills mana now.
 	player:FindFirstChild("PlayerStats"):FindFirstChild("Mana").Value =
 		player:FindFirstChild("PlayerStats"):FindFirstChild("MaxMana").Value
 end
 
--- [[ 3. APHANIS (Seer) ]] --
--- Skill: Null Gaze (Silence Beam)
+-- RacialSkills.Seer() - Null Gaze: a beam that damages and slows for about 5 seconds
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Seer(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -569,7 +537,6 @@ function RacialSkills.Seer(player: Player, character: Model)
 		:Play()
 	game.Debris:AddItem(NewShield2, 0.75)
 
-	-- Animation
 	local anim = Instance.new("Animation")
 	anim.AnimationId = "rbxassetid://129404885767130"
 	local animator = character.Humanoid.Animator
@@ -591,7 +558,7 @@ function RacialSkills.Seer(player: Player, character: Model)
 	game.Debris:AddItem(fire, 5)
 
 	local params = {
-		SizeOrPart = Vector3.new(4, 6, 12), -- Long beam
+		SizeOrPart = Vector3.new(4, 6, 12),
 		LookingFor = "Humanoid",
 		Debug = false,
 		Blacklist = { character },
@@ -602,21 +569,19 @@ function RacialSkills.Seer(player: Player, character: Model)
 	hitbox:WeldTo(hrp, CFrame.new(0, 0, -6))
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		-- Null Gaze: doubled tick count at half damage per tick keeps the same
-		-- total output (~10 ticks x 5 = 50). Per-tick stun dropped (stunTime 0) so the
-		-- explicit Slow controls movement instead of a hard freeze. Slow refreshes each
-		-- tick (SlowDuration slightly above tick spacing) so it holds for the whole beam.
+		-- Ten ticks at 5 damage keep the total near 50. stunTime is 0, so the slow
+		-- controls movement instead of a freeze.
 		processHit(player, character, hitChars, hitList, 5, "Magic", 10, 0, 0, nil, {
 			Slow = true,
-			SlowSpeed = 4, -- hard crawl (base walkspeed ~16): can't reposition or
-			-- walk out of an M1 while tagged. Buffed from 6.
-			SlowDuration = 1.0, -- comfortably above tick spacing so it holds the whole beam
+			-- A hard crawl, so the target cannot walk out of an M1.
+			SlowSpeed = 4,
+			-- Longer than the tick spacing, so the slow holds for the whole beam.
+			SlowDuration = 1.0,
 		})
 	end)
 
 	task.spawn(function()
-		-- 10 ticks at 0.4s active + 0.1s gap = ~5s total beam (same as the old
-		-- 5 ticks at 0.8 + 0.2), but twice as many damage windows.
+		-- 10 ticks of 0.4 seconds active and a 0.1-second gap, about 5 seconds in total.
 		for i = 1, 10 do
 			if not hitbox or not character or character.Humanoid.Health <= 0 then
 				break
@@ -641,20 +606,21 @@ function RacialSkills.Seer(player: Player, character: Model)
 	end)
 end
 
--- [[ 4. OSSUAR (Meskari) ]] --
--- Skill: Spectre Round (Cero Beam)
+-- RacialSkills.Meskar() - Spectre Round: fire a beam projectile from a gun
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Meskar(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
 		return
 	end
 
-	-- [[ 1. EQUIP GUN VISUAL ]] --
 	local gunTemplate = ReplicatedStorage.assets:FindFirstChild("gunHandle")
 	local gun = gunTemplate:Clone()
 	gun.Name = "MeskariGun"
 
-	-- Find the arm (Supports R6 and R15)
 	local arm = character:FindFirstChild("Left Arm")
 
 	gun.Parent = character
@@ -664,11 +630,9 @@ function RacialSkills.Meskar(player: Player, character: Model)
 	motor.Part0 = arm
 	motor.Part1 = gun
 
-	-- Schedule removal after 1 second
 	Debris:AddItem(gun, 1)
 	Debris:AddItem(motor, 2)
 
-	-- [[ 2. SKILL LOGIC ]] --
 	StateHandler.SetState(character, "CantAnything", true, 1)
 	AnimationHandler.LoadAnim(character, "Shoot", "rbxassetid://130627090034596", nil, false)
 
@@ -694,10 +658,8 @@ function RacialSkills.Meskar(player: Player, character: Model)
 		laser2tweenOFF:Play()
 	end)
 
-	-- Animation: Gun pose
 	playSound(character, SoundFolder:FindFirstChild("Gunshot"))
 
-	-- Create a moving projectile hitbox
 	local duration = 0.2
 
 	local params = {
@@ -709,14 +671,13 @@ function RacialSkills.Meskar(player: Player, character: Model)
 
 	local hitbox = HitboxClass.new(params)
 
-	-- Offset the hitbox slightly to the left to match the gun position
 	hitbox:WeldTo(character["Left Arm"], CFrame.new(0, -9, 0))
 
 	local alreadyHit = {}
 
 	hitbox.HitSomeone:Connect(function(hitChars)
 		processHit(player, character, hitChars, alreadyHit, 10, "Ranged", 30, 1, 1, hrp)
-		hitbox:Destroy() -- Destroy on impact
+		hitbox:Destroy()
 	end)
 
 	hitbox:Start()
@@ -727,8 +688,11 @@ function RacialSkills.Meskar(player: Player, character: Model)
 	end)
 end
 
--- [[ 5. KARU (Rams) ]] --
--- Skill: Headbutt (Lunge)
+-- RacialSkills.Karu() - Headbutt: lunge forward and knock the target up and back
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Karu(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -777,14 +741,12 @@ function RacialSkills.Karu(player: Player, character: Model)
 	playSound(character, SoundFolder:FindFirstChild("woosh"))
 	playSound(character, SoundFolder:FindFirstChild("Dash"))
 
-	-- Physics Lunge
 	local bv = Instance.new("BodyVelocity")
 	bv.MaxForce = Vector3.new(25000, 0, 25000)
 	bv.Velocity = hrp.CFrame.LookVector * 60
 	bv.Parent = hrp
 	Debris:AddItem(bv, 0.2)
 
-	-- Hitbox
 	local params = {
 		SizeOrPart = Vector3.new(4, 6, 4),
 		LookingFor = "Humanoid",
@@ -798,7 +760,6 @@ function RacialSkills.Karu(player: Player, character: Model)
 	hitbox:WeldTo(hrp, CFrame.new(0, 0, -4))
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		-- Knockback Up and Back
 		processHit(player, character, hitChars, hitList, 15, "Physical", 50, 1, 2)
 	end)
 
@@ -810,8 +771,11 @@ function RacialSkills.Karu(player: Player, character: Model)
 	end)
 end
 
--- [[ 6. CHLORIS (Seedlings) ]] --
--- Skill: Root Prison (AoE Root)
+-- RacialSkills.Verdis() - Root Prison: root every target around the caster
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Verdis(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -853,11 +817,10 @@ function RacialSkills.Verdis(player: Player, character: Model)
 
 	task.wait(1)
 
-	-- Animation: Ground slam
 	playSound(character, SoundFolder:FindFirstChild("GroundSlam"))
 
 	local params = {
-		SizeOrPart = 10, -- Large Radius
+		SizeOrPart = 10,
 		SpatialOption = "InRadius",
 		LookingFor = "Humanoid",
 		Blacklist = { character },
@@ -869,7 +832,7 @@ function RacialSkills.Verdis(player: Player, character: Model)
 	local hitList = {}
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		-- No ragdoll, just root
+		-- Root without a ragdoll.
 		processHit(
 			player,
 			character,
@@ -887,7 +850,6 @@ function RacialSkills.Verdis(player: Player, character: Model)
 
 	hitbox:Start()
 
-	-- VFX: Roots
 	local vfx = Assets.FX.skills:FindFirstChild("VerdisSkillPart").Attachment:Clone()
 	vfx.Parent = hrp
 	Debris:AddItem(vfx, 1.5)
@@ -898,10 +860,12 @@ function RacialSkills.Verdis(player: Player, character: Model)
 	end)
 end
 
--- [[ 7. GLAUCUS (Marasi) ]] --
--- Skill: Tidal Slug (Water Projectile)
+-- RacialSkills.Marasi() - Tidal Slug: throw a water projectile
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Marasi(player: Player, character: Model)
-	-- Identical logic to Ossuar, just different visual and stats
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
 		return
@@ -962,7 +926,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 	playSound(character, SoundFolder:FindFirstChild("Explosion"))
 
 	local params = {
-		SizeOrPart = 3, -- Larger sphere
+		SizeOrPart = 3,
 		LookingFor = "Humanoid",
 		Blacklist = { character },
 		Debug = false,
@@ -976,7 +940,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 	hitbox:WeldTo(projectile)
 
 	local bv = Instance.new("BodyVelocity")
-	bv.Velocity = hrp.CFrame.LookVector * 70 -- Slower than gun
+	bv.Velocity = hrp.CFrame.LookVector * 70
 	bv.MaxForce = Vector3.new(1, 1, 1) * 1000000
 	bv.Parent = projectile
 
@@ -995,7 +959,6 @@ function RacialSkills.Marasi(player: Player, character: Model)
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = player.Character:FindFirstChild("HumanoidRootPart")
@@ -1008,8 +971,6 @@ function RacialSkills.Marasi(player: Player, character: Model)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					print("iframed lawl :p")
-
 					local targetPlrData =
 						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
@@ -1185,7 +1146,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 
 					playSound(player.Character, ReplicatedStorage.assets.sounds.ParrySound)
 
-					-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+					-- A parry beats hyper armor: clear it so the punish stun lands.
 					player.Character:SetAttribute("HyperArmor", nil)
 					StateHandler.SetStun(player.Character, true, 0.5, 2)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
@@ -1208,8 +1169,8 @@ function RacialSkills.Marasi(player: Player, character: Model)
 					hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- Route through BlockResolver for facing + guard-bar fill/break.
-					-- Bespoke skill with no damage local: keeps its own fixed chip.
+					-- BlockResolver checks facing and fills the guard bar. This skill keeps its own
+					-- fixed chip damage.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
 						attacker = attackerChar,
@@ -1248,7 +1209,6 @@ function RacialSkills.Marasi(player: Player, character: Model)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
-					-- Normal Hit
 					doAttack(0, 5)
 				end
 			end
@@ -1264,8 +1224,11 @@ function RacialSkills.Marasi(player: Player, character: Model)
 	end)
 end
 
--- [[ 8. CRUOR (Zowr) ]] --
--- Skill: Parasitic Impale (Grab + DoT)
+-- RacialSkills.Cruor() - Parasitic Impale: grab a target and deal damage over time
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Cruor(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -1274,7 +1237,6 @@ function RacialSkills.Cruor(player: Player, character: Model)
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
-	-- [[ VISUALS & SOUND ]] --
 	playSound(character, ReplicatedStorage.assets.sounds.DANGER)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
@@ -1312,7 +1274,6 @@ function RacialSkills.Cruor(player: Player, character: Model)
 		return
 	end
 
-	-- [[ HITBOX LOGIC ]] --
 	local params = {
 		SizeOrPart = Vector3.new(4, 4, 5),
 		LookingFor = "Humanoid",
@@ -1413,14 +1374,15 @@ function RacialSkills.Cruor(player: Player, character: Model)
 					RagdollManager.Ragdoll(target, 1)
 				end)
 
-				break -- Only grab one
+				-- Grab only one target.
+				break
 			end
 		end
 	end)
 
 	hitbox:Start()
 
-	-- Cleanup hitbox after 0.2s if no one hit
+	-- Remove the hitbox after 0.2 seconds if nobody was hit.
 	task.delay(0.2, function()
 		if hitbox then
 			hitbox:Destroy()
@@ -1429,8 +1391,12 @@ function RacialSkills.Cruor(player: Player, character: Model)
 	end)
 end
 
--- [[ 9. SKOTOS (Arach) ]] --
--- Skill: Silk Grasp (Grapple Hook)
+-- RacialSkills.Arach() - Silk Grasp: grapple to a wall or pull into an enemy
+-- @player: the casting player
+-- @character: the player's character
+-- @mouseHit: where the player aimed
+--
+-- Return: nothing. Yields for the grapple travel and the impact.
 function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid")
@@ -1440,22 +1406,19 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
-	-- 1. CONFIGURATION & ASSETS
 	local MAX_DIST = 77.5
 	local GRAPPLE_SPEED = 0.2
 
-	-- Asset References (Assuming they exist in ServerStorage/Assets based on your script)
 	local AssetFolder = ReplicatedStorage.assets:FindFirstChild("grapple")
 	local cordTemplate = AssetFolder:FindFirstChild("Cord")
 	local grapplePartTemplate = AssetFolder:FindFirstChild("GrapplePart")
 
-	-- If assets are missing, use fallbacks to prevent errors
 	if not cordTemplate or not grapplePartTemplate then
-		warn("Missing Grapple Assets in ServerStorage!")
+		warn("[RacialSkills] Grapple assets are missing in ReplicatedStorage.assets.grapple.")
 		return
 	end
 
-	-- 2. RAYCAST (Server Validation)
+	-- The server checks the grapple target with its own raycast.
 	local startPos = hrp.Position
 	local direction = (mouseHit.Position - startPos).Unit * MAX_DIST
 
@@ -1468,18 +1431,17 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local targetPos = rayResult and rayResult.Position or (startPos + direction)
 	local hitInstance = rayResult and rayResult.Instance
 
-	-- Distance Check
 	local dist = (targetPos - startPos).Magnitude
 	if dist > MAX_DIST then
 		return
 	end
 
-	-- Verticality Check (From your script)
+	-- Without a hit, the point must be at least 4 studs above the caster.
 	if not hitInstance and (targetPos.Y - hrp.Position.Y) < 4 then
 		return
 	end
 
-	-- Transparency Check
+	-- An invisible part is not a grapple target, unless it belongs to a character.
 	if
 		hitInstance
 		and hitInstance.Transparency == 1
@@ -1488,7 +1450,6 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		return
 	end
 
-	-- 3. ENEMY DETECTION
 	local enemyChar = nil
 	if hitInstance then
 		if hitInstance.Parent:FindFirstChild("Humanoid") then
@@ -1498,7 +1459,7 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		end
 	end
 
-	-- Alive Check
+	-- Only a character in plrManager.alive can be pulled in.
 	if
 		enemyChar
 		and not enemyChar:IsDescendantOf(
@@ -1508,7 +1469,6 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		return
 	end
 
-	-- 4. VISUALS (Grapple Rope)
 	AnimationHandler.LoadAnim(character, "Skill", "rbxassetid://70984351311195", nil, false)
 
 	local attach = Instance.new("Attachment")
@@ -1527,7 +1487,7 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	cord.Parent = attach.Parent
 	Debris:AddItem(cord, 0.7)
 
-	-- If we hit an enemy, attach the part to them
+	-- Attach the grapple part to a hit enemy.
 	if enemyChar then
 		local enemyTorso = enemyChar:FindFirstChild("Torso")
 			or enemyChar:FindFirstChild("UpperTorso")
@@ -1542,23 +1502,19 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		grapplePart.Anchored = true
 	end
 
-	-- Tween visuals
 	local tween =
 		game:GetService("TweenService")
 			:Create(grapplePart, TweenInfo.new(GRAPPLE_SPEED), { CFrame = CFrame.new(targetPos) })
 	tween:Play()
 
-	-- Wait for travel time
 	task.wait(GRAPPLE_SPEED)
 
 	if not character:IsDescendantOf(workspace) then
 		return
 	end
 
-	-- 5. MOVEMENT LOGIC
-	playSound(character, SoundFolder:FindFirstChild("GrappleSound")) -- Ensure this sound exists in Assets/sounds/skills
+	playSound(character, SoundFolder:FindFirstChild("GrappleSound"))
 
-	-- Remove existing velocities
 	for _, obj in pairs(hrp:GetChildren()) do
 		if obj:IsA("BodyVelocity") then
 			obj:Destroy()
@@ -1573,15 +1529,14 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local between = targetPos - hrp.Position
 
 	if not enemyChar then
-		-- PULL TO WALL
+		-- Pull to the wall.
 		bv.Velocity = Vector3.new(0, 60, 0) + between * 1.4
 		bv.Parent = hrp
 		Debris:AddItem(bv, 0.5)
 	else
-		-- PULL TO ENEMY
+		-- Pull to the enemy.
 		local daf = (enemyChar:FindFirstChild("HumanoidRootPart").Position - hrp.Position)
 
-		-- Custom Velocity Logic from your script
 		bv.Velocity = Vector3.new(daf.X * 1.8, daf.Y + 50, daf.Z * 1.8)
 
 		task.spawn(function()
@@ -1601,8 +1556,8 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		bv.Parent = hrp
 		Debris:AddItem(bv, 0.45)
 
-		-- 6. COMBAT LOGIC
-		task.wait(0.6) -- Impact time
+		-- Wait for the impact.
+		task.wait(0.6)
 
 		if not enemyChar or not enemyChar:FindFirstChild("Humanoid") then
 			return
@@ -1615,12 +1570,10 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		}
 
 		if not enemyState.Blocking and not enemyState.Parrying and not enemyState.Dodging then
-			-- HIT
 			local eHum = enemyChar.Humanoid
 			if eHum.Health > 0 then
 				dmgCalculator.CalculateDamage(character, enemyChar, 15, 0, false, "Racial")
 
-				-- VFX
 				local h1 = ReplicatedStorage.assets.FX:FindFirstChild("h1"):Clone()
 				h1.Parent = enemyChar:FindFirstChild("HumanoidRootPart")
 				Debris:AddItem(h1, 0.1)
@@ -1638,13 +1591,11 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 				playSound(enemyChar.HumanoidRootPart, SoundFolder:FindFirstChild("PunchHit"))
 			end
 		elseif enemyState.Parrying then
-			-- PARRIED
 			RagdollManager.Ragdoll(character, 2)
-			playSound(character, ReplicatedStorage.assets.FX["parry/blocked"].parry) -- Visual/Sound for parry
+			playSound(character, ReplicatedStorage.assets.FX["parry/blocked"].parry)
 		elseif enemyState.Blocking then
-			-- BLOCKED. This ult's block interaction is bespoke (the attacker bounces
-			-- off / ragdolls), so we keep that, but still feed the defender's guard
-			-- bar so blocking it counts toward a guard break like everything else.
+			-- This skill keeps its own block result (the attacker bounces off and ragdolls),
+			-- but blocking it still fills the guard bar.
 			local GuardBarService = require(game.ServerScriptService.modules.GuardBarService)
 			if GuardBarService.AddOnBlock(enemyChar, "Skill") == false then
 				RagdollManager.Ragdoll(character, 2)
@@ -1654,10 +1605,8 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 				)
 			end
 		elseif enemyState.Dodging then
-			-- DODGED
 			playSound(enemyChar.HumanoidRootPart, SoundFolder:FindFirstChild("Dodged"))
 
-			-- Transparency Effect
 			for _, part in pairs(enemyChar:GetChildren()) do
 				if
 					part:IsA("BasePart")
@@ -1677,8 +1626,11 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	end
 end
 
--- [[ 10. PORPHYR (Maw) ]] --
--- Skill: Void Crunch (Guard Break)
+-- RacialSkills.Maw() - Void Crunch: a bite that breaks the target's guard
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Maw(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -1726,7 +1678,6 @@ function RacialSkills.Maw(player: Player, character: Model)
 	skillVFX.Parent = hrp
 	game.Debris:AddItem(skillVFX, 0.5)
 
-	-- AnimationHandler.LoadAnim(character, "Skill", "rbxassetid://BITE_ID", nil, false)
 	playSound(character, SoundFolder:FindFirstChild("Bite"))
 
 	local params = {
@@ -1740,7 +1691,6 @@ function RacialSkills.Maw(player: Player, character: Model)
 	local hitList = {}
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		-- Send GuardBreak = true
 		processHit(
 			player,
 			character,
@@ -1764,10 +1714,12 @@ function RacialSkills.Maw(player: Player, character: Model)
 	end)
 end
 
--- [[ 11. Ancestors ]] --
--- Skill: Vampire Drain
+-- RacialSkills.Ancestor() - Vampire Drain: grab a target and drain HP to heal
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Ancestor(player: Player, character: Model)
-	-- Identical logic to Cruor, but with Heal on attacker
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid")
 	if not hrp or not hum then
@@ -1866,7 +1818,6 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 
 				grabbed = true
 
-				-- Weld
 				tHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0)
 				local weld = Instance.new("WeldConstraint")
 				weld.Part0 = hrp
@@ -1877,7 +1828,6 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 
 				task.wait(0.5)
 
-				-- Drain
 				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
 					or "rbxassetid://111089735892609"
 				AnimationHandler.LoadAnim(target, "Hit", animID, nil, false)
@@ -1909,8 +1859,8 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 
 				hum.Health = math.min(hum.Health + 15, hum.MaxHealth)
 
-				-- [[ SAFETY FIX ]] --
-				-- If the enemy died, destroy the weld IMMEDIATELY to prevent physics bugs dragging you down.
+				-- If the target died, remove the weld at once, so the body does not drag the
+				-- attacker down.
 				if tHum.Health <= 0 then
 					if weld then
 						weld:Destroy()
@@ -1919,7 +1869,6 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 						hrp.Anchored = false
 					end
 				else
-					-- Normal release
 					task.delay(0.5, function()
 						if weld then
 							weld:Destroy()
@@ -1945,8 +1894,11 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 	end)
 end
 
--- [[ 12. VIRDIS (Goblins) ]] --
--- Skill: Jury-Rigged Bomb (RNG)
+-- RacialSkills.Grob() - Jury-Rigged Bomb: throw a bomb that explodes, smokes, or fails
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing.
 function RacialSkills.Grob(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -1970,18 +1922,15 @@ function RacialSkills.Grob(player: Player, character: Model)
 
 	bombModel.Parent = workspace.plrManager.projectiles
 
-	-- Apply Velocity to the Root Part (Since they are welded, the whole model moves)
+	-- The bomb parts are welded, so a velocity on the root part moves the whole model.
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = (hrp.CFrame.LookVector + Vector3.new(0, 0.5, 0)) * 50
 	bv.MaxForce = Vector3.new(1, 1, 1) * 10000
-	bv.Parent = bombPart -- Apply force to the physical part
+	bv.Parent = bombPart
 
 	game.Debris:AddItem(bv, 0.3)
-	-- [[ FIX END ]] --
 
-	-- Explode after 1.5s
 	task.delay(1.5, function()
-		-- Check if the MODEL exists
 		if not bombModel.Parent then
 			return
 		end
@@ -1996,34 +1945,32 @@ function RacialSkills.Grob(player: Player, character: Model)
 		end
 
 		if explosionType == "Dud" then
-			-- Fail
+			-- A dud hurts the caster a little.
 			if character:FindFirstChild("Humanoid").Health > 20 then
 				character:FindFirstChild("Humanoid"):TakeDamage(5)
 			end
 			playSound(bombPart, SoundFolder:FindFirstChild("Dud"))
 
-			-- Cleanup Model after a delay so they see the dud
+			-- Keep the dud visible for a moment.
 			task.delay(2, function()
 				if bombModel then
 					bombModel:Destroy()
 				end
 			end)
 		elseif explosionType == "Smoke" then
-			-- Smoke Screen
 			playSound(bombPart, SoundFolder:FindFirstChild("Explosion"))
 			local smoke = Instance.new("Smoke")
 			smoke.Color = Color3.new(0.2, 0.2, 0.2)
 			smoke.Size = 20
 			smoke.Parent = bombPart
 
-			-- Destroy MODEL after smoke clears
+			-- Remove the bomb after the smoke clears.
 			task.delay(5, function()
 				if bombModel then
 					bombModel:Destroy()
 				end
 			end)
 		else
-			-- Explosion
 			playSound(bombPart, SoundFolder:FindFirstChild("Explosion"))
 			local params = {
 				SizeOrPart = 15,
@@ -2048,12 +1995,16 @@ function RacialSkills.Grob(player: Player, character: Model)
 			exp.DestroyJointRadiusPercent = 0
 			exp.Parent = workspace
 
-			-- Destroy the MODEL immediately on explosion
 			bombModel:Destroy()
 		end
 	end)
 end
 
+-- RacialSkills.Aegir() - lunge with dragon wings and slam the ground
+-- @player: the casting player
+-- @character: the player's character
+--
+-- Return: nothing. Yields during the lunge.
 function RacialSkills.Aegir(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	if not hrp then
@@ -2105,7 +2056,6 @@ function RacialSkills.Aegir(player: Player, character: Model)
 	playSound(character, SoundFolder:FindFirstChild("woosh"))
 	playSound(character, SoundFolder:FindFirstChild("Dash"))
 
-	-- Physics Lunge
 	local bv = Instance.new("BodyVelocity")
 	bv.MaxForce = Vector3.new(25000, 0, 25000)
 	bv.Velocity = hrp.CFrame.LookVector * 50
@@ -2118,7 +2068,6 @@ function RacialSkills.Aegir(player: Player, character: Model)
 
 	playSound(character, SoundFolder:WaitForChild("GroundImpact"))
 
-	-- Hitbox
 	local params = {
 		SizeOrPart = Vector3.new(7, 6, 8),
 		LookingFor = "Humanoid",
@@ -2132,9 +2081,9 @@ function RacialSkills.Aegir(player: Player, character: Model)
 	hitbox:WeldTo(hrp, CFrame.new(0, 0, -4))
 
 	local startPos = hrp.Position + (hrp.CFrame.LookVector * 5)
-	local direction = Vector3.new(0, -15, 0) -- Check 15 studs down
+	local direction = Vector3.new(0, -15, 0)
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = { character } -- Ignore the player
+	params.FilterDescendantsInstances = { character }
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
@@ -2152,7 +2101,6 @@ function RacialSkills.Aegir(player: Player, character: Model)
 	end
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		-- Knockback Up and Back
 		processHit(player, character, hitChars, hitList, 30, "Physical", 25, 1, 2)
 	end)
 

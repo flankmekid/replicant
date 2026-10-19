@@ -98,9 +98,36 @@ this.
 
 ## Lunge steering
 
-When the lunge has a target, it steers toward the target and keeps a weaker drive
-through the windup, so a sprinter cannot simply outrun the windup. Without a target
-it is a plain forward burst that ends after 0.3 s.
+`LungeService` runs the lunge on the server.
+
+The boost always fires. It is the move: a forward burst, then the animation, then the
+swing. It needs no target and works into empty air.
+
+The chase engages only when the target runs away. Then the lunge steers toward the
+target and keeps a follow drive through the windup, so a sprinter cannot outrun the
+running attack. Against a target who faces the attacker and holds ground, there is
+only the plain step-in, and the attacker has to reach them. A chase against someone
+who stands their ground is only magnetism: it drags the attacker onto a target who
+never tried to escape, and it makes spacing meaningless. The chase is checked again
+every frame, so a target who turns to face the attacker stops being chased.
+
+A target counts as running away if either test passes:
+
+- Facing: they are turned away from the attacker (`FLEE_FACING_DOT`).
+- Moving: their velocity away from the attacker is at least `FLEE_SPEED_MIN`.
+  Strafing adds nothing.
+
+Backing up while facing the attacker is spacing, not fleeing.
+
+The follow speed is the target's sprint times `CHASE_SPRINT_MULT`, capped at the
+weapon's boost speed. It depends on the target, not on the boost, because a 35-speed
+weapon would otherwise chase at 19 against a 28 sprint, slower than the runner. The
+drive stops within `STOP_DIST` of the target, so the attacker lands next to them
+instead of passing through.
+
+Targeting follows the lock-on: the locked target if there is one (the server checks
+the client's `LockTarget` attribute again, so a forged attribute gains nothing),
+otherwise the nearest valid target in a cone in front of the attacker.
 
 The lunge can be beaten on purpose:
 
@@ -137,3 +164,99 @@ blocked swing.
 The attacker gets mana on every landed hit: 2% of MaxMana on M1 and 4% on M2 and E.
 This is in the shared damage step and not in BuffService, so the amount is the same
 with or without an active buff.
+
+## Parry cooldown
+
+The server owns the parry cooldown (`ParryService`). Clients keep a local copy only
+for input feel.
+
+- Pressing parry starts the full cooldown (`BASE_COOLDOWN`, 5 s) at once.
+- A landed parry shortens it to `RESET_COOLDOWN` (1 s). This partial reset keeps the
+  exchange going.
+- A whiffed parry is never shortened, so it keeps the full lockout. No whiff
+  detection is needed: the lockout is the default, and a landed parry pulls it back.
+- Getting parried does not change your own cooldown. That is the trade.
+
+## Damage formula
+
+`damageCalculator.CalculateDamage` adds every bonus into one pool and applies it once:
+the race `DamageBoost`, the armor `DamageBuff`, and the stat bonus for the damage type.
+The bonuses are summed and never multiplied together, so stacking grows linearly, not
+exponentially. The target's `DefenseBoost` divides the result.
+
+| dmgType | Stat |
+|---|---|
+| `"Weapon"` (M1, M2, E) | Strength |
+| `"Skill"` | Dexterity |
+| `"Racial"` | Dexterity plus a Magic add-on |
+| `nil` | None (true damage) |
+
+Hitting a body that is already downed deals no damage, but it restarts the bleed-out
+timer, so beating on a downed player keeps them down.
+
+## WalkSpeed ownership
+
+`SpeedService` owns every write to `Humanoid.WalkSpeed`.
+
+Many systems change WalkSpeed: block, the M1/M2/E slow, stun, hitstop, skill
+self-slows, and debuffs like Null Gaze. If each one saved the old speed and restored
+it later, two effects at the same time would break each other: the last restore
+overwrites the speed of the effect that is still active. Examples are blocking at full
+speed after an M1, or returning to base speed instead of block speed after a hit
+during a block.
+
+So each effect pushes a modifier (a source key, a priority, and a speed) and pops it
+when it ends. After every push and pop, SpeedService computes the speed again from
+the live stack. The order of pushes and pops does not matter.
+
+- The highest priority wins. Modifiers override, they do not add: a stun pins the
+  player, it does not stack with block.
+- On equal priority, the most recent push wins. This handles refreshes, such as beam
+  ticks.
+- With no modifiers, the speed is the live base (`GetBaseWalkSpeed * SpeedBoost`), so
+  stamina respecs and race boosts apply with no extra code.
+
+SpeedService owns WalkSpeed only. JumpPower, JumpHeight, and AutoRotate stay with
+hitstop and stun, because far fewer systems write them.
+
+## Block rules
+
+`BlockResolver.Resolve` is the only place that decides what happens when a hit lands
+on a blocking target. CombatCore, the per-weapon M2 and E modules, SkillFunctions,
+and RacialSkills all call it, so every attack uses the same facing check, guard bar
+rules, chip damage, and frame advantage.
+
+- A blocked E: the defender is plus. The attacker gets a short recovery stun.
+- A blocked M1: about neutral. A small chip, and nobody gains real advantage.
+- A guard-break attack (`cfg.guardbreak`, every M2 at the moment) skips the bar and
+  breaks the guard at once, for full damage. It never fills the bar.
+- A hit from the side or back (outside the block cone) skips the block.
+- Any other blocked hit fills the guard bar. The hit that makes the bar reach the
+  maximum breaks the block. There is no grace hit.
+
+The guard bar is a character attribute (`GuardBar`), so clients read it with
+`GetAttribute` and never get out of sync with a server-side table. Only
+`GuardBarService` writes it. After a break, the bar starts full and drains to empty over
+`GUARD_RECOVERY_DURATION` (5 s), and the player cannot block until it is empty. A burst
+(T) calls `SetStun(char, false)` first, so it also escapes a block-break stun, at the
+normal burst cost.
+
+A guard break from an attack and a guard break from a full bar use the same
+`GuardBarService.Break`, so the stun, the lockout, the animation, and the 5-second
+no-block recovery are the same.
+
+## Burst
+
+Burst (T) is a universal panic button. `BurstHandler` checks its mana cost and
+cooldown. It works like a stripped Abyssal Scream: about one frame of startup, no
+damage, and no stun. It knocks back and briefly ragdolls everyone in `BURST_RADIUS`,
+so the user gets out of a combo, and it gives the user i-frames (the `Dodging` state,
+which every hit path treats as "negate this hit") for `BURST_ACTIVE`.
+
+Burst clears the user's stun first, so a player caught in a combo can use it. It also
+escapes a block-break stun.
+
+`BURST_WHIFF_RECOVERY` is a `CantAnything` lock the user always takes. It outlasts the
+i-frames, so a burst on nothing leaves the user exposed for about a second and open to
+a punish. The user is also rooted: `BURST_ROOT_WHIFF` on a whiff, and the shorter
+`BURST_ROOT_HIT` when the burst catches a target.

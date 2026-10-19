@@ -1,18 +1,8 @@
--- BuffService: centralized, weapon-independent combat buffs.
+-- SPDX-License-Identifier: MIT
 --
--- Buffs used to live as per-weapon local tables (monasticStance/buffState) inside
--- individual M1 modules (Caestus, Tanto, Dragon Slayer...), so a transposed skill
--- on a sibling weapon (Dagger, Fists, Shackles, Greatsword) set state on the wrong
--- module and never affected that weapon's hits. This moves buff state onto the
--- PLAYER, keyed by skill name, so every weapon in a class benefits automatically.
---
--- A buff carries:
---   damage : how the buffed hit's damage is computed from (dmg, extraDmg)
---   heal   : flat HP restored per buffed hit
---   mana   : flat mana restored per buffed hit (capped so it never overfills)
---   fx     : which visual routine to run on activate (aura / eyes / none)
--- Numbers preserve the original per-weapon behavior. `perWeapon` lets you override
--- any field for a specific equipped weapon later without touching this logic.
+-- Owns combat buffs such as Monastic Stance, Mystic Eyes, and Berserker Armor. A buff
+-- belongs to the player and is keyed by skill name, so it works with every weapon of
+-- the class, not only the weapon that has the skill.
 
 local Players = game:GetService("Players")
 local RP = game:GetService("ReplicatedStorage")
@@ -23,24 +13,27 @@ local damageCalculator = require(SSS.modules.damageCalculator)
 
 local module = {}
 
--- active[plr] = { [buffName] = { def = <def>, expireToken = <token> } }
+-- Layout: active[plr][buffName] = { def, char, expireToken }.
 local active = setmetatable({}, { __mode = "k" })
 
--- ── damage modes ────────────────────────────────────────────────────────────
--- each returns (baseArg, extraArg) to hand to CalculateDamage.
+-- Each damage mode returns the base and extra damage to pass to CalculateDamage.
 local DamageModes = {
-	-- base + half-of-base as extra (Monastic Stance / Berserker Armor)
+	-- Base plus half of the base as extra (Monastic Stance, Berserker Armor).
 	additiveHalf = function(dmg, extra)
 		return dmg, dmg / 2
 	end,
-	-- double the base, keep original extra (Mystic Eyes)
+	-- Double base, the extra unchanged (Mystic Eyes).
 	doubleBase = function(dmg, extra)
 		return dmg * 2, extra
 	end,
 }
 
--- ── buff definitions (tunable) ──────────────────────────────────────────────
--- keyed by the skill name exactly as it appears in SkillConfig.
+-- BuffService.Buffs holds the buff definitions, keyed by the skill name in SkillConfig.
+--
+-- Each buff has a duration, a damage mode, heal and mana restored per buffed hit (mana
+-- never overfills), and an fx routine ("aura", "eyes", or "none"). A perWeapon table
+-- can override any field for one equipped weapon, for example
+-- ["Mystic Eyes"].perWeapon = { Dagger = { damage = "additiveHalf" } }.
 module.Buffs = {
 	["Monastic Stance"] = {
 		duration = 10,
@@ -63,14 +56,8 @@ module.Buffs = {
 		mana = 5,
 		fx = "none",
 	},
-
-	-- Optional per-equipped-weapon overrides. Any field set here wins for that
-	-- weapon; unset fields fall back to the base def above. Empty for now (all
-	-- siblings share the origin's numbers), but this is the tuning hook.
-	-- e.g. ["Mystic Eyes"].perWeapon = { Dagger = { damage = "additiveHalf" } }
 }
 
--- ── helpers ─────────────────────────────────────────────────────────────────
 local function getEquippedWeapon(char)
 	local tool = char and char:FindFirstChildOfClass("Tool")
 	if tool and tool.Parent == char then
@@ -79,8 +66,7 @@ local function getEquippedWeapon(char)
 	return nil
 end
 
--- resolve the effective def for a player's currently-equipped weapon, applying
--- any per-weapon override on top of the base def.
+-- Returns the def with the per-weapon override for the equipped weapon applied.
 local function resolveDef(def, weaponName)
 	local perWeapon = def.perWeapon and weaponName and def.perWeapon[weaponName]
 	if not perWeapon then
@@ -110,7 +96,6 @@ local function restoreMana(plr, amount)
 	mana.Value = math.min(mana.Value + amount, cap)
 end
 
--- ── FX ──────────────────────────────────────────────────────────────────────
 local FX = {}
 
 function FX.aura(char)
@@ -137,7 +122,6 @@ function FX.auraOff(char)
 end
 
 function FX.eyes(char, duration)
-	-- head eye visual (weapon-agnostic)
 	local head = char:FindFirstChild("Head")
 	if head then
 		local eye = RP.assets.FX.skills.tanto.ResurrectionEYE:Clone()
@@ -150,8 +134,8 @@ function FX.eyes(char, duration)
 		Debris:AddItem(weld, duration)
 	end
 
-	-- blade highlight on whatever bladed weapon is equipped (Tanto has a
-	-- BladeHighlight child; parity copies exist on siblings like Dagger)
+	-- Light up the blade of any bladed weapon. Tanto has a BladeHighlight child, and
+	-- siblings such as Dagger have copies.
 	local tool = char:FindFirstChildOfClass("Tool")
 	if tool then
 		local highlight = tool:FindFirstChild("BladeHighlight", true)
@@ -172,7 +156,6 @@ local function runActivateFX(def, char, duration)
 	elseif def.fx == "eyes" then
 		FX.eyes(char, duration)
 	end
-	-- activation sound, matched to the old behavior
 	local ok, s = pcall(function()
 		return RP.assets.sounds.PunchHit:Clone()
 	end)
@@ -187,16 +170,20 @@ local function runDeactivateFX(def, char)
 	if def.fx == "aura" then
 		FX.auraOff(char)
 	end
-	-- eyes clean themselves up via Debris timers
+	-- The eyes FX removes itself through Debris.
 end
 
--- ── public API ──────────────────────────────────────────────────────────────
-
--- forward-declared; defined with Deactivate below (Activate refreshes need it).
+-- Defined below with Deactivate. Activate needs it to refresh a buff.
 local cancelExpiry
 
--- Activate a named buff on a player. Duration comes from the def (falls back to
--- the passed duration, then 10s). Re-activating refreshes the timer.
+-- BuffService.Activate() - start a buff on a player
+-- @plr: the player
+-- @buffName: the skill name of the buff
+-- @durationOverride: the duration in seconds, used when the def has none
+--
+-- Activating a buff that is already active restarts its timer.
+--
+-- Return: nothing.
 function module.Activate(plr, buffName, durationOverride)
 	local def = module.Buffs[buffName]
 	if not def then
@@ -213,9 +200,8 @@ function module.Activate(plr, buffName, durationOverride)
 
 	active[plr] = active[plr] or {}
 
-	-- cancel any prior timer for this buff (refresh). Re-casting a buff while its
-	-- aura is up must also clear the OLD body's FX, or a refresh across a respawn
-	-- leaves particles behind.
+	-- A refresh cancels the old timer. If the player respawned, it also removes the FX
+	-- from the old body.
 	local prior = active[plr][buffName]
 	if prior then
 		cancelExpiry(prior)
@@ -224,9 +210,8 @@ function module.Activate(plr, buffName, durationOverride)
 		end
 	end
 
-	-- Remember the body the buff was applied to. On death/respawn plr.Character is
-	-- replaced, and the FX are welded to the OLD parts; sweeping the new body finds
-	-- nothing and the particles stay on the corpse.
+	-- Remember the body that has the FX. After a respawn, plr.Character is the new body,
+	-- and the FX would stay on the corpse.
 	local entry = { def = eff, char = char }
 	active[plr][buffName] = entry
 
@@ -237,13 +222,8 @@ function module.Activate(plr, buffName, durationOverride)
 	end)
 end
 
--- Cancels a scheduled expiry safely.
---
--- The expire thread's body IS module.Deactivate (see the task.delay above), so when
--- a buff runs its full duration, Deactivate executes INSIDE the very thread it is
--- about to cancel. task.cancel on the running coroutine throws "cannot cancel
--- thread". Pop the token first, then only cancel if it is not the thread we are
--- standing in.
+-- When a buff runs out, Deactivate runs inside the expiry thread, and task.cancel on
+-- the running thread throws. So clear the token first and skip the cancel in that case.
 function cancelExpiry(entry)
 	local token = entry.expireToken
 	if not token then
@@ -256,10 +236,13 @@ function cancelExpiry(entry)
 	pcall(task.cancel, token)
 end
 
--- Tears down one buff. `charOverride` lets callers (death, respawn, menu) pass the
--- body the buff was actually applied to, because plr.Character may already be a new
--- character, or nil, by the time we get here. Without it, auraOff would sweep the
--- wrong body and leave particles welded to the corpse forever.
+-- BuffService.Deactivate() - end one buff on a player
+-- @plr: the player
+-- @buffName: the skill name of the buff
+-- @charOverride: the body that has the FX, for death, respawn, and menu return, when
+--                plr.Character is already a new body or nil
+--
+-- Return: nothing.
 function module.Deactivate(plr, buffName, charOverride)
 	local bucket = active[plr]
 	local entry = bucket and bucket[buffName]
@@ -280,11 +263,14 @@ function module.Deactivate(plr, buffName, charOverride)
 	end
 end
 
--- Tears down EVERY buff on a player. This is the lifecycle hook that was missing:
--- nothing but the expiry timer ever called Deactivate, so buff state (and its FX,
--- and its heal/damage modifiers) survived death, respawn, race reroll, and menu
--- return. A player who died with Monastic Stance up kept the aura on the corpse and
--- kept the buff in `active`, and a rerolled race inherited whatever was still there.
+-- BuffService.ClearAll() - end every buff on a player
+-- @plr: the player
+-- @charOverride: the body that has the FX, as in Deactivate
+--
+-- Call this on death, respawn, race reroll, and menu return, so no buff, FX, or
+-- modifier carries over.
+--
+-- Return: nothing.
 function module.ClearAll(plr, charOverride)
 	local bucket = active[plr]
 	if not bucket then
@@ -296,8 +282,8 @@ function module.ClearAll(plr, charOverride)
 	active[plr] = nil
 end
 
--- Returns the first active buff def for a player, or nil. (Buffs here don't
--- stack with each other in practice; a class has one buff skill.)
+-- Returns the first active buff def, or nil. A class has one buff skill, so buffs do
+-- not stack in practice.
 local function getActiveDef(plr)
 	local bucket = active[plr]
 	if not bucket then
@@ -307,9 +293,17 @@ local function getActiveDef(plr)
 	return entry and entry.def or nil
 end
 
--- The single damage entry point every weapon's onDamage should call. Applies
--- the buffed damage math + heal + mana if a buff is active, plain damage if not.
--- `dmgType` defaults to "Weapon" (matches the M1/M2/E path).
+-- BuffService.ApplyDamage() - deal weapon damage with the active buff applied
+-- @plr: the attacking player
+-- @char: the attacking character
+-- @targetChar: the target
+-- @dmg: the base damage
+-- @extraDmg: the extra damage
+-- @dmgType: the damage type, "Weapon" by default
+--
+-- Every weapon's onDamage calls this. Without an active buff it deals plain damage.
+--
+-- Return: the final damage from CalculateDamage.
 function module.ApplyDamage(plr, char, targetChar, dmg, extraDmg, dmgType)
 	dmgType = dmgType or "Weapon"
 	local def = plr and getActiveDef(plr)
@@ -331,6 +325,11 @@ function module.ApplyDamage(plr, char, targetChar, dmg, extraDmg, dmgType)
 	return result
 end
 
+-- BuffService.IsActive() - check whether a player has a buff
+-- @plr: the player
+-- @buffName: the skill name of the buff, or nil for any buff
+--
+-- Return: true if the buff is active.
 function module.IsActive(plr, buffName)
 	local bucket = active[plr]
 	if not bucket then

@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Small server helpers for attacks: the attack slow, knockback, and hitbox cleanup.
 local module = {}
 
 local Players = game:GetService("Players")
@@ -23,23 +26,28 @@ local function onPlayerRemoving(player)
 	originalSpeeds[player] = nil
 end
 
+-- helperModule.SetSpeed() - slow a character for an attack and disable jumping
+-- @char: the character
+-- @speed: the WalkSpeed during the attack
+-- @optionalPrevSpeed: not used
+--
+-- Return: nothing.
 function module.SetSpeed(char, speed, optionalPrevSpeed)
 	if not char then
-		return warn("No character found!!!")
+		return warn("[helperModule] SetSpeed called without a character.")
 	end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
-		warn("No humanoid found!!!")
+		warn(`[helperModule] SetSpeed: {char.Name} has no Humanoid.`)
 		return
 	end
 
-	-- originalSpeeds still tracks "is a helper slow active" so ResetSpeed knows to
-	-- pop; the actual speed value is owned by SpeedService now (optionalPrevSpeed /
-	-- the old stashed WalkSpeed are dead: the stack recomputes the correct restore).
+	-- The originalSpeeds table marks an active helper slow, so ResetSpeed pops it.
+	-- SpeedService owns the speed value.
 	originalSpeeds[char] = true
 
-	-- SKILL priority: sits above Block, so an M1 out of a held block briefly moves at
-	-- the swing speed, then settles back to the block speed when ResetSpeed pops.
+	-- SKILL priority is above Block, so an M1 out of a held block moves at the swing
+	-- speed and then returns to the block speed.
 	SpeedService.Push(char, "HelperSlow", speed, SpeedService.Priority.SKILL)
 	humanoid.JumpHeight = 0
 
@@ -65,39 +73,48 @@ local function getBaseJumpHeight(char)
 	return BASE_JUMP_HEIGHT * mult
 end
 
+-- helperModule.ResetSpeed() - end the attack slow and restore the jump height
+-- @char: the character
+--
+-- Does nothing when no slow is active.
+--
+-- Return: nothing.
 function module.ResetSpeed(char)
 	if not char then
-		return warn("No character found!!!")
+		return warn("[helperModule] ResetSpeed called without a character.")
 	end
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
 	if not humanoid then
-		warn("No humanoid found!!!")
+		warn(`[helperModule] ResetSpeed: {char.Name} has no Humanoid.`)
 		return
 	end
 
 	if originalSpeeds[char] then
-		-- Pop the helper slow and let SpeedService recompute. If the character is
-		-- still blocking (or under any other live modifier) it settles to THAT, not
-		-- to base: this is the fix for "moves fast while blocking after an M1".
+		-- SpeedService computes the speed again, so a character who is still blocking
+		-- settles to the block speed, not to base.
 		SpeedService.Pop(char, "HelperSlow")
 
-		-- Was hardcoded to 7.2, which threw away the race JumpBoost. Every M1, M2 and
-		-- E calls SetSpeed (JumpHeight = 0) and then ResetSpeed, so an Arach
-		-- (JumpBoost 1.5, real jump height 10.8) had their jump permanently flattened
-		-- to base by their first attack and never got it back until respawn.
+		-- Restore the jump height with the race JumpBoost, not the base value.
 		humanoid.JumpHeight = getBaseJumpHeight(char)
 
 		originalSpeeds[char] = nil
 	end
 end
 
+-- helperModule.ApplyKnockback() - push a character with a short BodyVelocity
+-- @char: the character
+-- @direction: the push direction
+-- @strength: the speed of the push in studs per second
+-- @duration: the push length in seconds, 0.2 by default
+--
+-- Return: nothing.
 function module.ApplyKnockback(char, direction, strength, duration)
 	if not char then
-		return warn("No character found!!!")
+		return warn("[helperModule] ApplyKnockback called without a character.")
 	end
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then
-		warn("No root found!!!")
+		warn(`[helperModule] ApplyKnockback: {char.Name} has no HumanoidRootPart.`)
 		return
 	end
 
@@ -114,6 +131,11 @@ function module.ApplyKnockback(char, direction, strength, duration)
 	game:GetService("Debris"):AddItem(bodyVel, duration or 0.2)
 end
 
+-- helperModule.RemoveHitboxesByNameForCharacter() - remove a character's named hitboxes
+-- @char: the character that owns the hitboxes
+-- @attackName: the AttackName value to match
+--
+-- Return: nothing.
 function module.RemoveHitboxesByNameForCharacter(char, attackName)
 	local hitboxesFolder = workspace:FindFirstChild("Hitboxes")
 	if not hitboxesFolder then

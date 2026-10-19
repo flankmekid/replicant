@@ -1,9 +1,12 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The server side of the weapon skills, keyed by skill name, and the universal Burst.
+-- processHit resolves the hits of most skills.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
--- [[ MODULES ]] --
 local StateHandler = require(ReplicatedStorage.modules.stateHandler)
 local animationHandler = require(ReplicatedStorage.modules.animationHandler)
 local hitboxClass = require(ReplicatedStorage.modules.hitboxClass)
@@ -16,8 +19,6 @@ local ParryService = require(ServerScriptService.modules.parryService)
 local SpeedService = require(ServerScriptService.modules.SpeedService)
 
 local module = {}
-
--- [[ HELPER FUNCTIONS ]] --
 
 local function playSound(char, soundIdOrObj)
 	local root = char:FindFirstChild("HumanoidRootPart")
@@ -87,8 +88,8 @@ local function createAfterImage(character)
 	end
 end
 
--- [[ CORE HIT HANDLER ]] --
--- This function handles all hit logic (Damage, Stun, XP, Blocking, Dodging)
+-- Resolves a skill hit on each target: dodge, then block, parry, or a clean hit, with
+-- damage, stun, and weapon XP.
 local function processHit(
 	player,
 	attackerChar,
@@ -103,14 +104,14 @@ local function processHit(
 	extraVar
 )
 	local attackerHRP = attackerChar:FindFirstChild("HumanoidRootPart")
-	-- If no specific origin part (like a fireball) is passed, use the attacker's RootPart
+	-- A projectile passes originPart. Otherwise the attacker's HumanoidRootPart is the
+	-- origin.
 	local originPosition = originPart and originPart.Position
 		or (attackerHRP and attackerHRP.Position)
 
 	local var = nil
 	if extraVar then
 		var = tostring(extraVar)
-		print(var)
 	end
 
 	if not attackerHRP or not originPosition then
@@ -132,14 +133,12 @@ local function processHit(
 
 		local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
-		-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 		if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
 			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 			if not targetHRP then
 				return
 			end
 
-			-- 1. DODGE CHECK
 			if StateHandler.GetState(targetChar, "Dodging") then
 				local sound = ReplicatedStorage.assets.sounds.Dodged:Clone()
 				sound.Parent = targetHRP
@@ -150,7 +149,6 @@ local function processHit(
 				game.Debris:AddItem(sound, 3)
 				game.Debris:AddItem(effect, 0.3)
 
-				-- Visual transparency effect for dodge
 				if
 					targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
 				then
@@ -169,10 +167,9 @@ local function processHit(
 						end
 					end
 				end
-				return -- Exit processing for this target
+				return
 			end
 
-			-- Internal function to apply the actual damage/effects
 			local function doAttack(extraDmg, finalKnockback)
 				local direction = (targetHRP.Position - originPosition).Unit
 
@@ -237,10 +234,9 @@ local function processHit(
 				alreadyHit[targetChar] = true
 			end
 
-			-- 2. BLOCK/PARRY CHECK
 			if StateHandler.GetState(targetChar, "Blocking") then
-				-- Route through BlockResolver (single chokepoint + guard bar). Skills
-				-- do not guardbreak by default; they fill the bar and can block-break.
+				-- Skills do not guard-break by default. They fill the guard bar and can break the
+				-- block.
 				local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 				local verdict = BlockResolver.Resolve({
 					attacker = attackerChar,
@@ -257,11 +253,10 @@ local function processHit(
 					animationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 					doAttack(extra, knockbackDist)
 				elseif verdict.outcome == "GuardBreak" then
-					-- bar-triggered block-break (GuardBarService set stun + anim)
+					-- The guard bar broke. GuardBarService already set the stun and the animation.
 					animationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 					doAttack(extra, verdict.knockback)
 				else
-					-- BLOCKED (chip + frame advantage already applied by resolver)
 					BlockResolver.OnAttackerLandedHit(attackerChar)
 					local parryE = ReplicatedStorage.assets.FX["parry/blocked"].parry:Clone()
 					local torso = targetChar:FindFirstChild("Torso")
@@ -273,7 +268,6 @@ local function processHit(
 					end
 					doAttack(extra, verdict.knockback)
 				end
-				-- 3. PARRY STATE (If you have a separate parry state, add logic here)
 			elseif StateHandler.GetState(targetChar, "Parrying") then
 				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
 					:Clone()
@@ -306,7 +300,7 @@ local function processHit(
 				game.Debris:AddItem(parryE, 0.7)
 				game.Debris:AddItem(effect2, 0.7)
 
-				-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+				-- A parry beats hyper armor: clear it so the punish stun lands.
 				attackerChar:SetAttribute("HyperArmor", nil)
 				StateHandler.SetStun(attackerChar, true, 0.5, 2)
 				StateHandler.SetState(attackerChar, "CantAnything", true, 0.5)
@@ -339,30 +333,25 @@ local function processHit(
 				)
 				return
 			else
-				-- NORMAL HIT
 				doAttack(0, knockbackDist)
 			end
 		end
 	end
 end
 
--- ====================================================================================
--- [[ DRAGON SLAYER ]] --
--- ====================================================================================
-
+-- SkillFunctions.AbyssalScream() - cast Abyssal Scream, a Dragon Slayer skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.AbyssalScream(player)
 	local character = player.Character
 	local hum = character.Humanoid
 	local root = character.HumanoidRootPart
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
-	--hum.WalkSpeed = 0
-	--hum.AutoRotate = false
-	--root.Anchored = true
 
 	animationHandler.LoadAnim(character, "JudgementCut", "rbxassetid://81314710758281", nil, false)
 
-	-- Visuals
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	NewShield2.Parent = character
 	NewShield2.CFrame = root.CFrame * CFrame.new(0, 5, 0)
@@ -423,40 +412,35 @@ function module.AbyssalScream(player)
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		-- Dmg: 5, XP: Greatsword, KB: 15, Stun: 0.5, Ragdoll: 1
 		processHit(player, character, hitCharsTable, alreadyHit, 20, "Greatsword", 15, 0.5, 1, root)
 	end)
 
 	task.delay(0.2, function()
 		Hitbox:Destroy()
-		--hum.WalkSpeed = 16
-		--hum.AutoRotate = true
-		--root.Anchored = false
 	end)
 end
 
--- ====================================================================================
--- [[ BURST (universal combo-breaker) ]] --
--- ====================================================================================
--- A universal panic button (bound to T, gated by BurstHandler for mana/cooldown).
--- Structurally a stripped Abyssal Scream: ~1-frame startup, no damage, no stun.
--- It knocks back + briefly ragdolls everyone in radius so the user pops out of a
--- combo, and grants the USER i-frames (the "Dodging" state, which processHit and
--- the combat cores already treat as "negate this hit") for the short active window.
---
--- Timing (tune here): ACTIVE is the i-frame / active-hitbox window; on a clean burst
--- you are untouchable for it. WHIFF_RECOVERY is the CantAnything lock the user eats
--- regardless, so bursting on nothing costs you ~1s of vulnerability afterwards (the
--- i-frames have already lapsed) and you can be punished. No damage is dealt, so there
--- is no processHit / CalculateDamage call at all: just knockback + ragdoll.
-local BURST_ACTIVE = 0.15 -- i-frame + hitbox window (0.1-0.2s per design)
-local BURST_WHIFF_RECOVERY = 1.0 -- total CantAnything lock (the punish on a whiff)
-local BURST_ROOT_HIT = 0.5 -- WalkSpeed root length when the burst catches a target
-local BURST_ROOT_WHIFF = 1.0 -- WalkSpeed root length on a clean whiff
-local BURST_RADIUS = 8 -- knockback radius around the user
-local BURST_KNOCKBACK = 30 -- how far enemies are shoved
-local BURST_RAGDOLL = 1.0 -- seconds enemies stay ragdolled
+-- How long the burst gives i-frames and its hitbox is live.
+local BURST_ACTIVE = 0.15
+-- The CantAnything lock. It outlasts the i-frames, so a whiffed burst can be punished.
+local BURST_WHIFF_RECOVERY = 1.0
+-- How long the user is rooted after a burst that catches a target.
+local BURST_ROOT_HIT = 0.5
+-- How long the user is rooted after a whiff.
+local BURST_ROOT_WHIFF = 1.0
+-- The knockback radius around the user, in studs.
+local BURST_RADIUS = 8
+local BURST_KNOCKBACK = 30
+-- How long enemies stay ragdolled, in seconds.
+local BURST_RAGDOLL = 1.0
 
+-- SkillFunctions.Burst() - break out of a combo with i-frames and knockback
+-- @player: the player who pressed T
+--
+-- BurstHandler checks the mana and the cooldown. The design is in
+-- docs/combat-design.md.
+--
+-- Return: nothing.
 function module.Burst(player)
 	local character = player.Character
 	if not character then
@@ -468,27 +452,15 @@ function module.Burst(player)
 		return
 	end
 
-	-- Break whatever the user is stuck in FIRST, so a combo-victim can actually
-	-- burst out: clear their Stunned so the i-frames + lock we set below stick.
+	-- Clear the stun first, so a player caught in a combo can burst out.
 	StateHandler.SetStun(character, false)
 
-	-- User i-frames for the active window (Dodging = incoming hits are negated),
-	-- and a full-length action lock. The lock outlasts the i-frames on purpose:
-	-- ACTIVE untouchable, then the remainder of WHIFF_RECOVERY exposed.
 	StateHandler.SetState(character, "Dodging", true, BURST_ACTIVE)
 	StateHandler.SetState(character, "CantAnything", true, BURST_WHIFF_RECOVERY)
 
-	-- Root the user in place. helperModule stashes the current WalkSpeed and restores
-	-- via StatScaling.GetBaseWalkSpeed (so race walk/jump bonuses survive, unlike a
-	-- hardcoded WalkSpeed = 16). Root length branches on hit vs whiff: on a clean
-	-- whiff the user is planted the full BURST_ROOT_WHIFF; the moment a VALID target
-	-- is caught (see the hit handler below), it shortens to BURST_ROOT_HIT.
-	--
-	-- Implementation: schedule the restore for the whiff (worst) case, guarded by a
-	-- token. A landed hit bumps the token and reschedules for the shorter time, so
-	-- the stale whiff-timer no-ops when it fires. The hitbox is only live for
-	-- BURST_ACTIVE (0.15s), well under either root time, so the hit is always known
-	-- before either restore fires. rootToken is upvalued by the hit handler.
+	-- Root the user. A whiff keeps the long root. The first target hit reschedules the
+	-- release to the short root, and the token makes the old timer do nothing. The hitbox
+	-- closes long before either release, so the result is known in time.
 	helperModule.SetSpeed(character, 0)
 	local rootToken = 0
 	local function scheduleUnroot(after)
@@ -503,10 +475,9 @@ function module.Burst(player)
 	end
 	scheduleUnroot(BURST_ROOT_WHIFF)
 
-	-- Near-instant startup: animation + VFX fire now, hitbox is live this frame.
 	animationHandler.LoadAnim(character, "Burst", "rbxassetid://71570879146947", nil, false)
 
-	-- Reused Abyssal Scream "danger" shield telegraph (author will swap VFX later).
+	-- TODO: Replace the reused Abyssal Scream telegraph with a Burst VFX.
 	local shield = ReplicatedStorage.assets.FX.danger:Clone()
 	shield.Parent = character
 	shield.CFrame = root.CFrame * CFrame.new(0, 3, 0)
@@ -528,7 +499,7 @@ function module.Burst(player)
 		end
 	end
 
-	-- Radius hitbox. No damage: for each enemy caught, knockback + short ragdoll only.
+	-- No damage: each enemy hit gets knockback and a short ragdoll.
 	local Hitbox =
 		hitboxClass.new({ SizeOrPart = BURST_RADIUS, SpatialOption = "InRadius", DebounceTime = 1 })
 	Hitbox:WeldTo(root, CFrame.new(0, 0, 0))
@@ -548,7 +519,7 @@ function module.Burst(player)
 				continue
 			end
 
-			-- never self; never friendly-fire the caster
+			-- Never hit the caster.
 			local hitPlr = game.Players:GetPlayerFromCharacter(targetChar)
 			if targetChar == character or (hitPlr and hitPlr == player) then
 				continue
@@ -556,8 +527,7 @@ function module.Burst(player)
 
 			alreadyHit[targetChar] = true
 
-			-- First valid target this burst: shorten the root from whiff-length to
-			-- hit-length. Guarded so multiple targets in one swing only reschedule once.
+			-- The first target shortens the root. Later targets do not reschedule it.
 			if not rootShortened then
 				rootShortened = true
 				scheduleUnroot(BURST_ROOT_HIT)
@@ -576,6 +546,10 @@ function module.Burst(player)
 	end)
 end
 
+-- SkillFunctions.Whirlwind() - cast Whirlwind, a greatsword-family skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Whirlwind(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -639,7 +613,6 @@ function module.Whirlwind(player)
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		-- Dmg: 25, XP: Greatsword, KB: 15, Stun: 0.5, Ragdoll: nil
 		processHit(player, character, hitCharsTable, alreadyHit, 15, "Greatsword", 15, 0.5, 0, root)
 	end)
 
@@ -649,6 +622,10 @@ function module.Whirlwind(player)
 	end)
 end
 
+-- SkillFunctions.BerserkerArmor() - cast Berserker Armor, a greatsword-family buff skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.BerserkerArmor(player)
 	local char = player.Character
 	local hum = char.Humanoid
@@ -786,10 +763,10 @@ function module.BerserkerArmor(player)
 	end)
 end
 
--- ====================================================================================
--- [[ EXCALIBUR ]] --
--- ====================================================================================
-
+-- SkillFunctions.AirWave() - cast Air Wave, an Excalibur skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.AirWave(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -825,7 +802,6 @@ function module.AirWave(player)
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		-- Dmg: 25, XP: Sword, KB: 15, Stun: 0.5, Ragdoll: 1, Origin: ExplosionPart
 		processHit(player, character, hitCharsTable, alreadyHit, 12, "Sword", 15, 0.5, 1, explosion)
 	end)
 
@@ -836,12 +812,16 @@ function module.AirWave(player)
 	Debris:AddItem(explosion, 1)
 end
 
+-- SkillFunctions.ElfinDance() - cast Elfin Dance, an Excalibur skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.ElfinDance(player)
 	local character = player.Character
 
 	StateHandler.SetState(character, "Dodging", true, 0.3)
 	StateHandler.SetState(character, "CantAnything", true, 1.3)
-	animationHandler.LoadAnim(character, "JudgementCut", "rbxassetid://113290197729979", nil, false) -- 105579656851449
+	animationHandler.LoadAnim(character, "JudgementCut", "rbxassetid://113290197729979", nil, false)
 
 	applyDashEffect(character)
 
@@ -888,6 +868,10 @@ function module.ElfinDance(player)
 	end)
 end
 
+-- SkillFunctions.Morgan() - cast Morgan, the Excalibur ultimate
+-- @player: the casting player
+--
+-- Return: nothing.
 function module.Morgan(player)
 	local character = player.Character
 	local tool = character:FindFirstChild("Excalibur")
@@ -916,10 +900,6 @@ function module.Morgan(player)
 			tool.Uchigatana.Bottom.Flare.Enabled = true
 			tool.Uchigatana.Bottom.Glow.Enabled = true
 		elseif kf == "EnableUpDraftParticle" then
-			--local upBeamEff = game.ReplicatedStorage.assets.FX.skills.EffectsExc.ExcUltBeam.BeamUP:Clone()
-			--upBeamEff.Parent = character.HumanoidRootPart
-			--game.Debris:AddItem(upBeamEff, 4)
-
 			helperModule.SetSpeed(character, 0, 16)
 
 			local UpDraftEffect =
@@ -993,7 +973,6 @@ function module.Morgan(player)
 					:Play()
 			end)
 
-			--
 			local function createSliceVFX(positionOffset, EndPos)
 				local sliceVFX = game.ReplicatedStorage.assets.FX.skills.EffectsExc.Slice:Clone()
 				sliceVFX.Parent = workspace.plrManager.projectiles
@@ -1051,10 +1030,10 @@ function module.Morgan(player)
 	end)
 end
 
--- ====================================================================================
--- [[ CAESTUS ]] --
--- ====================================================================================
-
+-- SkillFunctions.MantraPalm() - cast Mantra Palm, a Caestus skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.MantraPalm(player)
 	StateHandler.SetState(player.Character, "CantAnything", true, 0.75)
 
@@ -1078,8 +1057,6 @@ function module.MantraPalm(player)
 
 	HRP.Parent.Humanoid.JumpHeight = 0
 	SpeedService.Push(HRP.Parent, "SkillSlow", 0, SpeedService.Priority.SKILL)
-
-	print(mana.Value)
 
 	animationHandler.LoadAnim(player.Character, "rbxassetid://101837266978570", nil, false)
 
@@ -1147,7 +1124,7 @@ function module.MantraPalm(player)
 					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
-					-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+					-- A parry beats hyper armor: clear it so the punish stun lands.
 					player.Character:SetAttribute("HyperArmor", nil)
 					StateHandler.SetStun(player.Character, true, 0.5, 2)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
@@ -1361,12 +1338,20 @@ function module.MantraPalm(player)
 	SpeedService.Pop(HRP.Parent, "SkillSlow")
 end
 
+-- SkillFunctions.MonasticStance() - cast Monastic Stance, the Caestus buff skill
+-- @player: the casting player
+--
+-- Return: nothing.
 function module.MonasticStance(player)
 	local char = player.Character
 
 	animationHandler.LoadAnim(char, "Activate", "rbxassetid://97964685841149", nil, false)
 end
 
+-- SkillFunctions.RisingDragon() - cast Rising Dragon, a Caestus skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.RisingDragon(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -1376,20 +1361,17 @@ function module.RisingDragon(player)
 
 	animationHandler.LoadAnim(character, "M1", "rbxassetid://122781628053647", nil, false)
 
-	-- Visuals
 	local Glow1 = game.ReplicatedStorage.Magic.MonkGlow.Glow:Clone()
 	local rLeg = character:FindFirstChild("Right Leg")
 
 	if rLeg then
 		Glow1.Parent = rLeg
-		-- Check if attachment exists before indexing
 		if rLeg:FindFirstChild("RightFootAttachment") then
 			Glow1.Position = rLeg.RightFootAttachment.Position
 		end
-		-- 4. CLEANUP VISUALS
-		Debris:AddItem(Glow1, 2) -- Destroy glow after 2 seconds
+		Debris:AddItem(Glow1, 2)
 	else
-		Glow1:Destroy() -- Cleanup if leg doesn't exist
+		Glow1:Destroy()
 	end
 
 	local InfoTween = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut)
@@ -1457,7 +1439,6 @@ function module.RisingDragon(player)
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = character:FindFirstChild("HumanoidRootPart")
@@ -1465,7 +1446,6 @@ function module.RisingDragon(player)
 					return
 				end
 
-				-- Standardize syntax (Assume Colon based on your first usage)
 				local isDodging = StateHandler:GetState(targetChar, "Dodging")
 
 				if StateHandler:GetState(character, "Stunned") then
@@ -1473,7 +1453,6 @@ function module.RisingDragon(player)
 				end
 
 				if isDodging then
-					-- (Dodging logic kept same)
 					local sound = game.ReplicatedStorage.assets.sounds.Dodged:Clone()
 					sound.Parent = targetChar.HumanoidRootPart
 					sound:Play()
@@ -1546,10 +1525,10 @@ function module.RisingDragon(player)
 	end)
 end
 
--- ====================================================================================
--- [[ SHACKLES ]] --
--- ====================================================================================
-
+-- SkillFunctions.Gohadoken() - cast Gohadoken, a Shackles fireball
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Gohadoken(player)
 	StateHandler.SetState(player.Character, "CantAnything", true, 0.75)
 
@@ -1576,13 +1555,10 @@ function module.Gohadoken(player)
 
 	animationHandler.LoadAnim(player.Character, "Shoot", "rbxassetid://97583385902594", nil, false)
 
-	print(mana.Value)
-
 	task.wait(0.75)
 
 	local fireballClone = game:GetService("ReplicatedStorage").Magic.Fireball:Clone()
 	fireballClone.Parent = game.Workspace
-	--fireballClone.Position = player.Character.HumanoidRootPart.Position
 	fireballClone.CFrame = player.Character.HumanoidRootPart.CFrame
 		* CFrame.Angles(0, math.rad(90), 0)
 	Hitbox:WeldTo(fireballClone)
@@ -1607,7 +1583,6 @@ function module.Gohadoken(player)
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = player.Character:FindFirstChild("HumanoidRootPart")
@@ -1620,8 +1595,6 @@ function module.Gohadoken(player)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					print("iframed lawl :p")
-
 					local targetPlrData =
 						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
@@ -1803,7 +1776,7 @@ function module.Gohadoken(player)
 
 					playSound(player.Character, ReplicatedStorage.assets.sounds.ParrySound)
 
-					-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+					-- A parry beats hyper armor: clear it so the punish stun lands.
 					player.Character:SetAttribute("HyperArmor", nil)
 					StateHandler.SetStun(player.Character, true, 0.5, 2)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
@@ -1846,9 +1819,8 @@ function module.Gohadoken(player)
 					Hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- Route through BlockResolver for facing + guard-bar fill/break.
-					-- This bespoke skill has no clean damage local, so it keeps its own
-					-- fixed chip on a normal block; the resolver owns the bar + verdict.
+					-- BlockResolver checks facing and fills the guard bar. This skill keeps its own
+					-- fixed chip damage on a normal block.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
 						attacker = player.Character,
@@ -1887,7 +1859,6 @@ function module.Gohadoken(player)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
-					-- Normal Hit
 					doAttack(0, 5)
 				end
 			end
@@ -1902,6 +1873,10 @@ function module.Gohadoken(player)
 	SpeedService.Pop(HRP.Parent, "SkillSlow")
 end
 
+-- SkillFunctions.AsuraGlide() - cast Asura Glide, a Shackles skill
+-- @player: the casting player
+--
+-- Return: nothing.
 function module.AsuraGlide(player)
 	local char = player.Character
 	local root = char.HumanoidRootPart
@@ -1926,6 +1901,10 @@ function module.AsuraGlide(player)
 	applyDashEffect(char)
 end
 
+-- SkillFunctions.Messatsu() - cast Messatsu, the Shackles grab
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Messatsu(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -1990,7 +1969,6 @@ function module.Messatsu(player)
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = character:FindFirstChild("HumanoidRootPart")
@@ -2003,8 +1981,6 @@ function module.Messatsu(player)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					print("iframed lawl :p")
-
 					local targetPlrData =
 						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
@@ -2060,18 +2036,11 @@ function module.Messatsu(player)
 				game.Debris:AddItem(ff, 2)
 				game.Debris:AddItem(ff2, 1.8)
 
-				-- 1. TURN OFF AUTO ROTATE
 				humanoid.AutoRotate = false
 				character.Humanoid.AutoRotate = false
 
-				-- 2. NEW: ANCHOR THE CHARACTER (Guarantees no rotation)
-				--character.HumanoidRootPart.Anchored = true
-				-- Optional: Anchor target too if you want them frozen relative to attacker
-				--targetChar.HumanoidRootPart.Anchored = true
-
-				-- 3. UPDATED LOOP: Destroy Rotation Movers too
+				-- Remove velocity and rotation movers, so the grab holds the attacker still.
 				for _, v in pairs(character.HumanoidRootPart:GetChildren()) do
-					-- Check for Velocity AND Rotation movers (Gyro, AlignOrientation, etc)
 					if
 						v:IsA("BodyVelocity")
 						or v:IsA("BodyGyro")
@@ -2159,10 +2128,6 @@ function module.Messatsu(player)
 					end
 				end
 
-				-- 4. NEW: UNANCHOR CHARACTER
-				--character.HumanoidRootPart.Anchored = false
-				--targetChar.HumanoidRootPart.Anchored = false
-
 				humanoid.AutoRotate = true
 				character.Humanoid.AutoRotate = true
 
@@ -2215,10 +2180,10 @@ function module.Messatsu(player)
 	end)
 end
 
--- ====================================================================================
--- [[ VERMILLION ]] --
--- ====================================================================================
-
+-- SkillFunctions.Zanshin() - cast Zanshin, a Vermillion skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Zanshin(player)
 	local character = player.Character
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
@@ -2272,8 +2237,11 @@ function module.Zanshin(player)
 	end)
 end
 
+-- SkillFunctions.Kurai() - cast Kurai, the Vermillion teleport dash
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Kurai(player)
-	-- Teleport Dash
 	local char = player.Character
 	local root = char.HumanoidRootPart
 
@@ -2295,14 +2263,14 @@ function module.Kurai(player)
 
 	playSound(char, ReplicatedStorage.assets.sounds.vermillion.dash)
 
-	-- Backward Velocity
 	local BV = Instance.new("BodyVelocity", root)
 	BV.MaxForce = Vector3.new(25000, 0, 25000)
 	BV.Velocity = root.CFrame.lookVector * -40
 	Debris:AddItem(BV, 0.3)
 
-	local TELEPORT_DISTANCE = 20 -- How far forward to teleport
-	local AIR_HEIGHT = 10 -- How high to go if starting from Ground
+	-- How far forward to teleport, and how high when starting on the ground.
+	local TELEPORT_DISTANCE = 20
+	local AIR_HEIGHT = 10
 
 	local forwardDir = root.CFrame.LookVector
 	local targetPosition
@@ -2346,7 +2314,6 @@ function module.Kurai(player)
 
 	applyDashEffect(char)
 
-	-- Forward Dash after TP
 	local BV2 = Instance.new("BodyVelocity", root)
 	BV2.MaxForce = Vector3.new(25000, 0, 25000)
 	BV2.Velocity = root.CFrame.lookVector * 30
@@ -2355,6 +2322,10 @@ function module.Kurai(player)
 	animationHandler.LoadAnim(char, "LeanForward", "rbxassetid://77971444416399", nil, false)
 end
 
+-- SkillFunctions.Kirikizu() - cast Kirikizu, a Vermillion skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Kirikizu(player)
 	local character = player.Character
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
@@ -2432,24 +2403,21 @@ function module.Kirikizu(player)
 	end)
 end
 
--- ====================================================================================
--- [[ TANTO ]] --
--- ====================================================================================
-
+-- SkillFunctions.HiddenDaggers() - cast Hidden Daggers, a Tanto throw of three daggers
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.HiddenDaggers(player)
 	local char = player.Character
 	local root = char.HumanoidRootPart
 
-	-- Configuration
 	local DAMAGE = 7
 	local THROW_SPEED = 250
 	local WINDUP_TIME = 0.4
 
-	-- 1. States and Windup
 	StateHandler.SetState(char, "CantAnything", true, WINDUP_TIME + 0.2)
 	helperModule.SetSpeed(char, 2, 16)
 
-	-- Optional: Play a windup animation here if you have one
 	animationHandler.LoadAnim(char, "DaggerThrow", "rbxassetid://116490680994705", nil, false)
 
 	task.wait(WINDUP_TIME)
@@ -2457,30 +2425,33 @@ function module.HiddenDaggers(player)
 	StateHandler.SetState(char, "M1", true, 0.5)
 	helperModule.ResetSpeed(char)
 
-	-- Play Throw Sound
-	playSound(char, ReplicatedStorage.assets.sounds.dagger.daggerLunge) -- Uncomment if you have this sound
+	playSound(char, ReplicatedStorage.assets.sounds.dagger.daggerLunge)
 
-	-- 2. Spawn 3 Daggers in a fan pattern (-30, 0, +30 degrees)
+	-- Throw 3 daggers in a fan: -30, 0, and +30 degrees.
 	local RunService = game:GetService("RunService")
 
-	-- Tunables
-	local SPAWN_FORWARD = 0.5 -- studs ahead of torso (small, so point-blank targets still get hit)
-	local FAN_ANGLE = 30 -- degrees between center dagger and each side dagger
-	local HITBOX_RADIUS = 2.0 -- fat hitbox radius for the spherecast
-	local LIFETIME = 1.5 -- seconds before the dagger despawns
-	local WALL_STICK = 1 -- seconds a stuck dagger lingers in the wall
+	-- Spawn distance ahead of the torso. It is small, so point-blank targets still get hit.
+	local SPAWN_FORWARD = 0.5
+	-- Degrees between the center dagger and each side dagger.
+	local FAN_ANGLE = 30
+	-- The spherecast radius.
+	local HITBOX_RADIUS = 2.0
+	-- Seconds before a dagger despawns.
+	local LIFETIME = 1.5
+	-- Seconds a dagger stays stuck in a wall.
+	local WALL_STICK = 1
 
 	for i = -1, 1 do
 		local projectile = game.ServerStorage.Extras.ThrowDagger:Clone()
 
-		-- Setup Visuals
 		projectile.Transparency = 0.5
 		projectile.Color = Color3.new(0, 0, 0)
-		projectile.Anchored = true -- we drive it ourselves, no physics
+		-- A Heartbeat loop moves the dagger and a spherecast finds hits, so the dagger is
+		-- anchored and does not use Touched.
+		projectile.Anchored = true
 		projectile.CanCollide = false
-		projectile.CanTouch = false -- collision handled by raycast, not Touched
+		projectile.CanTouch = false
 
-		-- Spawn just in front of the torso, angled outward by the fan
 		local originCF = root.CFrame
 			* CFrame.new(0, 0, -SPAWN_FORWARD)
 			* CFrame.Angles(0, math.rad(i * FAN_ANGLE), 0)
@@ -2492,16 +2463,13 @@ function module.HiddenDaggers(player)
 			projectile.TestTrail.Enabled = true
 		end
 
-		-- Travel direction is the dagger's forward (matches the old bv.Velocity convention)
 		local travelDir = originCF.LookVector
 		local position = originCF.Position
 
-		-- Per-dagger hit bookkeeping
 		local hitDebounce = {}
 		local alive = true
 		local elapsed = 0
 
-		-- Raycast params: ignore the caster and the projectile folder, hit everything else
 		local rayParams = RaycastParams.new()
 		rayParams.FilterType = Enum.RaycastFilterType.Exclude
 		rayParams.FilterDescendantsInstances = { char, workspace.plrManager.projectiles }
@@ -2520,8 +2488,7 @@ function module.HiddenDaggers(player)
 			Debris:AddItem(projectile, WALL_STICK)
 		end
 
-		-- All the damage / parry / block / dodge logic, unchanged, factored into one function.
-		-- Returns true if the projectile should be consumed (destroyed) by this hit.
+		-- Returns true if the hit consumes the dagger.
 		local function onHitCharacter(enemyChar)
 			if hitDebounce[enemyChar] then
 				return false
@@ -2533,7 +2500,8 @@ function module.HiddenDaggers(player)
 				sound.Parent = enemyChar.HumanoidRootPart
 				sound:Play()
 				game.Debris:AddItem(sound, 3)
-				return false -- passes through a dodge, keeps flying
+				-- A dodge lets the dagger fly on.
+				return false
 			end
 
 			local function applyDamage(extraDmg)
@@ -2558,7 +2526,6 @@ function module.HiddenDaggers(player)
 				game.Debris:AddItem(highlight, 0.1)
 			end
 
-			-- Block/Parry Checks
 			if StateHandler.GetState(enemyChar, "Parrying") then
 				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
 					:Clone()
@@ -2586,7 +2553,7 @@ function module.HiddenDaggers(player)
 				game.Debris:AddItem(parryE, 0.7)
 				game.Debris:AddItem(effect2, 0.7)
 
-				-- Parry beats hyperarmor: clear it so this punish stun actually lands.
+				-- A parry beats hyper armor: clear it so the punish stun lands.
 				char:SetAttribute("HyperArmor", nil)
 				StateHandler.SetStun(char, true, 0.5, 2)
 				StateHandler.SetState(char, "CantAnything", true, 0.5)
@@ -2624,8 +2591,8 @@ function module.HiddenDaggers(player)
 				)
 				return true
 			elseif StateHandler.GetState(enemyChar, "Blocking") then
-				-- Route through BlockResolver for facing + guard-bar fill/break. This
-				-- dagger projectile keeps its own fixed chip via applyDamage.
+				-- BlockResolver checks facing and fills the guard bar. The dagger keeps its own
+				-- fixed chip damage.
 				local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 				local verdict = BlockResolver.Resolve({
 					attacker = char,
@@ -2665,17 +2632,17 @@ function module.HiddenDaggers(player)
 					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
-					applyDamage(-3) -- Reduced Damage
+					applyDamage(-3)
 					return true
 				end
 			else
-				-- Clean Hit
 				applyDamage(0)
 				return true
 			end
 		end
 
-		-- 3. Drive + collide the dagger with a per-frame spherecast (no physics, no Touched)
+		-- Move the dagger each frame and spherecast the segment it crosses, so it never
+		-- passes through a target.
 		local conn
 		conn = RunService.Heartbeat:Connect(function(dt)
 			if not alive or not projectile.Parent then
@@ -2694,7 +2661,6 @@ function module.HiddenDaggers(player)
 			end
 
 			local step = THROW_SPEED * dt
-			-- Spherecast the exact segment we're about to cross, so nothing is tunneled through.
 			local result =
 				workspace:Spherecast(position, HITBOX_RADIUS, travelDir * step, rayParams)
 
@@ -2715,16 +2681,15 @@ function module.HiddenDaggers(player)
 						end)
 						return
 					end
-					-- not consumed (dodge): advance to the hit point and keep going next frame
+					-- A dodge does not consume the dagger, so it moves on from the hit point.
 					position = result.Position
 					projectile.CFrame = CFrame.lookAt(position, position + travelDir)
 				else
-					-- Hit world geometry: stick exactly at the impact point
+					-- A wall hit: stick at the impact point.
 					conn:Disconnect()
 					stopInWall(result.Position)
 				end
 			else
-				-- Clear path this frame: advance
 				position = position + travelDir * step
 				projectile.CFrame = CFrame.lookAt(position, position + travelDir)
 			end
@@ -2732,6 +2697,10 @@ function module.HiddenDaggers(player)
 	end
 end
 
+-- SkillFunctions.YingYangSpiral() - cast Ying Yang Spiral, a Tanto skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.YingYangSpiral(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -2797,18 +2766,24 @@ function module.YingYangSpiral(player)
 	end)
 end
 
+-- SkillFunctions.MysticEyes() - cast Mystic Eyes, the Tanto buff skill
+-- @player: the casting player
+--
+-- Return: nothing.
 function module.MysticEyes(player)
 	local character = player.Character
 	if not character then
 		return
 	end
-	-- activation anim only; buff state + eye/blade FX are owned by BuffService
-	-- (activated from SkillHandler) so they apply to every weapon in the class.
+	-- Only the animation. BuffService owns the buff state and FX, so the buff works with
+	-- every weapon of the class.
 	animationHandler.LoadAnim(character, "Activate", "rbxassetid://97964685841149", nil, false)
 end
 
--- [[ GUANDAO ]] --
-
+-- SkillFunctions.DownwardCleave() - cast Downward Cleave, a Guandao skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.DownwardCleave(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -2863,14 +2838,12 @@ function module.DownwardCleave(player)
 	playSound(character, game.ReplicatedStorage.assets.sounds.skills.GroundImpact)
 
 	local startPos = root.Position + (root.CFrame.LookVector * 12)
-	local direction = Vector3.new(0, -15, 0) -- Check 15 studs down
+	local direction = Vector3.new(0, -15, 0)
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = { character } -- Ignore the player
+	params.FilterDescendantsInstances = { character }
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
-
-	print(result)
 
 	if result then
 		local slamEff = ReplicatedStorage.assets.FX.guandao.guandaogroundSlam:Clone()
@@ -2906,6 +2879,10 @@ function module.DownwardCleave(player)
 	end)
 end
 
+-- SkillFunctions.Tianshi() - cast Tianshi, a Guandao skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Tianshi(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
@@ -2941,14 +2918,12 @@ function module.Tianshi(player)
 	Hitbox:Start()
 
 	local startPos = root.Position + (root.CFrame.LookVector * 12)
-	local direction = Vector3.new(0, -50, 0) -- Check 15 studs down
+	local direction = Vector3.new(0, -50, 0)
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = { character } -- Ignore the player
+	params.FilterDescendantsInstances = { character }
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
-
-	print(result)
 
 	if result then
 		local slamEff = ReplicatedStorage.assets.FX.guandao.GuandaoS2:Clone()
@@ -2974,6 +2949,10 @@ function module.Tianshi(player)
 	end)
 end
 
+-- SkillFunctions.Dao() - cast Dao, a Guandao skill
+-- @player: the casting player
+--
+-- Return: nothing. Yields during the cast.
 function module.Dao(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart

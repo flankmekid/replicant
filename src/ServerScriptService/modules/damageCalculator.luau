@@ -1,24 +1,27 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Applies damage from every source: combat tags, stat scaling, the downed check, hit
+-- FX, damage numbers, the hit animation, and the default hitstun. The damage formula is
+-- in docs/combat-design.md.
 local module = {}
 
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Debris = game:GetService("Debris")
 
--- Modules
 local CombatManager = require(ServerScriptService.modules.combatTagManager)
 local AnimationHandler = require(game.ReplicatedStorage.modules.animationHandler)
 local StateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 local StatScaling = require(game.ReplicatedStorage.modules.StatScaling)
--- [[ NEW REQUIRE ]] --
 local DownedManager = require(ServerScriptService.modules.DownedManager)
 
 local DamageNumberRemote = game.ReplicatedStorage.remotes:WaitForChild("DamageNumber")
 local CameraShakeRemote = game.ReplicatedStorage.remotes:WaitForChild("CameraShake")
 
--- Damage above which we add a camera shake (mirrors the red damage-indicator threshold).
+-- Damage above which a hit shakes the camera, the same as the red damage indicator.
 local SHAKE_DAMAGE_THRESHOLD = 20
 
--- Helper to find a stat value inside a model (Player or NPC)
+-- Reads a stat from a character attribute, then from PlayerStats, for players and NPCs.
 local function getStatValue(character, statName, defaultValue)
 	local attrValue = character:GetAttribute(statName)
 	if attrValue ~= nil then
@@ -37,9 +40,8 @@ local function getStatValue(character, statName, defaultValue)
 	return defaultValue
 end
 
--- Reads an invested stat-point value (Vitality/Stamina/Strength/Dexterity/Magic)
--- from PlayerStats.Stats. Returns 0 for non-players (NPCs/bosses), so stat
--- scaling is a no-op against them and nothing nil-indexes.
+-- Reads invested stat points from PlayerStats.Stats. NPCs and bosses get 0, so stat
+-- scaling does nothing against them.
 local function getStatPoints(character, statName)
 	local player = Players:GetPlayerFromCharacter(character)
 	if not player then
@@ -57,11 +59,21 @@ local function getStatPoints(character, statName)
 	return obj and obj.Value or 0
 end
 
--- [[ ADDED isInstantKill PARAMETER ]] --
--- stunOverride / stunSpeedOverride: optional per-move hitstun. Callers that pass
--- nothing keep the historical 0.85s duration. stunSpeedOverride defaults to 2 so
--- a hit victim is pinned near-immobile (they cannot walk out of an attack); pass a
--- higher value for stuns that should still allow repositioning.
+-- damageCalculator.CalculateDamage() - deal damage from one character to another
+-- @attackerChar: the attacking character
+-- @targetChar: the character that takes the damage
+-- @baseDmg: the base damage
+-- @extraDmg: damage added to the base
+-- @isInstantKill: true to down or kill the target at once
+-- @dmgType: "Weapon" (scales with Strength), "Skill" (Dexterity), "Racial" (Dexterity
+--           and Magic), or nil for true damage with no stat scaling
+-- @stunOverride: the hitstun in seconds, 0.85 by default. Not used for "Weapon".
+-- @stunSpeedOverride: the WalkSpeed during the hitstun, 2 by default
+--
+-- Weapon hits get no hitstun here, because the CombatCore knockback closures set the
+-- per-move hitstun just before this call.
+--
+-- Return: the final damage, or nil when the target is missing or dead.
 function module.CalculateDamage(
 	attackerChar,
 	targetChar,
@@ -84,7 +96,6 @@ function module.CalculateDamage(
 	local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
 	local attackerPlayer = Players:GetPlayerFromCharacter(attackerChar)
 
-	-- [[ 1. APPLY INITIAL COMBAT TAGS (PvP) ]] --
 	if targetPlayer and attackerPlayer then
 		CombatManager.TagPlayer(targetPlayer, attackerPlayer)
 		CombatManager.TagPlayer(attackerPlayer, targetPlayer)
@@ -101,7 +112,6 @@ function module.CalculateDamage(
 		Debris:AddItem(tag, 30)
 	end
 
-	-- [[ 2. APPLY NPC KILL TAG (PvE) ]] --
 	if not targetPlayer and attackerPlayer then
 		local oldTag = targetHum:FindFirstChild("KillTag")
 		if oldTag then
@@ -120,7 +130,6 @@ function module.CalculateDamage(
 		armorBuffs = attackerPlayer:FindFirstChild("PlayerStats"):FindFirstChild("ArmorBuffs")
 	end
 
-	-- Sanitize inputs
 	baseDmg = baseDmg or 0
 	extraDmg = extraDmg or 0
 
@@ -128,14 +137,8 @@ function module.CalculateDamage(
 	local armorDmgBoost = armorBuffs and armorBuffs:FindFirstChild("DamageBuff").Value or 1
 	local defBoost = getStatValue(targetChar, "DefenseBoost", 1)
 
-	-- [[ ADDITIVE DAMAGE COMBINATION + STAT SPREAD SCALING ]] --
-	-- All damage sources contribute their bonus to ONE pool, applied once.
-	-- race DamageBoost, armor DamageBuff, and the relevant stat are summed
-	-- (never multiplied together), so stacking scales linearly, not exponentially.
-	--   dmgType "Weapon" -> Strength (M1/E/M2)
-	--   dmgType "Skill"  -> Dexterity
-	--   dmgType "Racial" -> Dexterity + Magic add-on (dual-scaled)
-	--   dmgType nil/other -> no stat scaling (back-compat / true damage)
+	-- Race, armor, and stat bonuses add into one pool that is applied once, so stacking
+	-- is linear, not exponential.
 	local statBonus = 0
 	if dmgType == "Weapon" then
 		statBonus = StatScaling.GetStrengthBonus(getStatPoints(attackerChar, "Strength"))
@@ -154,25 +157,18 @@ function module.CalculateDamage(
 	end
 	local finalDamage = rawDamage / defBoost
 
-	-- [[ DOWNED SYSTEM INTEGRATION START ]] --
-	-- Check if this damage should knock the player down instead of applying damage
 	local wasDowned = DownedManager.CheckDownedCondition(targetChar, finalDamage, isInstantKill)
 
 	if wasDowned then
-		-- Player was JUST knocked down.
 		return finalDamage
 	end
 
-	-- [[ THE FIX: Abort the rest of the script if they are ALREADY downed ]] --
-	-- This prevents standing hit animations and overlapping stuns from breaking the ragdoll
+	-- An already downed target takes no damage, hit animation, or stun, because the
+	-- ragdoll owns them. The hit restarts their bleed-out timer instead.
 	if StateHandler.GetState(targetChar, "Downed") then
-		-- Hitting a body that is already down refreshes their bleed-out. They do
-		-- not take damage (they cannot: the ragdoll owns them), but the clock
-		-- restarts, so beating on someone keeps them there.
 		DownedManager.ResetReviveTimer(targetChar)
 		return finalDamage
 	end
-	-- [[ DOWNED SYSTEM INTEGRATION END ]] --
 
 	if StateHandler.GetState(attackerChar, "Executing") then
 		DownedManager.StopExecution(attackerChar)
@@ -186,10 +182,8 @@ function module.CalculateDamage(
 		finalDamage = finalDamage * 1.3
 	end
 
-	-- [[ DEAL DAMAGE ]] --
 	targetHum:TakeDamage(finalDamage)
 
-	-- slash fx
 	if targetChar:FindFirstChild("Torso") then
 		local r = math.random(-180, 180)
 
@@ -219,8 +213,7 @@ function module.CalculateDamage(
 		end
 	end
 
-	-- [[ CAMERA SHAKE on big hits ]] --
-	-- Same threshold as the red damage indicator. Taking a hit shakes harder than landing one.
+	-- Taking a big hit shakes the camera harder than landing one.
 	if finalDamage > SHAKE_DAMAGE_THRESHOLD then
 		if targetPlayer then
 			CameraShakeRemote:FireClient(targetPlayer, { kind = "Damage", taken = true })
@@ -230,10 +223,8 @@ function module.CalculateDamage(
 		end
 	end
 
-	-- [[ HIT ANIM ]] --
-	-- HYPERARMOR: skip the flinch/hit-react animation on an armored target so it does
-	-- not stomp their in-progress swing/cast animation. They still took the damage
-	-- above; they just do not visibly flinch out of their move.
+	-- An armored target does not flinch, so the hit animation does not cancel their
+	-- swing or cast. They still take the damage.
 	if not targetChar:GetAttribute("HyperArmor") then
 		local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
 			or "rbxassetid://111089735892609"
@@ -248,13 +239,7 @@ function module.CalculateDamage(
 		game.Debris:AddItem(anim, 2)
 	end
 
-	-- Hitstun. Weapon hits (M1/M2/E) set their own per-move hitstun in CombatCore's
-	-- knockback closures, which run just before this damage call; applying a stun
-	-- here too would clobber that per-move value with a flat one. So for dmgType
-	-- "Weapon" we skip it and let CombatCore own it. Everything else (skills, racials,
-	-- mobs/bosses with dmgType nil) has no such closure, so this is their hitstun:
-	-- default 0.85s, walkspeed pinned to 2 (can't walk out), unless the caller passed
-	-- explicit overrides.
+	-- Weapon hits already have their per-move hitstun from CombatCore.
 	if dmgType ~= "Weapon" then
 		StateHandler.SetStun(targetChar, true, stunOverride or 0.85, stunSpeedOverride or 2)
 	end
@@ -271,7 +256,7 @@ function module.CalculateDamage(
 		attackerChar.Humanoid.Health += 2
 	end
 
-	-- [[ AEGIR RACIAL PASSIVE ]] --
+	-- Aegir racial passive: taking damage restores mana.
 	if targetPlayer then
 		local stats = targetPlayer:FindFirstChild("PlayerStats")
 		if stats and stats.Race.Value == "Aegir" then

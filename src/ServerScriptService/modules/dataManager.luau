@@ -1,19 +1,20 @@
--- [[ DATA MANAGER (ProfileStore Implementation) ]] --
--- Location: ServerScriptService.modules.dataManager
+-- SPDX-License-Identifier: MIT
+--
+-- Owns player save data through ProfileStore: loading and saving profiles, the
+-- PlayerStats folder that mirrors the data for other scripts and the client, and the
+-- API for currency, stats, appearance, armor, weapons, skills, quests, and titles.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Debris = game:GetService("Debris")
 
--- Require the ProfileStore module
 local ProfileStore = require(game.ServerScriptService.modules:WaitForChild("ProfileStore"))
 local StatScaling = require(game.ReplicatedStorage.modules:WaitForChild("StatScaling"))
 
 local module = {}
 
--- [[ CONFIGURATION ]] --
-local DATA_STORE_NAME = "Apocrypha_Data_v6_TESTING" -- OLD :: "Apocrypha_Data_v3" "Apocrypha_Data_v5_TESTING"
+local DATA_STORE_NAME = "Apocrypha_Data_v6_TESTING"
 local CURRENCY_NAME = "Liturgy"
 local MAX_LEVEL = 25
 local WEAPON_TYPES = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
@@ -21,26 +22,25 @@ local DROP_LIFETIME = 180
 local DEATH_DROP_AMOUNT = 200
 local DEFAULT_WEAPON = "Fists"
 
--- [[ ASSETS ]] --
 local assets = ReplicatedStorage:WaitForChild("assets")
 local fxFolder = assets:WaitForChild("FX")
 local liturgyTemplate = fxFolder:WaitForChild("Liturgy")
 local facesFolder = ReplicatedStorage:WaitForChild("faces")
 
--- [[ EYE COLOR CONFIG ]] --
+-- A new profile gets a random eye color from this list.
 local REALISTIC_EYE_COLORS = {
-	{ R = 89, G = 59, B = 32 }, -- Dark Brown
-	{ R = 139, G = 69, B = 19 }, -- Brown
-	{ R = 99, G = 78, B = 52 }, -- Hazel
-	{ R = 45, G = 87, B = 139 }, -- Deep Blue
-	{ R = 95, G = 140, B = 178 }, -- Light Blue
-	{ R = 62, G = 107, B = 64 }, -- Green
-	{ R = 128, G = 128, B = 128 }, -- Grey
-	{ R = 48, G = 48, B = 48 }, -- Black/Very Dark
-	{ R = 138, G = 119, B = 78 }, -- Amber
+	{ R = 89, G = 59, B = 32 }, -- Dark brown.
+	{ R = 139, G = 69, B = 19 }, -- Brown.
+	{ R = 99, G = 78, B = 52 }, -- Hazel.
+	{ R = 45, G = 87, B = 139 }, -- Deep blue.
+	{ R = 95, G = 140, B = 178 }, -- Light blue.
+	{ R = 62, G = 107, B = 64 }, -- Green.
+	{ R = 128, G = 128, B = 128 }, -- Grey.
+	{ R = 48, G = 48, B = 48 }, -- Black.
+	{ R = 138, G = 119, B = 78 }, -- Amber.
 }
 
--- [[ PROFILE TEMPLATE ]] --
+-- The default profile. ProfileStore adds missing keys to old profiles with Reconcile.
 local ProfileTemplate = {
 	Liturgy = 0,
 	Spins = 100,
@@ -50,14 +50,16 @@ local ProfileTemplate = {
 	WeaponProgression = {},
 
 	UnlockedSpells = {},
-	EquippedSkills = {}, -- [family] = {Z=, X=, C=}; per-family skill loadout for the spellbook
+	-- The spellbook loadout: EquippedSkills[family] = { Z, X, C }.
+	EquippedSkills = {},
 
 	Inventory = {},
 
-	-- [[ NEW INVENTORY DATA STRUCTURE ]] --
 	InventoryData = {
-		Items = {}, -- Stores tables: {Id = "uuid", Name = "ItemName", Amount = 1}
-		Hotbar = {}, -- Dictionary mapping slot index (1-9) to an Item Id
+		-- Items: { Id = "uuid", Name = "ItemName", Amount = 1 }.
+		Items = {},
+		-- Hotbar: slot index (1 to 9) to item.
+		Hotbar = {},
 		Equipment = {
 			Head = nil,
 			Torso = nil,
@@ -66,14 +68,12 @@ local ProfileTemplate = {
 		},
 	},
 
-	-- [[ APPEARANCE ]] --
 	EyeColor = nil,
 	Face = nil,
 	Hair = { 0, 0, 0 },
 	Gender = "Male",
 	ArmorColor = nil,
 
-	-- [[ STATS ]] --
 	MaxHP = 100,
 	MaxMana = 100,
 	HPBoost = 1,
@@ -87,7 +87,7 @@ local ProfileTemplate = {
 	DashDuration = 0.2,
 	SlideDuration = 2.0,
 
-	-- [[ STAT SPREAD (Souls-like invested points, 0-50 each) ]] --
+	-- Invested stat points, 0 to 50 each.
 	Stats = {
 		Vitality = 0,
 		Stamina = 0,
@@ -95,41 +95,37 @@ local ProfileTemplate = {
 		Dexterity = 0,
 		Magic = 0,
 	},
-	-- [[ SKILL POINT BUDGET (Model A) ]]
-	-- SkillPointsOwned: total skill points bought with Liturgy (0..150, only rises).
-	-- Stats are assigned from these for free (1 skill point = 1 stat point).
-	-- Available to assign = SkillPointsOwned - (sum of all stat values).
+	-- Skill points bought with Liturgy (0 to 150, never decreases). Assigning one to a
+	-- stat is free, so the available points are SkillPointsOwned minus the sum of all
+	-- stats.
 	SkillPointsOwned = 0,
 
-	-- [[ ARMOR ]]
 	CurrentArmor = "Rags",
 	OwnedArmors = { "Rags" },
-	-- Transmog override. nil = vanity follows CurrentArmor; a string = an
-	-- explicit vanity differing from the stats-armor. Stats always come from CurrentArmor.
+	-- The transmog. nil means the vanity follows CurrentArmor. Stats always come from
+	-- CurrentArmor.
 	CurrentVanity = nil,
 
-	-- [[ QUEST DATA ]] --
 	Quest = {
-		Active = {}, -- array of { Id = string, Progress = number }
-		Tracked = nil, -- quest ID currently shown in the HUD tracker
+		-- Active: an array of { Id = string, Progress = number }.
+		Active = {},
+		-- Tracked: the quest ID in the HUD tracker. See SetTrackedQuest.
+		Tracked = nil,
 		Completed = {},
 		Cooldowns = {},
 	},
 
-	-- SPIRES
 	Attuned = {},
 
-	-- TITLES
 	UnlockedTitles = {},
 	CurrentTitle = "",
 	PlayerKills = 0,
 	PlayerDeaths = 0,
 
-	-- LAST SAVED POS
-	LastPosition = nil, -- stored as {X, Y, Z}
+	-- The last saved position as { X, Y, Z }.
+	LastPosition = nil,
 }
 
--- Initialize Weapon Progression
 for _, weapon in ipairs(WEAPON_TYPES) do
 	ProfileTemplate.WeaponProgression[weapon] = { XP = 0, Level = 1 }
 end
@@ -137,7 +133,6 @@ end
 local GameProfileStore = ProfileStore.New(DATA_STORE_NAME, ProfileTemplate)
 local Profiles = {}
 
--- [[ HELPER: RANDOM FACE ]] --
 local function GetRandomFaceForRace(raceName)
 	local targetFolder = facesFolder:FindFirstChild(string.lower(raceName))
 	if not targetFolder or #targetFolder:GetChildren() == 0 then
@@ -155,7 +150,7 @@ local function GetRandomFaceForRace(raceName)
 	return "rbxassetid://0"
 end
 
--- [[ XP FORMULAS ]] --
+-- The total XP needed to reach a level, rounded up to a multiple of 25.
 local function GetXPThreshold(targetLevel)
 	if targetLevel <= 1 then
 		return 0
@@ -164,14 +159,20 @@ local function GetXPThreshold(targetLevel)
 	return math.ceil(xpNeeded / 25) * 25
 end
 
--- [[ STATS VISUALIZATION ]] --
+-- dataManager.CreateSessionStats() - create the PlayerStats folder of a player
+-- @player: the player
+-- @profile: the loaded profile
+--
+-- Other scripts and the client read the data from this folder. Writing a mirrored
+-- value writes it back to the profile.
+--
+-- Return: nothing.
 function module.CreateSessionStats(player, profile)
 	local data = profile.Data
 
 	local playerStats = Instance.new("Folder")
 	playerStats.Name = "PlayerStats"
 
-	-- Liturgy (Currency)
 	local liturgyVal = Instance.new("IntValue")
 	liturgyVal.Name = CURRENCY_NAME
 	liturgyVal.Value = data.Liturgy
@@ -182,7 +183,6 @@ function module.CreateSessionStats(player, profile)
 		end
 	end)
 
-	-- Spins
 	local spinsVal = Instance.new("IntValue")
 	spinsVal.Name = "Spins"
 	spinsVal.Value = data.Spins
@@ -203,7 +203,6 @@ function module.CreateSessionStats(player, profile)
 		end
 	end)
 
-	-- Race Name
 	local raceVal = Instance.new("StringValue")
 	raceVal.Name = "Race"
 	raceVal.Value = data.Race
@@ -214,7 +213,6 @@ function module.CreateSessionStats(player, profile)
 		end
 	end)
 
-	-- [[ ARMOR BUFFS ]] --
 	local armorFolder = Instance.new("Folder")
 	armorFolder.Name = "ArmorBuffs"
 	armorFolder.Parent = playerStats
@@ -231,7 +229,6 @@ function module.CreateSessionStats(player, profile)
 	createArmorStat("DefenseBuff", 1)
 	createArmorStat("DamageBuff", 1)
 
-	-- [[ STATS VALUES ]] --
 	local function createStat(name, defaultVal)
 		local val = Instance.new("NumberValue")
 		val.Name = name
@@ -256,7 +253,7 @@ function module.CreateSessionStats(player, profile)
 	createStat("DashDuration", data.DashDuration)
 	createStat("SlideDuration", data.SlideDuration)
 
-	-- [[ STAT SPREAD: invested point counts (read by damageCalculator & client UI) ]] --
+	-- The client UI and damageCalculator read the invested points.
 	local statsFolder = Instance.new("Folder")
 	statsFolder.Name = "Stats"
 	statsFolder.Parent = playerStats
@@ -276,7 +273,7 @@ function module.CreateSessionStats(player, profile)
 		end)
 	end
 
-	-- Skill-point budget mirrors (display-only; server is authoritative).
+	-- Display-only copies of the skill-point budget. The server owns the real values.
 	local ownedVal = Instance.new("IntValue")
 	ownedVal.Name = "SkillPointsOwned"
 	ownedVal.Value = data.SkillPointsOwned or 0
@@ -291,7 +288,7 @@ function module.CreateSessionStats(player, profile)
 	availVal.Value = (data.SkillPointsOwned or 0) - assigned
 	availVal.Parent = statsFolder
 
-	-- Mana Setup (MaxMana now includes the Magic stat's flat +mana bonus)
+	-- MaxMana includes the flat mana bonus from Magic.
 	local magicManaBonus = StatScaling.GetManaBonus(data.Stats.Magic or 0)
 	local calculatedMaxMana = (data.MaxMana * data.ManaBoost) + magicManaBonus
 	local manaVal = Instance.new("NumberValue", playerStats)
@@ -302,7 +299,6 @@ function module.CreateSessionStats(player, profile)
 	maxManaVal.Name = "MaxMana"
 	maxManaVal.Value = calculatedMaxMana
 
-	-- Folders
 	local weaponDataFolder = Instance.new("Folder")
 	weaponDataFolder.Name = "WeaponData"
 	weaponDataFolder.Parent = playerStats
@@ -311,7 +307,7 @@ function module.CreateSessionStats(player, profile)
 	skillsFolder.Name = "UnlockedSkills"
 	skillsFolder.Parent = playerStats
 
-	-- [[ FIXED: Load Spells separately from tools ]] --
+	-- Spells are StringValues, not tools.
 	if data.UnlockedSpells then
 		for _, spellName in ipairs(data.UnlockedSpells) do
 			local val = Instance.new("StringValue")
@@ -320,16 +316,15 @@ function module.CreateSessionStats(player, profile)
 		end
 	end
 
-	-- [[ EQUIPPED SKILLS (Spellbook loadout) ]] --
-	-- Build a replicated folder the client reads to resolve Z/X/C per family.
-	-- Structure: PlayerStats.EquippedSkills.<Family> with StringValues named Z/X/C.
+	-- The client reads the loadout from PlayerStats.EquippedSkills.<Family>, with a
+	-- StringValue per slot (Z, X, C).
 	local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 	if not data.EquippedSkills then
 		data.EquippedSkills = {}
 	end
 
-	-- Migration: if a player has unlocked spells but no saved loadout, rebuild it
-	-- by placing each unlocked spell into its family slot (last-write-wins per slot).
+	-- An old profile with unlocked spells and no loadout gets one: each spell goes into
+	-- its family slot, and the last one per slot wins.
 	if next(data.EquippedSkills) == nil and data.UnlockedSpells and #data.UnlockedSpells > 0 then
 		for _, spellName in ipairs(data.UnlockedSpells) do
 			local fam, slotIdx = SkillConfig.FindSkillSlot(spellName)
@@ -355,7 +350,6 @@ function module.CreateSessionStats(player, profile)
 		end
 	end
 
-	-- Weapon Progression
 	for _, weaponName in ipairs(WEAPON_TYPES) do
 		local savedStats = data.WeaponProgression[weaponName]
 		if not savedStats then
@@ -381,7 +375,8 @@ function module.CreateSessionStats(player, profile)
 	playerStats.Parent = player
 end
 
--- [[ MANA REGENERATION ]] --
+-- Regenerates 1 mana per second, or every 0.5 seconds with Excalibur, until the player
+-- leaves.
 local function startManaRegeneration(player)
 	task.spawn(function()
 		while player and player.Parent do
@@ -402,7 +397,13 @@ local function startManaRegeneration(player)
 	end)
 end
 
--- [[ DATA LOADING ]] --
+-- dataManager.PlayerAdded() - load the profile of a joining player
+-- @player: the player
+--
+-- Migrates old data, sets defaults for a new player, and creates PlayerStats. Kicks
+-- the player if the profile cannot load.
+--
+-- Return: nothing. Yields until the session starts.
 function module.PlayerAdded(player)
 	local profile = GameProfileStore:StartSessionAsync(tostring(player.UserId), {
 		Cancel = function()
@@ -432,10 +433,10 @@ function module.PlayerAdded(player)
 			profile.Data.CurrentTitle = ""
 		end
 
-		-- Migrate old quest structure to new array-based structure
+		-- Migrate the old quest format to the array format.
 		local q = profile.Data.Quest
 		if q then
-			-- Old structure had Active as a string or nil, Progress as a number
+			-- The old format had Active as a string or nil and Progress as a number.
 			if type(q.Active) ~= "table" then
 				local oldId = type(q.Active) == "string" and q.Active or nil
 				local oldProgress = type(q.Progress) == "number" and q.Progress or 0
@@ -445,9 +446,8 @@ function module.PlayerAdded(player)
 				end
 				q.Progress = nil
 			end
-			-- Only seed a default track when Tracked was never set (nil). `false`
-			-- means the player deliberately untracked in a prior session; preserve it
-			-- so rejoining does not silently re-track the first active quest.
+			-- Track the first active quest only when Tracked was never set (nil). false means the
+			-- player untracked on purpose, so a rejoin must not track a quest again.
 			if q.Tracked == nil and #q.Active > 0 then
 				q.Tracked = q.Active[1].Id
 			end
@@ -459,12 +459,11 @@ function module.PlayerAdded(player)
 			end
 		end
 
-		-- 1. Initialize InventoryData if it doesn't exist
 		if not profile.Data.InventoryData then
 			profile.Data.InventoryData = { Items = {}, Hotbar = {}, Equipment = {} }
 		end
 
-		-- 2. DATA MIGRATION: Old Inventory to New InventoryData
+		-- Migrate the old Inventory list to InventoryData.
 		if profile.Data.Inventory and #profile.Data.Inventory > 0 then
 			if #profile.Data.InventoryData.Items == 0 then
 				for _, toolName in ipairs(profile.Data.Inventory) do
@@ -474,17 +473,15 @@ function module.PlayerAdded(player)
 						Amount = 1,
 					})
 				end
-				print("[DATA] Migrated old inventory format for " .. player.Name)
 			end
 			profile.Data.Inventory = nil
 		end
 
-		-- 3. [[ NEW PLAYER LOGIC: GIVE DEFAULT WEAPON TO HOTBAR ]] --
+		-- A new player gets the default weapon in hotbar slot 1.
 		local invData = profile.Data.InventoryData
 		local isInventoryEmpty = #invData.Items == 0
 		local isHotbarEmpty = true
 
-		-- Check if any slot in hotbar is filled
 		for i = 1, 9 do
 			if invData.Hotbar[tostring(i)] or invData.Hotbar[i] then
 				isHotbarEmpty = false
@@ -493,24 +490,18 @@ function module.PlayerAdded(player)
 		end
 
 		if isInventoryEmpty and isHotbarEmpty then
-			print(
-				"[DATA] New Player detected. Assigning " .. DEFAULT_WEAPON .. " to Hotbar Slot 1."
-			)
 			local defaultItem = {
 				Id = game:GetService("HttpService"):GenerateGUID(false),
 				Name = DEFAULT_WEAPON,
 				Amount = 1,
 			}
-			-- Assign to Slot 1 in Data
 			invData.Hotbar["1"] = defaultItem
 		end
 
-		-- Ensure CurrentWeapon matches the default if empty
 		if profile.Data.CurrentWeapon == nil or profile.Data.CurrentWeapon == "" then
 			profile.Data.CurrentWeapon = DEFAULT_WEAPON
 		end
 
-		-- [[ 4. APPEARANCE INITIALIZATION ]] --
 		if profile.Data.EyeColor == nil then
 			local rand = REALISTIC_EYE_COLORS[math.random(1, #REALISTIC_EYE_COLORS)]
 			profile.Data.EyeColor = { R = rand.R, G = rand.G, B = rand.B }
@@ -530,7 +521,6 @@ function module.PlayerAdded(player)
 			Profiles[player] = profile
 			module.CreateSessionStats(player, profile)
 			startManaRegeneration(player)
-			print(string.format("[DATA] Profile loaded for %s", player.Name))
 		else
 			profile:EndSession()
 		end
@@ -539,14 +529,19 @@ function module.PlayerAdded(player)
 	end
 end
 
+-- The Liturgy a player drops for leaving during combat.
 local LOG_PENALTY_AMOUNT = 500
 
+-- dataManager.PlayerRemoving() - save and release the profile of a leaving player
+-- @player: the player
+--
+-- A player who leaves during combat drops LOG_PENALTY_AMOUNT Liturgy.
+--
+-- Return: nothing.
 function module.PlayerRemoving(player)
 	local combatExpiry = player:GetAttribute("CombatLogExpiry")
 
 	if combatExpiry and os.clock() < combatExpiry then
-		print(player.Name .. " combat logged! Applying penalty inside DataManager.")
-
 		local success = module.RemoveLiturgy(player, LOG_PENALTY_AMOUNT)
 
 		if success then
@@ -557,10 +552,8 @@ function module.PlayerRemoving(player)
 		end
 	end
 
-	-- Remove this leaver as an attacker from everyone they had tagged, and drop
-	-- their own tag. Without this, a victim stays in combat after their attacker
-	-- leaves (combat tag persists). Done here (PlayerRemoving) to avoid the
-	-- ordering race the manager comment warns about.
+	-- Remove the leaver as an attacker from everyone they tagged, and drop their own tag,
+	-- so no victim stays in combat. combatTagManager expects this call here.
 	local okTag, TagManager =
 		pcall(require, game:GetService("ServerScriptService").modules.combatTagManager)
 	if okTag and TagManager then
@@ -570,19 +563,25 @@ function module.PlayerRemoving(player)
 	local profile = Profiles[player]
 	if profile then
 		profile:EndSession()
-		print(string.format("[DATA] Saved %s", player.Name))
 	end
 end
 
--- [[ API METHODS ]] --
+-- dataManager.GetProfile() - get the loaded profile of a player
+-- @player: the player
+--
+-- Return: the profile, or nil.
 function module.GetProfile(player)
 	return Profiles[player]
 end
 
--- [[ STAT SPREAD API (Model A: skill-point budget) ]] --
 local VALID_STATS =
 	{ Vitality = true, Stamina = true, Strength = true, Dexterity = true, Magic = true }
 
+-- dataManager.GetStat() - get a player's invested points in a stat
+-- @player: the player
+-- @statName: Vitality, Stamina, Strength, Dexterity, or Magic
+--
+-- Return: the points, or 0.
 function module.GetStat(player, statName)
 	local p = Profiles[player]
 	if not p or not p.Data.Stats then
@@ -591,7 +590,7 @@ function module.GetStat(player, statName)
 	return p.Data.Stats[statName] or 0
 end
 
--- Sum of all assigned stat points (= skill points currently spent).
+-- The sum of all assigned stat points, which is the number of skill points spent.
 local function sumStats(p)
 	local total = 0
 	if p.Data.Stats then
@@ -602,11 +601,19 @@ local function sumStats(p)
 	return total
 end
 
+-- dataManager.GetSkillPointsOwned() - get the skill points a player bought
+-- @player: the player
+--
+-- Return: the number of skill points.
 function module.GetSkillPointsOwned(player)
 	local p = Profiles[player]
 	return p and (p.Data.SkillPointsOwned or 0) or 0
 end
 
+-- dataManager.GetAvailableSkillPoints() - get the skill points a player can assign
+-- @player: the player
+--
+-- Return: the owned points minus the assigned points.
 function module.GetAvailableSkillPoints(player)
 	local p = Profiles[player]
 	if not p then
@@ -615,7 +622,7 @@ function module.GetAvailableSkillPoints(player)
 	return (p.Data.SkillPointsOwned or 0) - sumStats(p)
 end
 
--- Mirror stat values + skill-point counters into the live PlayerStats.Stats folder.
+-- Copies a stat and the skill-point counters to the PlayerStats.Stats folder.
 local function pushStat(player, statName)
 	local p = Profiles[player]
 	if not p then
@@ -645,8 +652,13 @@ local function pushStat(player, statName)
 	end
 end
 
--- Buy one SKILL POINT with Liturgy (rising curve, capped at MAX_SKILL_POINTS).
--- Returns true, cost on success; false, reason on failure.
+-- dataManager.BuySkillPoint() - buy one skill point with Liturgy
+-- @player: the player
+--
+-- The cost rises with each point, up to StatScaling.MAX_SKILL_POINTS.
+--
+-- Return: true and the cost on success. false and a reason ("NoProfile",
+-- "MaxSkillPoints", or "NotEnoughLiturgy") on failure.
 function module.BuySkillPoint(player)
 	local p = Profiles[player]
 	if not p then
@@ -674,7 +686,14 @@ function module.BuySkillPoint(player)
 	return true, cost
 end
 
--- Assign one available skill point to a stat (free, 1:1). Capped at MAX_STAT.
+-- dataManager.AssignStatPoint() - assign one available skill point to a stat
+-- @player: the player
+-- @statName: Vitality, Stamina, Strength, Dexterity, or Magic
+--
+-- Assigning is free. A stat is capped at StatScaling.MAX_STAT.
+--
+-- Return: true on success. false and a reason ("NoProfile", "BadStat", "MaxStat", or
+-- "NoSkillPoints") on failure.
 function module.AssignStatPoint(player, statName)
 	local p = Profiles[player]
 	if not p then
@@ -702,9 +721,14 @@ function module.AssignStatPoint(player, statName)
 	return true
 end
 
--- Respec: free ALL assigned skill points (zero every stat). Keeps owned points.
--- No Liturgy involved (you keep the points you bought; this just frees them to
--- reassign). Refuses if nothing is assigned.
+-- dataManager.RespecStats() - unassign every stat point
+-- @player: the player
+--
+-- The player keeps the skill points they bought and can assign them again. Costs no
+-- Liturgy.
+--
+-- Return: true on success. false and a reason ("NoProfile", "NoStats", or
+-- "NothingToRespec") on failure.
 function module.RespecStats(player)
 	local p = Profiles[player]
 	if not p then
@@ -728,11 +752,18 @@ function module.RespecStats(player)
 	return true
 end
 
+-- dataManager.GetNextSkillPointCost() - get the Liturgy cost of the next skill point
+-- @player: the player
+--
+-- Return: the cost.
 function module.GetNextSkillPointCost(player)
 	return StatScaling.GetNextSkillPointCost(module.GetSkillPointsOwned(player))
 end
 
--- APPEARANCE API
+-- dataManager.GetEyeColor() - get a player's eye color
+-- @player: the player
+--
+-- Return: the color, or black when there is no profile.
 function module.GetEyeColor(player)
 	local p = Profiles[player]
 	if p and p.Data.EyeColor then
@@ -742,11 +773,20 @@ function module.GetEyeColor(player)
 	return Color3.new(0, 0, 0)
 end
 
+-- dataManager.GetFace() - get a player's face texture
+-- @player: the player
+--
+-- Return: the texture ID, or "rbxassetid://0".
 function module.GetFace(player)
 	local p = Profiles[player]
 	return p and p.Data.Face or "rbxassetid://0"
 end
 
+-- dataManager.SetFace() - set a player's face texture
+-- @player: the player
+-- @textureId: the texture ID
+--
+-- Return: nothing.
 function module.SetFace(player, textureId)
 	local p = Profiles[player]
 	if p then
@@ -754,7 +794,10 @@ function module.SetFace(player, textureId)
 	end
 end
 
--- [[ BARBER API ]] --
+-- dataManager.GetAppearance() - get a player's hair, gender, and armor color
+-- @player: the player
+--
+-- Return: { Hair, Gender, ArmorColor }, or nil when there is no profile.
 function module.GetAppearance(player)
 	local p = Profiles[player]
 	if not p then
@@ -781,6 +824,12 @@ function module.GetAppearance(player)
 	}
 end
 
+-- dataManager.SetHair() - set one hair slot
+-- @player: the player
+-- @slot: the hair slot, 1 to 3
+-- @id: the hair asset ID
+--
+-- Return: nothing.
 function module.SetHair(player, slot, id)
 	local p = Profiles[player]
 	if p then
@@ -791,6 +840,10 @@ function module.SetHair(player, slot, id)
 	end
 end
 
+-- dataManager.ResetHair() - clear every hair slot
+-- @player: the player
+--
+-- Return: nothing.
 function module.ResetHair(player)
 	local p = Profiles[player]
 	if p then
@@ -798,6 +851,11 @@ function module.ResetHair(player)
 	end
 end
 
+-- dataManager.SetGender() - set a player's gender
+-- @player: the player
+-- @gender: the gender
+--
+-- Return: nothing.
 function module.SetGender(player, gender)
 	local p = Profiles[player]
 	if p then
@@ -805,6 +863,11 @@ function module.SetGender(player, gender)
 	end
 end
 
+-- dataManager.SetArmorColor() - set a player's armor color
+-- @player: the player
+-- @color: the Color3
+--
+-- Return: nothing.
 function module.SetArmorColor(player, color)
 	local p = Profiles[player]
 	if p then
@@ -816,12 +879,20 @@ function module.SetArmorColor(player, color)
 	end
 end
 
--- Liturgy Logic
+-- dataManager.GetLiturgy() - get a player's Liturgy
+-- @player: the player
+--
+-- Return: the amount.
 function module.GetLiturgy(player)
 	local p = Profiles[player]
 	return p and p.Data.Liturgy or 0
 end
 
+-- dataManager.AddLiturgy() - give a player Liturgy
+-- @player: the player
+-- @amount: the amount before the player's LiturgyMultiplier
+--
+-- Return: nothing.
 function module.AddLiturgy(player, amount)
 	local p = Profiles[player]
 	if p then
@@ -835,6 +906,11 @@ function module.AddLiturgy(player, amount)
 	end
 end
 
+-- dataManager.RemoveLiturgy() - take Liturgy from a player
+-- @player: the player
+-- @amount: the amount
+--
+-- Return: true if the player had enough, false otherwise.
 function module.RemoveLiturgy(player, amount)
 	local p = Profiles[player]
 	if p and p.Data.Liturgy >= amount then
@@ -848,11 +924,20 @@ function module.RemoveLiturgy(player, amount)
 	return false
 end
 
+-- dataManager.GetCurrentArmor() - get the armor that sets a player's stats
+-- @player: the player
+--
+-- Return: the armor name, "Rags" by default.
 function module.GetCurrentArmor(player)
 	local profile = Profiles[player]
 	return profile and profile.Data.CurrentArmor or "Rags"
 end
 
+-- dataManager.SetCurrentArmor() - set the armor that sets a player's stats
+-- @player: the player
+-- @armorName: the armor name
+--
+-- Return: nothing.
 function module.SetCurrentArmor(player, armorName)
 	local profile = Profiles[player]
 	if profile then
@@ -860,6 +945,11 @@ function module.SetCurrentArmor(player, armorName)
 	end
 end
 
+-- dataManager.OwnsArmor() - check whether a player owns an armor
+-- @player: the player
+-- @armorName: the armor name
+--
+-- Return: true if the player owns it.
 function module.OwnsArmor(player, armorName)
 	local profile = Profiles[player]
 	if not profile then
@@ -868,6 +958,11 @@ function module.OwnsArmor(player, armorName)
 	return table.find(profile.Data.OwnedArmors, armorName) ~= nil
 end
 
+-- dataManager.AddArmor() - give a player an armor
+-- @player: the player
+-- @armorName: the armor name
+--
+-- Return: nothing.
 function module.AddArmor(player, armorName)
 	local profile = Profiles[player]
 	if profile then
@@ -877,8 +972,10 @@ function module.AddArmor(player, armorName)
 	end
 end
 
--- Vanity (transmog) accessors. CurrentVanity is nil when vanity follows the
--- stats-armor; GetCurrentVanity resolves that fallback for callers.
+-- dataManager.GetCurrentVanity() - get the armor that a player shows
+-- @player: the player
+--
+-- Return: the transmog armor, or the current armor when there is no transmog.
 function module.GetCurrentVanity(player)
 	local profile = Profiles[player]
 	if not profile then
@@ -887,6 +984,11 @@ function module.GetCurrentVanity(player)
 	return profile.Data.CurrentVanity or profile.Data.CurrentArmor or "Rags"
 end
 
+-- dataManager.SetCurrentVanity() - set the transmog armor
+-- @player: the player
+-- @armorName: the armor to show, or nil to show the current armor
+--
+-- Return: nothing.
 function module.SetCurrentVanity(player, armorName)
 	local profile = Profiles[player]
 	if profile then
@@ -894,11 +996,21 @@ function module.SetCurrentVanity(player, armorName)
 	end
 end
 
+-- dataManager.GetPity() - get a player's race spin pity counter
+-- @player: the player
+--
+-- Return: the counter.
 function module.GetPity(player)
 	local p = Profiles[player]
 	return p and p.Data.Pity or 0
 end
 
+-- dataManager.UpdatePity() - add to or reset the pity counter
+-- @player: the player
+-- @amount: the amount to add
+-- @reset: true to set the counter to 0 instead
+--
+-- Return: nothing.
 function module.UpdatePity(player, amount, reset)
 	local p = Profiles[player]
 	if p then
@@ -914,11 +1026,20 @@ function module.UpdatePity(player, amount, reset)
 	end
 end
 
+-- dataManager.GetSpins() - get a player's race spins
+-- @player: the player
+--
+-- Return: the number of spins.
 function module.GetSpins(player)
 	local p = Profiles[player]
 	return p and p.Data.Spins or 0
 end
 
+-- dataManager.UpdateSpins() - add race spins
+-- @player: the player
+-- @amount: the number of spins to add, negative to use them
+--
+-- Return: nothing.
 function module.UpdateSpins(player, amount)
 	local p = Profiles[player]
 	if p then
@@ -930,6 +1051,12 @@ function module.UpdateSpins(player, amount)
 	end
 end
 
+-- dataManager.SetRaceStats() - set a player's race and its stat boosts
+-- @player: the player
+-- @raceName: the race name
+-- @statsTable: the Stats table of the race in RaceConfig
+--
+-- Return: nothing.
 function module.SetRaceStats(player, raceName, statsTable)
 	local p = Profiles[player]
 	if not p then
@@ -951,6 +1078,10 @@ function module.SetRaceStats(player, raceName, statsTable)
 	end
 end
 
+-- dataManager.YieldUntilLoaded() - wait for a player's profile to load
+-- @player: the player
+--
+-- Return: nothing. Yields for at most 15 seconds.
 function module.YieldUntilLoaded(player)
 	if Profiles[player] then
 		return
@@ -961,7 +1092,14 @@ function module.YieldUntilLoaded(player)
 	until Profiles[player] or tick() - t > 15
 end
 
--- [[ FIXED HYBRID LOGIC: EquipLoadout ]] --
+-- dataManager.EquipLoadout() - give a player the tools from their saved inventory
+-- @player: the player
+-- @character: not used
+--
+-- Clears the Backpack and StarterGear, then gives each item from the grid, hotbar,
+-- and equipment once.
+--
+-- Return: nothing.
 function module.EquipLoadout(player, character)
 	local profile = Profiles[player]
 	if not profile then
@@ -972,7 +1110,6 @@ function module.EquipLoadout(player, character)
 	local invData = data.InventoryData or { Items = {}, Hotbar = {}, Equipment = {} }
 	local currentWeapon = data.CurrentWeapon
 
-	-- [[ REFERENCE BOTH FOLDERS ]] --
 	local weaponsFolder = ServerStorage:FindFirstChild("Weapons")
 	local equipmentFolder = ServerStorage:FindFirstChild("Equipment")
 
@@ -981,11 +1118,9 @@ function module.EquipLoadout(player, character)
 
 	local givenItems = {}
 
-	-- Helper function to clone tool if not already given
 	local function giveItem(itemName)
-		--task.wait()
 		if itemName and not givenItems[itemName] then
-			-- [[ DUAL FOLDER CHECK ]] --
+			-- Weapons first, then equipment.
 			local toolTemplate = nil
 			if weaponsFolder then
 				toolTemplate = weaponsFolder:FindFirstChild(itemName)
@@ -1002,38 +1137,30 @@ function module.EquipLoadout(player, character)
 		end
 	end
 
-	-- 1. Read all tools from general items array
 	for _, itemData in ipairs(invData.Items or {}) do
-		print(itemData.Name)
 		giveItem(itemData.Name)
 	end
 
-	-- 2. Read all tools from the hotbar dictionary
 	for _, itemData in pairs(invData.Hotbar or {}) do
 		if itemData and not itemData.IsSpell then
-			print(itemData.Name)
 			giveItem(itemData.Name)
 		end
 	end
 
-	-- 3. Read all tools from equipment dictionary (if you treat equipment as tools)
 	for _, itemData in pairs(invData.Equipment or {}) do
 		if itemData then
-			print(itemData.Name)
 			giveItem(itemData.Name)
 		end
 	end
-
-	-- Equip the last known equipped weapon automatically
-	--local toolToEquip = player.Backpack:FindFirstChild(currentWeapon)
-	--local humanoid = character:FindFirstChild("Humanoid")
-
-	--if toolToEquip and humanoid then
-	--	humanoid:EquipTool(toolToEquip)
-	--end
 end
 
--- Drops
+-- dataManager.HandlePlayerDeath() - drop part of a dead player's Liturgy
+-- @player: the player who died
+-- @position: where to drop it
+--
+-- Drops at most DEATH_DROP_AMOUNT.
+--
+-- Return: nothing.
 function module.HandlePlayerDeath(player, position)
 	local current = module.GetLiturgy(player)
 	local dropAmount = math.min(current, DEATH_DROP_AMOUNT)
@@ -1045,6 +1172,13 @@ function module.HandlePlayerDeath(player, position)
 	end
 end
 
+-- dataManager.CreateDrop() - create a Liturgy pickup in the world
+-- @position: where to create it
+-- @amount: the Liturgy in the pickup
+--
+-- The pickup disappears after DROP_LIFETIME seconds.
+--
+-- Return: nothing.
 function module.CreateDrop(position, amount)
 	if amount <= 0 then
 		return
@@ -1083,8 +1217,11 @@ function module.CreateDrop(position, amount)
 	Debris:AddItem(dropPart, DROP_LIFETIME)
 end
 
--- Reads a family's current mastery level straight off the profile. Returns 0 when
--- the family does not exist, so callers can compare against thresholds safely.
+-- dataManager.GetWeaponLevel() - get a player's mastery level in a weapon family
+-- @player: the player
+-- @family: the weapon family
+--
+-- Return: the level, or 0 when the family does not exist.
 function module.GetWeaponLevel(player, family)
 	local profile = Profiles[player]
 	if not profile then
@@ -1094,8 +1231,8 @@ function module.GetWeaponLevel(player, family)
 	return weaponData and weaponData.Level or 0
 end
 
--- Awards XP to a SINGLE family and returns the level it ended on. Does not touch
--- quests; the caller reconciles once, after all families have been credited.
+-- Gives XP to one family and returns its new level. It does not touch quests: the
+-- caller reconciles once, after every family has its XP.
 local function grantFamilyXP(player, family, amount)
 	local profile = Profiles[player]
 	if not profile then
@@ -1104,7 +1241,7 @@ local function grantFamilyXP(player, family, amount)
 
 	local weaponData = profile.Data.WeaponProgression[family]
 	if not weaponData then
-		warn("[DataManager] No WeaponProgression entry for family: " .. tostring(family))
+		warn(`[dataManager] No WeaponProgression entry for family {family}.`)
 		return nil
 	end
 
@@ -1120,7 +1257,7 @@ local function grantFamilyXP(player, family, amount)
 		end
 	end
 
-	-- Cap XP at the max-level threshold so the bar does not keep filling past 25.
+	-- At the max level, keep XP at 0 so the bar does not fill past 25.
 	if weaponData.Level >= MAX_LEVEL then
 		weaponData.XP = 0
 	end
@@ -1143,17 +1280,16 @@ local function grantFamilyXP(player, family, amount)
 	return weaponData.Level
 end
 
--- Awards weapon XP. `weaponName` may be a family ("Fists"), a branch weapon
--- ("Caestus", "Shackles"), or a hybrid ("Guandao").
+-- dataManager.AddWeaponXP() - give weapon XP to a player
+-- @player: the player
+-- @weaponName: a family ("Fists"), a branch weapon ("Caestus"), or a hybrid ("Guandao")
+-- @amount: the XP
 --
---   branch weapon -> resolved to its family via SkillConfig.WeaponFamily
---   hybrid        -> HALVED XP to each of its two parent families
+-- A branch weapon gives XP to its family. A hybrid gives half the XP to each parent
+-- family. Quests are then reconciled from the profile, not from the level-up, so a
+-- player who passes several milestones at once still gets the right checkpoint.
 --
--- Quest state is NEVER driven off the level-up event. We credit the XP, then ask
--- the reconciler to evaluate the resulting profile state. A player who blows past
--- several milestones in one hit, or who is already mid-quest, still lands on the
--- correct next checkpoint, because the reconciler reads the profile rather than
--- trusting a one-shot signal it might miss.
+-- Return: nothing.
 function module.AddWeaponXP(player, weaponName, amount)
 	local profile = Profiles[player]
 	if not profile then
@@ -1178,7 +1314,7 @@ function module.AddWeaponXP(player, weaponName, amount)
 	else
 		local family = SkillConfig.GetXPFamily(weaponName)
 		if not family then
-			warn("[DataManager] Unrecognised weapon for XP: " .. tostring(weaponName))
+			warn(`[dataManager] Unknown weapon {weaponName} for XP.`)
 			return
 		end
 		if grantFamilyXP(player, family, amount) then
@@ -1203,15 +1339,18 @@ function module.AddWeaponXP(player, weaponName, amount)
 			end
 		end
 
-		-- A parent family levelling may have crossed a hybrid threshold, so
-		-- re-evaluate every hybrid whose parents we just touched.
+		-- A parent family level-up can unlock a hybrid skill.
 		if QuestManager then
 			QuestManager.ReconcileHybrids(player)
 		end
 	end)
 end
 
--- Inventory & Selection
+-- dataManager.SetCurrentWeapon() - save the weapon a player holds
+-- @player: the player
+-- @weaponName: the weapon name, or "" for none
+--
+-- Return: nothing.
 function module.SetCurrentWeapon(player, weaponName)
 	local profile = Profiles[player]
 	if profile then
@@ -1219,15 +1358,23 @@ function module.SetCurrentWeapon(player, weaponName)
 	end
 end
 
+-- dataManager.GetCurrentWeapon() - get the saved weapon of a player
+-- @player: the player
+--
+-- Return: the weapon name, DEFAULT_WEAPON when there is no profile.
 function module.GetCurrentWeapon(player)
 	local profile = Profiles[player]
 	return profile and profile.Data.CurrentWeapon or DEFAULT_WEAPON
 end
 
--- [[ SPELLBOOK SNAPSHOT ]] --
--- Resolves the player's CurrentWeapon -> family, then for each slot (Z/X/C)
--- returns the skills they own and which one is equipped. All server-authoritative;
--- the client just renders this. Returns { ok, family, slots = { Z = {owned={}, equipped=}, ... } }.
+-- dataManager.GetSpellbookSnapshot() - get the spellbook view of a player
+-- @player: the player
+--
+-- Finds the family of the player's weapon, then lists the owned and equipped skill of
+-- each slot (Z, X, C). The client only draws this.
+--
+-- Return: { ok, family, slots }, where slots[slotKey] = { owned, equipped }. On failure,
+-- { ok = false, reason = "NoProfile" }.
 function module.GetSpellbookSnapshot(player)
 	local profile = Profiles[player]
 	if not profile then
@@ -1236,10 +1383,9 @@ function module.GetSpellbookSnapshot(player)
 
 	local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 
-	-- Resolve the player's weapon from what they actually have, not the stored field.
-	-- Priority: the held Tool (one weapon on the avatar at a time), then any weapon
-	-- Tool in the Backpack (covers a sheathed weapon while resting). A Tool is a
-	-- weapon iff its name is a key in WeaponFamily, which skips spells/consumables.
+	-- Find the weapon from what the player has, not from the saved field: the held Tool
+	-- first, then a weapon Tool in the Backpack. A Tool is a weapon if its name is a key
+	-- in WeaponFamily, which skips spells and consumables.
 	local function resolveWeaponName()
 		local char = player.Character
 		if char then
@@ -1256,7 +1402,7 @@ function module.GetSpellbookSnapshot(player)
 				end
 			end
 		end
-		-- Last resort: the stored field, if it happens to be a real weapon.
+		-- Last, the saved field, if it is a real weapon.
 		local stored = profile.Data.CurrentWeapon
 		if stored and SkillConfig.WeaponFamily[stored] then
 			return stored
@@ -1306,11 +1452,20 @@ function module.GetSpellbookSnapshot(player)
 	return { ok = true, family = family, slots = slots }
 end
 
+-- dataManager.GetInventoryData() - get a player's saved inventory
+-- @player: the player
+--
+-- Return: the InventoryData table, or nil.
 function module.GetInventoryData(player)
 	local profile = Profiles[player]
 	return profile and profile.Data.InventoryData or nil
 end
 
+-- dataManager.SaveInventoryData() - replace a player's saved inventory
+-- @player: the player
+-- @newInventoryData: the new { Items, Hotbar, Equipment } table
+--
+-- Return: nothing.
 function module.SaveInventoryData(player, newInventoryData)
 	local profile = Profiles[player]
 	if profile then
@@ -1318,6 +1473,11 @@ function module.SaveInventoryData(player, newInventoryData)
 	end
 end
 
+-- dataManager.HasItem() - check whether a player owns an item
+-- @player: the player
+-- @itemName: the item name
+--
+-- Return: true if the item is in the grid, hotbar, or equipment.
 function module.HasItem(player, itemName)
 	local profile = Profiles[player]
 	if not profile then
@@ -1329,21 +1489,18 @@ function module.HasItem(player, itemName)
 		return false
 	end
 
-	-- 1. Check general inventory
 	for _, item in ipairs(invData.Items or {}) do
 		if item.Name == itemName then
 			return true
 		end
 	end
 
-	-- 2. Check hotbar
 	for _, item in pairs(invData.Hotbar or {}) do
 		if item and item.Name == itemName then
 			return true
 		end
 	end
 
-	-- 3. Check equipped gear
 	for _, item in pairs(invData.Equipment or {}) do
 		if item and item.Name == itemName then
 			return true
@@ -1353,6 +1510,13 @@ function module.HasItem(player, itemName)
 	return false
 end
 
+-- dataManager.UnlockSpell() - give a player a skill
+-- @player: the player
+-- @spellName: the skill name
+--
+-- Also equips the skill into its family slot. Does nothing if the player has it.
+--
+-- Return: nothing.
 function module.UnlockSpell(player, spellName)
 	local profile = Profiles[player]
 	if profile then
@@ -1373,9 +1537,7 @@ function module.UnlockSpell(player, spellName)
 					val.Parent = skillsFolder
 				end
 			end
-			-- [[ AUTO-EQUIP INTO SPELLBOOK ]] --
-			-- Place the newly learned skill into its own family slot, overwriting
-			-- whatever sat there. Other two slots are left untouched.
+			-- Equip the new skill into its family slot. The other two slots do not change.
 			local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 			local fam, slotIdx = SkillConfig.FindSkillSlot(spellName)
 			if fam and slotIdx then
@@ -1386,7 +1548,7 @@ function module.UnlockSpell(player, spellName)
 				profile.Data.EquippedSkills[fam] = profile.Data.EquippedSkills[fam] or {}
 				profile.Data.EquippedSkills[fam][slotKey] = spellName
 
-				-- Mirror to the replicated folder so the client updates immediately.
+				-- Copy it to the replicated folder so the client updates at once.
 				if stats then
 					local equippedFolder = stats:FindFirstChild("EquippedSkills")
 					if equippedFolder then
@@ -1409,7 +1571,6 @@ function module.UnlockSpell(player, spellName)
 				end
 			end
 
-			print(string.format("[DATA] %s unlocked spell: %s", player.Name, spellName))
 			local tm = _G.TitleManager
 			if tm then
 				tm.CheckSkillUnlock(player, spellName)
@@ -1418,6 +1579,11 @@ function module.UnlockSpell(player, spellName)
 	end
 end
 
+-- dataManager.HasSpell() - check whether a player has a skill
+-- @player: the player
+-- @spellName: the skill name
+--
+-- Return: true if the player has it.
 function module.HasSpell(player, spellName)
 	local profile = Profiles[player]
 	if not profile then
@@ -1429,9 +1595,15 @@ function module.HasSpell(player, spellName)
 	return table.find(profile.Data.UnlockedSpells, spellName) ~= nil
 end
 
--- [[ SPELLBOOK: equip an owned skill into a slot of its family ]] --
--- Validates ownership and that the skill actually belongs to (family, slot).
--- Returns true on success. Used by the spire spellbook UI.
+-- dataManager.EquipSkill() - equip an owned skill into a slot of its family
+-- @player: the player
+-- @family: the weapon family
+-- @slotKey: "Z", "X", or "C"
+-- @skillName: the skill name
+--
+-- The spire spellbook UI calls this. The skill must belong to the family and slot.
+--
+-- Return: true on success, false otherwise.
 function module.EquipSkill(player, family, slotKey, skillName)
 	local profile = Profiles[player]
 	if not profile then
@@ -1440,7 +1612,6 @@ function module.EquipSkill(player, family, slotKey, skillName)
 
 	local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 
-	-- Verify the skill belongs to this family + slot.
 	local fam, slotIdx = SkillConfig.FindSkillSlot(skillName)
 	if fam ~= family then
 		return false
@@ -1449,7 +1620,6 @@ function module.EquipSkill(player, family, slotKey, skillName)
 		return false
 	end
 
-	-- Verify ownership.
 	if not module.HasSpell(player, skillName) then
 		return false
 	end
@@ -1458,7 +1628,6 @@ function module.EquipSkill(player, family, slotKey, skillName)
 	profile.Data.EquippedSkills[family] = profile.Data.EquippedSkills[family] or {}
 	profile.Data.EquippedSkills[family][slotKey] = skillName
 
-	-- Mirror to replicated folder.
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
 		local equippedFolder = stats:FindFirstChild("EquippedSkills")
@@ -1483,7 +1652,12 @@ function module.EquipSkill(player, family, slotKey, skillName)
 	return true
 end
 
--- Returns the equipped skill name for a family + slot, or nil.
+-- dataManager.GetEquippedSkill() - get the equipped skill of a slot
+-- @player: the player
+-- @family: the weapon family
+-- @slotKey: "Z", "X", or "C"
+--
+-- Return: the skill name, or nil.
 function module.GetEquippedSkill(player, family, slotKey)
 	local profile = Profiles[player]
 	if not profile or not profile.Data.EquippedSkills then
@@ -1500,7 +1674,11 @@ function module.GetEquippedSkill(player, family, slotKey)
 	return v
 end
 
--- Tutorial
+-- dataManager.SetTutorialComplete() - set whether a player finished the tutorial
+-- @player: the player
+-- @status: true by default
+--
+-- Return: nothing.
 function module.SetTutorialComplete(player, status)
 	local profile = Profiles[player]
 	if profile then
@@ -1511,12 +1689,20 @@ function module.SetTutorialComplete(player, status)
 	end
 end
 
+-- dataManager.GetTutorialComplete() - check whether a player finished the tutorial
+-- @player: the player
+--
+-- Return: true if the tutorial is complete.
 function module.GetTutorialComplete(player)
 	local profile = Profiles[player]
 	return profile and profile.Data.TutorialComplete or false
 end
 
--- Mana
+-- dataManager.ConsumeMana() - spend a player's mana
+-- @player: the player
+-- @amount: the mana to spend
+--
+-- Return: true if the player had enough, false otherwise.
 function module.ConsumeMana(player, amount)
 	local stats = player:FindFirstChild("PlayerStats")
 	if not stats then
@@ -1530,16 +1716,21 @@ function module.ConsumeMana(player, amount)
 	return false
 end
 
--- [[ FIXED: Clear the new OOP Inventory Data structure ]]
+-- dataManager.ClearInventory() - empty a player's saved inventory
+-- @player: the player
+--
+-- Return: nothing.
 function module.ClearInventory(player)
 	local profile = Profiles[player]
 	if profile then
 		profile.Data.InventoryData = { Items = {}, Hotbar = {}, Equipment = {} }
-		print(string.format("[DATA] Cleared saved inventory for %s", player.Name))
 	end
 end
 
--- [[ GET QUEST DATA ]]
+-- dataManager.GetQuestData() - get a player's quest data
+-- @player: the player
+--
+-- Return: the Quest table, or nil when there is no profile.
 function module.GetQuestData(player)
 	local p = Profiles[player]
 	if not p then
@@ -1554,7 +1745,11 @@ function module.GetQuestData(player)
 	return p.Data.Quest
 end
 
--- [[ GET SINGLE ACTIVE QUEST ENTRY BY ID ]]
+-- dataManager.GetActiveQuestEntry() - get the entry of an active quest
+-- @player: the player
+-- @questId: the quest ID
+--
+-- Return: { Id, Progress }, or nil.
 function module.GetActiveQuestEntry(player, questId)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1568,12 +1763,20 @@ function module.GetActiveQuestEntry(player, questId)
 	return nil
 end
 
--- [[ CHECK IF QUEST IS ACTIVE ]]
+-- dataManager.IsQuestActive() - check whether a quest is active
+-- @player: the player
+-- @questId: the quest ID
+--
+-- Return: true if it is active.
 function module.IsQuestActive(player, questId)
 	return module.GetActiveQuestEntry(player, questId) ~= nil
 end
 
--- [[ ADD QUEST TO ACTIVE ARRAY ]]
+-- dataManager.SetActiveQuest() - add a quest to the active list
+-- @player: the player
+-- @questId: the quest ID
+--
+-- Return: nothing.
 function module.SetActiveQuest(player, questId)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1583,14 +1786,19 @@ function module.SetActiveQuest(player, questId)
 		return
 	end
 	table.insert(questData.Active, { Id = questId, Progress = 0 })
-	-- Auto-track ONLY if Tracked was never set (nil). A `false` here means the
-	-- player deliberately untracked, so leave it alone instead of re-picking.
+	-- Track it only if Tracked was never set (nil). false means the player untracked on
+	-- purpose.
 	if questData.Tracked == nil then
 		questData.Tracked = questId
 	end
 end
 
--- [[ UPDATE PROGRESS FOR A SPECIFIC QUEST ]]
+-- dataManager.UpdateQuestProgress() - add progress to an active quest
+-- @player: the player
+-- @questId: the quest ID
+-- @amount: the progress to add
+--
+-- Return: the new progress, or 0 when the quest is not active.
 function module.UpdateQuestProgress(player, questId, amount)
 	local entry = module.GetActiveQuestEntry(player, questId)
 	if not entry then
@@ -1600,13 +1808,15 @@ function module.UpdateQuestProgress(player, questId, amount)
 	return entry.Progress
 end
 
--- [[ SET TRACKED QUEST ]]
--- Tracked has THREE states, do not collapse them:
---   a quest id  -> that quest is tracked
---   false       -> player deliberately untracked; auto-track must NOT re-pick
---   nil         -> never set; auto-track is free to pick a default on grant/load
--- Untracking passes questId == nil, which we store as `false` (the sentinel) so
--- a later grant/completion/reconcile does not silently re-track on rejoin.
+-- dataManager.SetTrackedQuest() - set the tracked quest
+-- @player: the player
+-- @questId: the quest ID, or nil to untrack
+--
+-- Tracked has three states: a quest ID, false (the player untracked on purpose, so
+-- auto-tracking must not pick one), and nil (never set, so auto-tracking may pick one).
+-- Untracking stores false, so a later grant or rejoin does not track a quest again.
+--
+-- Return: nothing.
 function module.SetTrackedQuest(player, questId)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1619,10 +1829,10 @@ function module.SetTrackedQuest(player, questId)
 	end
 end
 
--- [[ GET TRACKED QUEST ID ]]
--- Returns a quest id, or nil for both "untracked" (false) and "never set" (nil).
--- Callers that only care about the id keep working; the false/nil distinction is
--- only consulted by the auto-track guards below.
+-- dataManager.GetTrackedQuest() - get the tracked quest
+-- @player: the player
+--
+-- Return: the quest ID, or nil for both untracked (false) and never set (nil).
 function module.GetTrackedQuest(player)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1631,11 +1841,18 @@ function module.GetTrackedQuest(player)
 	local tracked = questData.Tracked
 	if not tracked then
 		return nil
-	end -- covers both false and nil
+	end
 	return tracked
 end
 
--- [[ REMOVE QUEST FROM ACTIVE ARRAY AND OPTIONALLY MARK COMPLETE ]]
+-- dataManager.ClearActiveQuest() - remove a quest from the active list
+-- @player: the player
+-- @questId: the quest ID
+-- @markComplete: true to add the quest to the completed list
+--
+-- If the quest was tracked, the next active quest is tracked.
+--
+-- Return: nothing.
 function module.ClearActiveQuest(player, questId, markComplete)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1652,7 +1869,6 @@ function module.ClearActiveQuest(player, questId, markComplete)
 			table.insert(questData.Completed, questId)
 		end
 	end
-	-- If the completed quest was tracked, auto-track the next available one
 	if questData.Tracked == questId then
 		if #questData.Active > 0 then
 			questData.Tracked = questData.Active[1].Id
@@ -1662,10 +1878,17 @@ function module.ClearActiveQuest(player, questId, markComplete)
 	end
 end
 
+-- dataManager.ClearQuest() - remove all trace of a quest
+-- @player: the player
+-- @questId: the quest ID
+--
+-- Removes the quest from the active and completed lists and untracks it.
+--
+-- Return: nothing.
 function module.ClearQuest(player, questId)
 	local p = Profiles[player]
 	if not p then
-		warn("[DataManager] Profile not found for " .. tostring(player))
+		warn(`[dataManager] ClearQuest: no profile for {player}.`)
 		return
 	end
 
@@ -1674,33 +1897,29 @@ function module.ClearQuest(player, questId)
 		return
 	end
 
-	-- Remove from Active
 	for i, entry in ipairs(quest.Active or {}) do
 		if entry.Id == questId then
 			table.remove(quest.Active, i)
-			print("[DataManager] Removed " .. questId .. " from Active.")
 			break
 		end
 	end
 
-	-- Remove from Completed
 	for i, id in ipairs(quest.Completed or {}) do
 		if id == questId then
 			table.remove(quest.Completed, i)
-			print("[DataManager] Removed " .. questId .. " from Completed.")
 			break
 		end
 	end
 
-	-- Clear tracked if it was this quest
 	if quest.Tracked == questId then
 		quest.Tracked = nil
 	end
-
-	print("[DataManager] ClearQuest done for: " .. questId)
 end
 
--- [[ GET ALL ACTIVE QUEST ENTRIES ]]
+-- dataManager.GetAllActiveQuests() - get every active quest entry
+-- @player: the player
+--
+-- Return: an array of { Id, Progress }.
 function module.GetAllActiveQuests(player)
 	local questData = module.GetQuestData(player)
 	if not questData then
@@ -1709,6 +1928,10 @@ function module.GetAllActiveQuests(player)
 	return questData.Active
 end
 
+-- dataManager.GetAttuned() - get the spires a player is attuned to
+-- @player: the player
+--
+-- Return: an array of spire IDs.
 function module.GetAttuned(player)
 	local p = Profiles[player]
 	if not p then
@@ -1720,11 +1943,21 @@ function module.GetAttuned(player)
 	return p.Data.Attuned
 end
 
+-- dataManager.IsAttuned() - check whether a player is attuned to a spire
+-- @player: the player
+-- @spireId: the spire ID
+--
+-- Return: true if attuned.
 function module.IsAttuned(player, spireId)
 	local attuned = module.GetAttuned(player)
 	return table.find(attuned, spireId) ~= nil
 end
 
+-- dataManager.AddAttuned() - attune a player to a spire
+-- @player: the player
+-- @spireId: the spire ID
+--
+-- Return: true if the spire is new, false otherwise.
 function module.AddAttuned(player, spireId)
 	local p = Profiles[player]
 	if not p then
@@ -1740,6 +1973,11 @@ function module.AddAttuned(player, spireId)
 	return true
 end
 
+-- dataManager.UnlockTitle() - give a player a title
+-- @player: the player
+-- @title: the title
+--
+-- Return: true if the title is new, false otherwise.
 function module.UnlockTitle(player, title)
 	local p = Profiles[player]
 	if not p then
@@ -1752,10 +1990,14 @@ function module.UnlockTitle(player, title)
 		return false
 	end
 	table.insert(p.Data.UnlockedTitles, title)
-	print(string.format("[DATA] %s unlocked title: %s", player.Name, title))
 	return true
 end
 
+-- dataManager.HasTitle() - check whether a player has a title
+-- @player: the player
+-- @title: the title
+--
+-- Return: true if the player has it.
 function module.HasTitle(player, title)
 	local p = Profiles[player]
 	if not p then
@@ -1767,6 +2009,13 @@ function module.HasTitle(player, title)
 	return table.find(p.Data.UnlockedTitles, title) ~= nil
 end
 
+-- dataManager.SetCurrentTitle() - equip a title
+-- @player: the player
+-- @title: an unlocked title, or "" for none
+--
+-- Also sets the Title attribute on the player.
+--
+-- Return: true on success, false if the title is locked.
 function module.SetCurrentTitle(player, title)
 	local p = Profiles[player]
 	if not p then
@@ -1780,16 +2029,28 @@ function module.SetCurrentTitle(player, title)
 	return true
 end
 
+-- dataManager.GetCurrentTitle() - get the equipped title
+-- @player: the player
+--
+-- Return: the title, or "".
 function module.GetCurrentTitle(player)
 	local p = Profiles[player]
 	return p and p.Data.CurrentTitle or ""
 end
 
+-- dataManager.GetUnlockedTitles() - get a player's titles
+-- @player: the player
+--
+-- Return: an array of titles.
 function module.GetUnlockedTitles(player)
 	local p = Profiles[player]
 	return p and p.Data.UnlockedTitles or {}
 end
 
+-- dataManager.AddKill() - count a player kill
+-- @player: the killer
+--
+-- Return: the new kill count.
 function module.AddKill(player)
 	local p = Profiles[player]
 	if not p then
@@ -1799,6 +2060,10 @@ function module.AddKill(player)
 	return p.Data.PlayerKills
 end
 
+-- dataManager.AddDeath() - count a death
+-- @player: the player who died
+--
+-- Return: the new death count.
 function module.AddDeath(player)
 	local p = Profiles[player]
 	if not p then
@@ -1808,35 +2073,54 @@ function module.AddDeath(player)
 	return p.Data.PlayerDeaths
 end
 
+-- dataManager.GetKills() - get a player's kill count
+-- @player: the player
+--
+-- Return: the count.
 function module.GetKills(player)
 	local p = Profiles[player]
 	return p and (p.Data.PlayerKills or 0) or 0
 end
 
+-- dataManager.GetDeaths() - get a player's death count
+-- @player: the player
+--
+-- Return: the count.
 function module.GetDeaths(player)
 	local p = Profiles[player]
 	return p and (p.Data.PlayerDeaths or 0) or 0
 end
 
+-- dataManager.SaveLastPosition() - save where a player is
+-- @player: the player
+-- @position: the Vector3 position
+--
+-- Return: nothing.
 function module.SaveLastPosition(player, position)
 	local p = Profiles[player]
 	if not p then
 		return
 	end
 	p.Data.LastPosition = { X = position.X, Y = position.Y, Z = position.Z }
-	--print(p.Data.LastPosition)
 end
 
+-- dataManager.GetLastPosition() - get a player's saved position
+-- @player: the player
+--
+-- Return: the Vector3, or nil.
 function module.GetLastPosition(player)
 	local p = Profiles[player]
 	if not p or not p.Data.LastPosition then
 		return nil
 	end
 	local pos = p.Data.LastPosition
-	--print(pos)
 	return Vector3.new(pos.X, pos.Y, pos.Z)
 end
 
+-- dataManager.ClearLastPosition() - forget a player's saved position
+-- @player: the player
+--
+-- Return: nothing.
 function module.ClearLastPosition(player)
 	local p = Profiles[player]
 	if not p then

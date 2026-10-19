@@ -1,6 +1,7 @@
--- [[ TITLE MANAGER ]]
--- Location: ServerScriptService.modules (ModuleScript)
--- Handles all title unlock checks and client notifications.
+-- SPDX-License-Identifier: MIT
+--
+-- Owns title unlocks: kill, death, weapon mastery, skill, and developer titles, their
+-- Liturgy rewards, and the title aura.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -13,25 +14,24 @@ local AurasFolder =
 
 local TitleManager = {}
 
--- ── TITLE DEFINITIONS ─────────────────────────────────────────────────────────
--- Each entry: Title string, Liturgy reward, unlock condition description
+-- Each title has a Liturgy reward and the unlock text shown to the player.
 
 TitleManager.Titles = {
 
-	-- Kill titles
+	-- Kill titles.
 	["the Bully"] = { Liturgy = 300, Description = "Kill 10 players." },
 	["the Butcher"] = { Liturgy = 300, Description = "Kill 50 players." },
 	["the Ghost"] = { Liturgy = 1000, Description = "Kill 100 players." },
 	["Hollow One"] = { Liturgy = 1500, Description = "Kill 500 players." },
 
-	-- Death titles
+	-- Death titles.
 	["the Victim"] = { Liturgy = 50, Description = "Die once." },
 	["the Hunted"] = { Liturgy = 150, Description = "Die 10 times." },
 	["the Prey"] = { Liturgy = 500, Description = "Die 50 times." },
 	["the Befallen"] = { Liturgy = 2000, Description = "Die 200 times." },
 	["the Vengeful"] = { Liturgy = 1000, Description = "Die 500 times." },
 
-	-- Weapon mastery titles
+	-- Weapon mastery titles.
 	["the Hero"] = { Liturgy = 0, Description = "Reach level 25 with the Sword." },
 	["the Berserker"] = { Liturgy = 0, Description = "Reach level 25 with the Greatsword." },
 	["the Shade"] = { Liturgy = 0, Description = "Reach level 25 with the Dagger." },
@@ -39,18 +39,16 @@ TitleManager.Titles = {
 	["the Iron Fist"] = { Liturgy = 0, Description = "Reach level 25 with the Fists." },
 	["the Oni"] = { Liturgy = 0, Description = "Obtain the skill Messatsu." },
 
-	-- Progression titles
+	-- Progression titles.
 	["the Unfound"] = { Liturgy = 0, Description = "Reach level 25 with any weapon." },
 	["the Replicant"] = { Liturgy = 0, Description = "Reach level 25 with all weapons." },
 
-	-- Dev specs
+	-- Developer titles, granted by UserId.
 	["Angel's Thanatos"] = { Liturgy = 6700, Description = "???", UserId = 107650965 },
 	["the Primal Maw"] = { Liturgy = 6700, Description = "???", UserId = 1526974131 },
 	["the Unforgiven"] = { Liturgy = 6700, Description = "???", UserId = 1718017878 },
 	["the Dragon Knight"] = { Liturgy = 6700, Description = "???", UserId = 1718017878 },
 }
-
--- ── KILL THRESHOLDS ───────────────────────────────────────────────────────────
 
 local KILL_TITLES = {
 	{ Threshold = 10, Title = "the Butcher" },
@@ -59,8 +57,6 @@ local KILL_TITLES = {
 	{ Threshold = 500, Title = "the Phantom" },
 }
 
--- ── DEATH THRESHOLDS ──────────────────────────────────────────────────────────
-
 local DEATH_TITLES = {
 	{ Threshold = 1, Title = "the Victim" },
 	{ Threshold = 10, Title = "the Hunted" },
@@ -68,8 +64,6 @@ local DEATH_TITLES = {
 	{ Threshold = 200, Title = "the Befallen" },
 	{ Threshold = 500, Title = "the Vengeful" },
 }
-
--- ── WEAPON MASTERY MAP ────────────────────────────────────────────────────────
 
 local WEAPON_TITLES = {
 	Sword = "the Hero",
@@ -80,8 +74,6 @@ local WEAPON_TITLES = {
 }
 
 local ALL_WEAPONS = { "Sword", "Greatsword", "Dagger", "Katana", "Fists" }
-
--- ── NOTIFICATION REMOTE ───────────────────────────────────────────────────────
 
 local remotes = ReplicatedStorage:WaitForChild("remotes")
 
@@ -99,8 +91,6 @@ if not TitleUnlockedRemote then
 	TitleUnlockedRemote.Parent = remotes
 end
 
--- ── GRANT HELPER ─────────────────────────────────────────────────────────────
-
 local function grantTitle(player, titleName)
 	local def = TitleManager.Titles[titleName]
 	if not def then
@@ -112,29 +102,21 @@ local function grantTitle(player, titleName)
 		return
 	end
 
-	-- Give Liturgy reward
 	if def.Liturgy and def.Liturgy > 0 then
 		DataManager.AddLiturgy(player, def.Liturgy)
 	end
 
-	-- Notify client — repurposes quest complete UI
+	-- The client shows this with the quest-complete UI.
 	TitleEarnedRemote:FireClient(player, titleName, def.Liturgy or 0)
 
-	-- Refresh title selector if open
+	-- Refreshes the title selector if it is open.
 	TitleUnlockedRemote:FireClient(player, titleName)
-
-	print(
-		string.format(
-			"[TitleManager] %s earned title: %s (+%d L)",
-			player.Name,
-			titleName,
-			def.Liturgy or 0
-		)
-	)
 end
 
--- ── PUBLIC CHECKS ─────────────────────────────────────────────────────────────
-
+-- TitleManager.CheckKills() - grant the kill titles a player has earned
+-- @player: the player
+--
+-- Return: nothing.
 function TitleManager.CheckKills(player)
 	local kills = DataManager.GetKills(player)
 	for _, entry in ipairs(KILL_TITLES) do
@@ -144,6 +126,10 @@ function TitleManager.CheckKills(player)
 	end
 end
 
+-- TitleManager.CheckDeaths() - grant the death titles a player has earned
+-- @player: the player
+--
+-- Return: nothing.
 function TitleManager.CheckDeaths(player)
 	local deaths = DataManager.GetDeaths(player)
 	for _, entry in ipairs(DEATH_TITLES) do
@@ -153,16 +139,22 @@ function TitleManager.CheckDeaths(player)
 	end
 end
 
+-- TitleManager.CheckWeaponMastery() - grant the titles for a weapon at level 25
+-- @player: the player
+-- @weaponName: the weapon that reached level 25
+--
+-- Also grants the Unfound title, and the Replicant title when every seed weapon is at
+-- level 25.
+--
+-- Return: nothing.
 function TitleManager.CheckWeaponMastery(player, weaponName)
 	local weaponTitle = WEAPON_TITLES[weaponName]
 	if weaponTitle then
 		grantTitle(player, weaponTitle)
 	end
 
-	-- Unfound — any weapon at 25
 	grantTitle(player, "the Unfound")
 
-	-- Replicant — check all weapons
 	local profile = DataManager.GetProfile(player)
 	if not profile then
 		return
@@ -182,7 +174,13 @@ function TitleManager.CheckWeaponMastery(player, weaponName)
 	end
 end
 
--- Add this new public function at the bottom with your other public checks
+-- TitleManager.UpdateAura() - show the aura of the equipped title
+-- @player: the player
+-- @equippedTitleName: the equipped title
+--
+-- Removes any old title aura first. Only some titles have an aura.
+--
+-- Return: nothing.
 function TitleManager.UpdateAura(player, equippedTitleName)
 	local character = player.Character
 	if not character then
@@ -201,12 +199,7 @@ function TitleManager.UpdateAura(player, equippedTitleName)
 
 	local auraFolder = AurasFolder:FindFirstChild(equippedTitleName)
 	if not auraFolder then
-		warn(
-			string.format(
-				"[TitleManager] Missing Aura folder in ReplicatedStorage for: %s",
-				equippedTitleName
-			)
-		)
+		warn(`[TitleManager] No aura folder for title {equippedTitleName}.`)
 		return
 	end
 
@@ -220,18 +213,15 @@ function TitleManager.UpdateAura(player, equippedTitleName)
 				clone.Parent = targetPart
 			end
 		else
-			-- Optional warning if you misspell a folder or the player is missing a limb
-			warn(
-				string.format(
-					"[TitleManager] Character %s is missing part: %s",
-					player.Name,
-					partFolder.Name
-				)
-			)
+			warn(`[TitleManager] {player.Name} has no part {partFolder.Name} for the title aura.`)
 		end
 	end
 end
 
+-- TitleManager.CheckSpecUnlock() - grant the developer titles of a player
+-- @player: the player
+--
+-- Return: nothing.
 function TitleManager.CheckSpecUnlock(player)
 	for titleName, def in pairs(TitleManager.Titles) do
 		if def.UserId and def.UserId == player.UserId then
@@ -240,6 +230,11 @@ function TitleManager.CheckSpecUnlock(player)
 	end
 end
 
+-- TitleManager.CheckSkillUnlock() - grant the title for a learned skill
+-- @player: the player
+-- @spellName: the skill the player learned
+--
+-- Return: nothing.
 function TitleManager.CheckSkillUnlock(player, spellName)
 	if spellName == "Messatsu" then
 		grantTitle(player, "the Oni")

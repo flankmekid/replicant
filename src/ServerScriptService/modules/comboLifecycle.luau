@@ -1,16 +1,15 @@
--- ============================================================
--- comboLifecycle (ModuleScript) -> ServerScriptService.modules
--- Shared attack lifecycle: re-entry guard + pcall + guaranteed teardown.
--- Each weapon keeps its OWN busy check; this only owns the swing run.
--- ============================================================
+-- SPDX-License-Identifier: MIT
+--
+-- Shared attack life cycle: a re-entry guard, a pcall around the swing, and a
+-- teardown that always runs. Each weapon keeps its own busy check.
 
 local Players = game:GetService("Players")
 
 local Lifecycle = {}
 
--- per-player re-entry guard, keyed by an action tag so M1 and M2 don't
--- collide with each other (one player can't double-fire the SAME action mid-swing)
-local active = {} -- active[plr] = { [tag] = true }
+-- Re-entry guard per player and action tag, so M1 and M2 do not block each other but
+-- the same action cannot fire twice during a swing. active[plr] = { [tag] = true }.
+local active = {}
 
 local function isActive(plr, tag)
 	local t = active[plr]
@@ -34,14 +33,13 @@ local function setActive(plr, tag, value)
 	end
 end
 
--- plr: Player
--- opts: {
---   tag = "M1" | "M2" | ...,        -- re-entry key, required
---   cleanupDelay = number?,          -- seconds before teardown runs (default 0.1)
---   onSwing = function(ctx),         -- the full attack body
---   onCleanup = function(ctx)?,      -- teardown (reset speed, kill trails, destroy hitbox)
--- }
--- returns true if the swing was accepted and started, false if guarded out
+-- Lifecycle.Run() - run one swing with a re-entry guard and a guaranteed teardown
+-- @plr: the attacking player
+-- @opts: tag (the re-entry key, required), onSwing(ctx) (the attack, required),
+--        onCleanup(ctx) (the teardown), and cleanupDelay (seconds before the
+--        teardown, 0.1 by default). onSwing can call ctx.cleanup() to tear down early.
+--
+-- Return: true if the swing started, false if the guard rejected it.
 function Lifecycle.Run(plr, opts)
 	assert(opts and opts.tag, "Lifecycle.Run requires opts.tag")
 	assert(opts.onSwing, "Lifecycle.Run requires opts.onSwing")
@@ -67,20 +65,22 @@ function Lifecycle.Run(plr, opts)
 		if opts.onCleanup then
 			local ok, err = pcall(opts.onCleanup, ctx)
 			if not ok then
-				warn("[Lifecycle:" .. opts.tag .. "] cleanup failed for", plr.Name, "->", err)
+				warn(`[comboLifecycle] Cleanup of {opts.tag} failed for {plr.Name}: {err}.`)
 			end
 		end
 	end
-	ctx.cleanup = cleanup -- expose so onSwing can force-teardown early if it wants
+	ctx.cleanup = cleanup
 
 	local ok, err = pcall(opts.onSwing, ctx)
 	if not ok then
-		warn("[Lifecycle:" .. opts.tag .. "] swing failed for", plr.Name, "->", err)
-		cleanup() -- crash path: tear down immediately, never strand the player
-		return true -- swing was accepted; it just blew up. caller already sent no decline.
+		warn(`[comboLifecycle] Swing {opts.tag} failed for {plr.Name}: {err}.`)
+		-- Tear down at once so the player is never stuck. The swing was accepted, so no
+		-- decline goes to the client.
+		cleanup()
+		return true
 	end
 
-	-- success path: tear down after the hitbox window closes
+	-- Tear down after the hitbox window closes.
 	task.delay(opts.cleanupDelay or 0.1, cleanup)
 	return true
 end

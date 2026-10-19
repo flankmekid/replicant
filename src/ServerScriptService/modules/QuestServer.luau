@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Owns quests on the server: assignment, progress, completion, rewards, the tracked
+-- quest, and the class quest and hybrid skill reconcilers. The reconciler design is
+-- in docs/systems-design.md.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -8,6 +13,7 @@ local DataManager = require(ServerScriptService.modules.dataManager)
 
 local QuestManager = {}
 
+-- The Liturgy cost of completing a class quest, by milestone.
 local CLASS_QUEST_LITURGY_COST = {
 	[15] = 500,
 	[20] = 750,
@@ -34,10 +40,18 @@ local function buildActiveList(player)
 	return list
 end
 
+-- QuestManager.AssignQuest() - give a player a quest
+-- @player: the player
+-- @questId: the quest ID in QuestConfig
+--
+-- Does nothing if the quest is active, its prerequisite is not met, or it is a
+-- completed quest that cannot repeat.
+--
+-- Return: nothing.
 function QuestManager.AssignQuest(player, questId)
 	local questDef = QuestConfig.Quests[questId]
 	if not questDef then
-		warn("Invalid Quest ID: " .. tostring(questId))
+		warn(`[QuestServer] Unknown quest ID {questId}.`)
 		return
 	end
 
@@ -51,13 +65,11 @@ function QuestManager.AssignQuest(player, questId)
 	end
 
 	if questDef.Prerequisite and not table.find(questData.Completed, questDef.Prerequisite) then
-		print("Prerequisite not met for: " .. questId)
 		return
 	end
 
 	if table.find(questData.Completed, questId) then
 		if not questDef.Repeatable then
-			print("Already completed non-repeatable quest: " .. questId)
 			return
 		end
 	end
@@ -80,10 +92,16 @@ function QuestManager.AssignQuest(player, questId)
 	end
 
 	QuestUpdateRemote:FireClient(player, "ListUpdate", buildActiveList(player))
-
-	print(player.Name .. " started quest: " .. questId)
 end
 
+-- QuestManager.IncrementProgress() - add progress to an active quest
+-- @player: the player
+-- @questId: the quest ID
+-- @amount: the progress to add
+--
+-- Completes the quest when progress reaches MaxProgress.
+--
+-- Return: nothing.
 function QuestManager.IncrementProgress(player, questId, amount)
 	local questDef = QuestConfig.Quests[questId]
 	if not questDef then
@@ -114,6 +132,14 @@ function QuestManager.IncrementProgress(player, questId, amount)
 	end
 end
 
+-- QuestManager.CompleteQuest() - complete an active quest and give its rewards
+-- @player: the player
+-- @questId: the quest ID
+--
+-- Class quests above milestone 10 cost Liturgy. If the player cannot pay, the quest
+-- stays active. Yields 0.5 seconds before it opens the next quest.
+--
+-- Return: nothing.
 function QuestManager.CompleteQuest(player, questId)
 	if not DataManager.IsQuestActive(player, questId) then
 		return
@@ -160,10 +186,8 @@ function QuestManager.CompleteQuest(player, questId)
 
 	QuestUpdateRemote:FireClient(player, "ListUpdate", buildActiveList(player))
 
-	-- Class quests do NOT chain via NextQuest. Completing one hands control back to
-	-- the reconciler, which re-reads mastery and opens the next earned checkpoint.
-	-- This is what makes "complete _10 at mastery 22" immediately surface _15, and
-	-- then _20, rather than stranding them behind a level-up that already happened.
+	-- Class quests do not chain through NextQuest. The reconciler opens the next earned
+	-- checkpoint.
 	if questDef.ClassQuest and questDef.Weapon then
 		task.wait(0.5)
 		QuestManager.ReconcileClassQuests(player, questDef.Weapon)
@@ -175,21 +199,21 @@ function QuestManager.CompleteQuest(player, questId)
 		end
 	end
 
-	print("[QuestServer] Completing quest: " .. questId)
-	print("[QuestServer] RewardItem: " .. tostring(questDef.RewardItem))
-	print("[QuestServer] ItemRewardManager: " .. tostring(_G.ItemRewardManager))
-
 	if questDef.RewardItem then
 		local irm = _G.ItemRewardManager
 		if irm then
-			print("[QuestServer] Calling GiveReward...")
 			irm.GiveReward(player, questDef.RewardItem)
 		else
-			warn("[QuestServer] ItemRewardManager is nil — reward not given.")
+			warn(`[QuestServer] ItemRewardManager is missing, so {player.Name} got no reward.`)
 		end
 	end
 end
 
+-- QuestManager.SetTracked() - set the quest a player tracks
+-- @player: the player
+-- @questId: an active quest ID, or nil to track nothing
+--
+-- Return: nothing.
 function QuestManager.SetTracked(player, questId)
 	if questId ~= nil and not DataManager.IsQuestActive(player, questId) then
 		return
@@ -208,25 +232,9 @@ function QuestManager.SetTracked(player, questId)
 	end
 end
 
--- ── CLASS QUEST RECONCILER ────────────────────────────────────────────────────
--- Quest state is a FUNCTION OF THE PROFILE, not a reaction to a level-up event.
---
--- The old TriggerClassQuest fired off `levelsGained` inside AddWeaponXP. That is a
--- one-shot signal, so two things went wrong:
---   1. Crossing 10 and 15 in a single XP award assigned _15 while _10 was still
---      Active. The Prerequisite check in AssignQuest silently dropped it, and
---      nothing ever re-fired it. The checkpoint was gone for good.
---   2. Completing _10 at mastery 22 never surfaced _15 or _20, because the
---      level-ups that would have triggered them were long past.
---
--- The reconciler instead asks the profile: "given this family's mastery and the set
--- of class quests already completed, what is the lowest unearned checkpoint at or
--- below the current level?" Run it on login, on mastery gain, and on quest
--- completion, and no checkpoint can be skipped or stranded, in any order.
-
 local CLASS_MILESTONES = { 10, 15, 20, 25 }
 
--- Is a class quest for this family already open? Only one per family at a time.
+-- Returns the open class quest of a family, or nil. Only one is open at a time.
 local function getActiveClassQuest(player, family)
 	local entries = DataManager.GetAllActiveQuests(player)
 	for _, entry in ipairs(entries) do
@@ -238,8 +246,13 @@ local function getActiveClassQuest(player, family)
 	return nil
 end
 
--- Evaluates one weapon family and assigns the correct next class quest, if any.
--- Safe to call as often as you like; a no-op when nothing has changed.
+-- QuestManager.ReconcileClassQuests() - open the next earned class quest of a family
+-- @player: the player
+-- @family: the weapon family
+--
+-- Safe to call any number of times. Does nothing when nothing changed.
+--
+-- Return: nothing.
 function QuestManager.ReconcileClassQuests(player, family)
 	if not family then
 		return
@@ -250,8 +263,7 @@ function QuestManager.ReconcileClassQuests(player, family)
 		return
 	end
 
-	-- One at a time. If a checkpoint is open, the player owes the trainer a visit
-	-- before the next one unlocks.
+	-- One at a time: the player visits the trainer before the next one unlocks.
 	if getActiveClassQuest(player, family) then
 		return
 	end
@@ -261,7 +273,7 @@ function QuestManager.ReconcileClassQuests(player, family)
 		return
 	end
 
-	-- Lowest milestone that is earned by level and not yet completed.
+	-- The lowest milestone that the level has earned and that is not completed.
 	for _, milestone in ipairs(CLASS_MILESTONES) do
 		if level >= milestone then
 			local questId = "ClassQuest_" .. family .. "_" .. milestone
@@ -273,8 +285,12 @@ function QuestManager.ReconcileClassQuests(player, family)
 	end
 end
 
--- Sweeps every weapon family. This is the login path: it recovers anything left
--- stranded by an earlier session, including checkpoints missed under the old code.
+-- QuestManager.ReconcileAllClassQuests() - reconcile every weapon family and hybrid
+-- @player: the player
+--
+-- The login path. It recovers checkpoints stranded in an earlier session.
+--
+-- Return: nothing.
 function QuestManager.ReconcileAllClassQuests(player)
 	local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 
@@ -289,20 +305,18 @@ function QuestManager.ReconcileAllClassQuests(player)
 	QuestManager.ReconcileHybrids(player)
 end
 
--- ── HYBRID RECONCILER ─────────────────────────────────────────────────────────
--- Hybrids (Guandao, Scythe) have NO class quests and NO XP bar of their own. Their
--- three skills are gated on BOTH parent families reaching a threshold: 15/15 for Z,
--- 20/20 for X, 25/25 for C. The weapon itself is handed over by the hybrid trainer,
--- who is world-discovered; the reconciler does not grant it. A player holding a
--- Guandao has already run eight class quests and does not need a marker.
+-- QuestManager.ReconcileHybrids() - unlock the hybrid skills a player has earned
+-- @player: the player
 --
--- UnlockSpell is idempotent and auto-equips into the family slot, so calling this
--- repeatedly is harmless.
+-- A hybrid skill unlocks when both parent families reach its threshold. Safe to call
+-- any number of times.
+--
+-- Return: nothing.
 function QuestManager.ReconcileHybrids(player)
 	local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 
 	for hybridName, parents in pairs(SkillConfig.HybridParents) do
-		-- The LOWER of the two parent levels gates everything.
+		-- The lower parent level decides.
 		local lowest = math.huge
 		for _, parentFamily in ipairs(parents) do
 			local lvl = DataManager.GetWeaponLevel(player, parentFamily)
@@ -335,34 +349,13 @@ function QuestManager.ReconcileHybrids(player)
 	end
 end
 
---[[
-local function RestoreSession(player)
-	DataManager.YieldUntilLoaded(player)
-
-	local questData = DataManager.GetQuestData(player)
-	if not questData then return end
-
-	local activeList = buildActiveList(player)
-	if #activeList == 0 then return end
-
-	for _, entry in ipairs(activeList) do
-		QuestUpdateRemote:FireClient(player, "New", buildPayload(entry.Id, entry.Progress))
-		task.wait(0.05)
-	end
-
-	QuestUpdateRemote:FireClient(player, "ListUpdate", activeList)
-	task.wait(0.1)
-
-	local tracked = DataManager.GetTrackedQuest(player)
-	if tracked then
-		local entry = DataManager.GetActiveQuestEntry(player, tracked)
-		if entry then
-			QuestUpdateRemote:FireClient(player, "Tracked", buildPayload(tracked, entry.Progress))
-		end
-	end
-end
-]]
-
+-- QuestManager.RestoreSession() - send a joining player their quests
+-- @player: the player
+--
+-- Yields until the profile is loaded. Reconciles class quests first, so a stranded
+-- checkpoint is in the list.
+--
+-- Return: nothing.
 function QuestManager.RestoreSession(player)
 	DataManager.YieldUntilLoaded(player)
 
@@ -371,11 +364,7 @@ function QuestManager.RestoreSession(player)
 		return
 	end
 
-	-- Reconcile BEFORE building the list. This is the recovery path: any checkpoint
-	-- stranded in a previous session (missed because it fired while another quest
-	-- was active, or because the player levelled past it) gets picked up here and
-	-- assigned, then shows up in the list we send down. Without this, a player who
-	-- lost a checkpoint under the old event-driven code would never get it back.
+	-- Reconcile before building the list, so a recovered checkpoint is in it.
 	QuestManager.ReconcileAllClassQuests(player)
 
 	local activeList = buildActiveList(player)
@@ -399,17 +388,6 @@ function QuestManager.RestoreSession(player)
 		end
 	end
 end
-
---[[
-Players.PlayerAdded:Connect(function(player)
-	task.wait(1) 
-	RestoreSession(player)
-	player.CharacterAdded:Connect(function()
-		task.wait(0.5)
-		RestoreSession(player)
-	end)
-end)
-]]
 
 _G.QuestManager = QuestManager
 return QuestManager

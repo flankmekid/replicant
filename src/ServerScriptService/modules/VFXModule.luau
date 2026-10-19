@@ -1,12 +1,18 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Server-side visual effects for skills.
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
 
 local module = {}
 
--- Ensure you have the asset or use a placeholder
 local wingAsset = game.ReplicatedStorage:FindFirstChild("assets")
 	and game.ReplicatedStorage.assets.FX.aegir:FindFirstChild("DragonWings")
 
+-- VFXModule.Wings() - show dragon wings that sweep back and fade
+-- @rootPart: the HumanoidRootPart to attach the wings to
+--
+-- Return: nothing.
 function module.Wings(rootPart)
 	local wing1 = wingAsset:Clone()
 	wing1.Parent = rootPart.Parent
@@ -17,7 +23,6 @@ function module.Wings(rootPart)
 	local tweenInfo = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local goal1 = {
 		Transparency = 0.6,
-		--Orientation = wing1.Orientation + Vector3.new(0, -65, 0),
 		Position = wing1.Position - (rootPart.CFrame.LookVector * 5),
 	}
 	local tw = TweenService:Create(wing1, tweenInfo, goal1)

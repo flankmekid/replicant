@@ -1,20 +1,27 @@
--- // ServerScriptService.InventoryManager
+-- SPDX-License-Identifier: MIT
+--
+-- Owns each player's inventory: the item grid, the 9-slot hotbar, and the equipment
+-- slots. It keeps the saved data, the physical tools, and the 3D equipment visuals in
+-- step, and sends the client UI every change.
 local InventoryManager = {}
 InventoryManager.__index = InventoryManager
 
--- Services
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 
--- Remote Functions/Events (Ensure these exist in ReplicatedStorage)
 local InventoryRemotes = ReplicatedStorage:WaitForChild("remotes")
 local UpdateUIEvent = InventoryRemotes:WaitForChild("UpdateUI")
 
--- Holds all active player inventories
+-- Active inventories by UserId.
 local PlayerInventories = {}
 
--- // Constructor
--- // Constructor
+-- InventoryManager.new() - create the inventory of a player
+-- @player: the player
+-- @savedData: the saved Items, Hotbar, and Equipment, or nil for a new player
+--
+-- A new player with nothing saved gets Fists in hotbar slot 1.
+--
+-- Return: the inventory.
 function InventoryManager.new(player, savedData)
 	local self = setmetatable({}, InventoryManager)
 	self.Player = player
@@ -49,20 +56,29 @@ function InventoryManager.new(player, savedData)
 			Back = nil,
 		}
 
-	-- When true, the Backpack ChildAdded hook ignores additions.
-	-- Set during a weapon swap so a deferred UnequipTools() dropping the
-	-- old tool back into the Backpack can't re-register it after ClearWeapons.
+	-- While true, the Backpack hook ignores new tools. A weapon swap sets it, so the
+	-- deferred UnequipTools cannot register the old tool again after ClearWeapons.
 	self.IsSwapping = false
 
 	PlayerInventories[player.UserId] = self
 	return self
 end
 
--- // Get a player's inventory instance
+-- InventoryManager.GetInventory() - get the inventory of a player
+-- @player: the player
+--
+-- Return: the inventory, or nil.
 function InventoryManager.GetInventory(player)
 	return PlayerInventories[player.UserId]
 end
 
+-- InventoryManager:AddItem() - add an item and give the physical tool
+-- @toolName: the item name in ServerStorage.Weapons or ServerStorage.Equipment
+-- @amount: the amount, 1 by default
+--
+-- Fills existing stacks first, then free hotbar slots, then the grid. Saves and syncs.
+--
+-- Return: true if the item exists, false otherwise.
 function InventoryManager:AddItem(toolName, amount)
 	amount = amount or 1
 	local toolPrefab = ServerStorage.Weapons:FindFirstChild(toolName)
@@ -75,9 +91,7 @@ function InventoryManager:AddItem(toolName, amount)
 	local isStackable = toolPrefab:GetAttribute("IsStackable")
 	local maxStack = toolPrefab:GetAttribute("MaxStack")
 
-	-- [[ 1. UPDATE THE DATA ]] --
 	if isStackable then
-		-- Find existing stack
 		for _, item in ipairs(self.Inventory) do
 			if item.Name == toolName and item.Amount < maxStack then
 				local spaceLeft = maxStack - item.Amount
@@ -93,16 +107,14 @@ function InventoryManager:AddItem(toolName, amount)
 		end
 	end
 
-	-- Create new slot if amount remains
 	while amount > 0 do
 		local stackAmount = isStackable and math.min(amount, maxStack) or 1
 		local newItemData = {
 			Name = toolName,
 			Amount = stackAmount,
-			Id = game:GetService("HttpService"):GenerateGUID(false), -- Unique ID
+			Id = game:GetService("HttpService"):GenerateGUID(false),
 		}
 
-		-- Prioritize Hotbar
 		local placedInHotbar = false
 		for i = 1, 9 do
 			if self.Hotbar[i] == nil and self.Hotbar[tostring(i)] == nil then
@@ -112,7 +124,6 @@ function InventoryManager:AddItem(toolName, amount)
 			end
 		end
 
-		-- Fallback to Inventory Grid
 		if not placedInHotbar then
 			table.insert(self.Inventory, newItemData)
 		end
@@ -120,9 +131,8 @@ function InventoryManager:AddItem(toolName, amount)
 		amount -= stackAmount
 	end
 
-	-- [[ 2. HYBRID LOGIC: GIVE THE PHYSICAL TOOL ]] --
-	-- Now that the data is saved, we safely grant the physical tool.
-	-- We check if they already physically have it so we don't spam the Backpack with duplicates of stackable items.
+	-- Give the physical tool only once, so stackable items do not fill the Backpack with
+	-- copies.
 	local backpack = self.Player:FindFirstChild("Backpack")
 	local starterGear = self.Player:FindFirstChild("StarterGear")
 
@@ -138,6 +148,9 @@ function InventoryManager:AddItem(toolName, amount)
 	return true
 end
 
+-- InventoryManager:SaveState() - save the inventory and sync the client
+--
+-- Return: nothing.
 function InventoryManager:SaveState()
 	local DataManager = require(game.ServerScriptService.modules:WaitForChild("dataManager"))
 
@@ -150,7 +163,12 @@ function InventoryManager:SaveState()
 	self:Sync()
 end
 
--- // Equip Item to Hotbar or Equipment Slot
+-- InventoryManager:Equip() - put an item in a hotbar or equipment slot
+-- @itemId: the item ID
+-- @slotType: "Hotbar" or "Equipment"
+-- @slotIndex: the hotbar slot, for "Hotbar"
+--
+-- Return: false if the item is not in the grid, nil otherwise.
 function InventoryManager:Equip(itemId, slotType, slotIndex)
 	local itemIndex, itemData = self:GetItemById(itemId)
 	if not itemData then
@@ -170,7 +188,11 @@ function InventoryManager:Equip(itemId, slotType, slotIndex)
 	self:Sync()
 end
 
--- // Equip a Spell to the Hotbar
+-- InventoryManager:EquipSpell() - put an unlocked spell in a hotbar slot
+-- @spellName: the spell name
+-- @slotIndex: the hotbar slot, 1 to 9
+--
+-- Return: true on success, false if the spell is locked or stats are missing.
 function InventoryManager:EquipSpell(spellName, slotIndex)
 	local playerStats = self.Player:FindFirstChild("PlayerStats")
 	if not playerStats then
@@ -179,42 +201,42 @@ function InventoryManager:EquipSpell(spellName, slotIndex)
 
 	local skillsFolder = playerStats:FindFirstChild("UnlockedSkills")
 	if not skillsFolder or not skillsFolder:FindFirstChild(spellName) then
-		warn("[Inventory] Player attempted to equip locked spell: " .. tostring(spellName))
+		warn(`[inventoryManager] {self.Player.Name} tried to equip locked spell {spellName}.`)
 		return false
 	end
 
-	-- Format the spell to match the expected Hotbar data structure
+	-- Spells use the hotbar item format. IsSpell tells the client UI that there is no
+	-- physical tool.
 	local spellData = {
 		Name = spellName,
-		Amount = 1, -- Spells don't deplete in quantity
-		Id = "Spell_" .. spellName, -- Unique ID pattern for spells
-		IsSpell = true, -- Tells the Client UI this is a spell, not a physical Tool
+		Amount = 1,
+		Id = "Spell_" .. spellName,
+		IsSpell = true,
 	}
 
-	-- Assign to the target hotbar slot (1 through 9)
 	self.Hotbar[slotIndex] = spellData
 
-	-- Save data and update the Client UI
 	self:SaveState()
 	return true
 end
 
--- // Hook onto the current Backpack (Call this whenever the player respawns)
+-- InventoryManager:HookBackpack() - register tools added to the current Backpack
+--
+-- Call this on every respawn. A tool that is not in the data is added as an item.
+--
+-- Return: nothing. Yields up to 10 seconds for the Backpack.
 function InventoryManager:HookBackpack()
 	local backpack = self.Player:WaitForChild("Backpack", 10)
 	if not backpack then
 		return
 	end
 
-	-- Disconnect old connection if it exists to prevent memory leaks
 	if self.BackpackConnection then
 		self.BackpackConnection:Disconnect()
 	end
 
-	-- Listen to the NEW Backpack
 	self.BackpackConnection = backpack.ChildAdded:Connect(function(child)
-		-- Ignore tools re-parented into the Backpack mid weapon-swap
-		-- (deferred UnequipTools dropping the old tool back in).
+		-- Ignore the old tool that a deferred UnequipTools drops back during a swap.
 		if self.IsSwapping then
 			return
 		end
@@ -241,26 +263,27 @@ function InventoryManager:HookBackpack()
 	end)
 end
 
--- // Wipes all Weapons (Preserves Spells and non-weapon Items)
+-- InventoryManager:ClearWeapons() - remove every weapon from the data and the player
+--
+-- Keeps spells and items that are not weapons. Saves and syncs.
+--
+-- Return: nothing.
 function InventoryManager:ClearWeapons()
 	local weaponsFolder = game:GetService("ServerStorage"):FindFirstChild("Weapons")
 	if not weaponsFolder then
 		return
 	end
 
-	-- Helper function to check if an item is strictly a weapon
 	local function isWeapon(itemName)
 		return weaponsFolder:FindFirstChild(itemName) ~= nil
 	end
 
-	-- 1. Remove from Inventory Data Array
 	for i = #self.Inventory, 1, -1 do
 		if isWeapon(self.Inventory[i].Name) then
 			table.remove(self.Inventory, i)
 		end
 	end
 
-	-- 2. Remove from Hotbar Dictionary
 	for i = 1, 9 do
 		local item = self.Hotbar[tostring(i)] or self.Hotbar[i]
 		if item and not item.IsSpell and isWeapon(item.Name) then
@@ -269,7 +292,6 @@ function InventoryManager:ClearWeapons()
 		end
 	end
 
-	-- 3. Physically remove from Character
 	local backpack = self.Player:FindFirstChild("Backpack")
 	local starterGear = self.Player:FindFirstChild("StarterGear")
 	local char = self.Player.Character
@@ -287,30 +309,32 @@ function InventoryManager:ClearWeapons()
 
 	clearPhysicalTools(backpack)
 	clearPhysicalTools(starterGear)
+	-- Also remove the weapon the player is holding.
 	if char then
 		clearPhysicalTools(char)
-	end -- Catches the weapon if they are currently holding it
+	end
 
-	-- Save the newly wiped data state
 	self:SaveState()
 end
 
--- // Post-swap reconcile: force the end-state to be "keepName is the ONLY weapon".
--- The swap sequence (deferred UnequipTools + destroy + AddItem) is timing-sensitive;
--- a stray unequip can drop the old tool back into the Backpack a frame late, or a
--- Sync can land out of order, leaving the old weapon visible for one player. This
--- runs AFTER the swap settles and makes the result deterministic: any weapon that is
--- not keepName is purged from data (Inventory + Hotbar) and from every physical
--- location (Backpack, StarterGear, Character), then the client is re-synced. Safe to
--- call redundantly. Does not touch spells or non-weapon equipment.
+-- InventoryManager:ReconcileWeapons() - make one weapon the only weapon
+-- @keepName: the weapon to keep
+--
+-- The swap (deferred UnequipTools, destroy, AddItem) depends on timing: a late
+-- unequip can drop the old tool back, or a Sync can arrive out of order. Run this after
+-- the swap settles. It removes every other weapon from the data and from the Backpack,
+-- StarterGear, and character, then syncs. Spells and equipment are not touched. Safe
+-- to call more than once.
+--
+-- Return: nothing.
 function InventoryManager:ReconcileWeapons(keepName)
 	local weaponsFolder = game:GetService("ServerStorage"):FindFirstChild("Weapons")
 	if not weaponsFolder then
 		return
 	end
 
-	-- A newer swap is mid-flight; let its own reconcile settle the end-state instead.
-	-- Prevents a stale reconcile from purging the weapon a later swap just granted.
+	-- A newer swap is in progress, and its own reconcile settles the result. This stops an
+	-- old reconcile from removing the weapon that the newer swap granted.
 	if self.IsSwapping then
 		return
 	end
@@ -321,7 +345,6 @@ function InventoryManager:ReconcileWeapons(keepName)
 
 	local changed = false
 
-	-- Data: Inventory grid.
 	for i = #self.Inventory, 1, -1 do
 		local it = self.Inventory[i]
 		if isWeapon(it.Name) and it.Name ~= keepName then
@@ -330,7 +353,7 @@ function InventoryManager:ReconcileWeapons(keepName)
 		end
 	end
 
-	-- Data: Hotbar dictionary (both numeric and string keys are used elsewhere).
+	-- The hotbar uses both number and string keys.
 	for i = 1, 9 do
 		local item = self.Hotbar[tostring(i)] or self.Hotbar[i]
 		if item and not item.IsSpell and isWeapon(item.Name) and item.Name ~= keepName then
@@ -340,7 +363,6 @@ function InventoryManager:ReconcileWeapons(keepName)
 		end
 	end
 
-	-- Physical: purge stray weapon tools from every location.
 	local function purge(parent)
 		if not parent then
 			return
@@ -361,12 +383,21 @@ function InventoryManager:ReconcileWeapons(keepName)
 	end
 end
 
--- // Handle Drag-and-Drop Movements
+-- InventoryManager:MoveItem() - move an item between grid, hotbar, and equipment
+-- @itemId: the item ID
+-- @sourceType: "Inventory", "Hotbar", or "Equipment"
+-- @sourceIndex: the source hotbar slot or equipment category
+-- @targetType: "Inventory", "Hotbar", or "Equipment"
+-- @targetIndex: the target hotbar slot or equipment category
+--
+-- An item in the target slot swaps back to the source. Moving a tool into equipment
+-- takes the physical tool away, and moving it out gives it back. Saves and syncs.
+--
+-- Return: true on success, false if the item or target is not valid.
 function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, targetIndex)
 	local itemData = nil
 	local invIndex = nil
 
-	-- [[ 1. LOCATE AND VERIFY THE ITEM ]] --
 	if sourceType == "Inventory" then
 		for i, item in ipairs(self.Inventory) do
 			if item.Id == itemId then
@@ -389,7 +420,7 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		return false
 	end
 
-	-- [[ 2. VALIDATE TARGET (Equipment Only) ]] --
+	-- An equipment slot accepts only items of its category.
 	if targetType == "Equipment" then
 		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(itemData.Name)
 			or game:GetService("ServerStorage")
@@ -407,7 +438,6 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		end
 	end
 
-	-- [[ 3. EXTRACT FROM SOURCE ]] --
 	if sourceType == "Inventory" then
 		table.remove(self.Inventory, invIndex)
 	elseif sourceType == "Hotbar" then
@@ -417,7 +447,6 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		self:RemoveCharacterVisuals(sourceIndex)
 	end
 
-	-- [[ 4. INSERT INTO TARGET & HANDLE SWAPS ]] --
 	local swappedItem = nil
 
 	if targetType == "Hotbar" then
@@ -436,7 +465,6 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		table.insert(self.Inventory, itemData)
 	end
 
-	-- [[ 5. ROUTE THE SWAPPED ITEM BACK ]] --
 	if swappedItem then
 		if sourceType == "Hotbar" then
 			self.Hotbar[tonumber(sourceIndex)] = swappedItem
@@ -447,9 +475,7 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		end
 	end
 
-	-- [[ 6. RESOLVE PHYSICAL TOOLS SAFELY ]] --
-	-- Now that the data is 100% secure in its new location, we handle the physical objects
-
+	-- Change the physical tools only after the data is in its new place.
 	local function GrantPhysicalTool(name)
 		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(name)
 			or game:GetService("ServerStorage"):FindFirstChild("Equipment"):FindFirstChild(name)
@@ -468,7 +494,6 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		local starterGear = self.Player:FindFirstChild("StarterGear")
 		local char = self.Player.Character
 
-		-- Destroy from inventory
 		if backpack and backpack:FindFirstChild(name) then
 			backpack[name]:Destroy()
 		end
@@ -476,26 +501,24 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 			starterGear[name]:Destroy()
 		end
 
-		-- [[ CRITICAL FIX: Destroy right out of the player's hands to prevent the crash ]]
+		-- Also destroy the tool in the player's hands.
 		if char and char:FindFirstChild(name) then
 			char[name]:Destroy()
 		end
 
-		-- Erase "currently holding" status from database
+		-- The player no longer holds this weapon.
 		local DataManager = require(game.ServerScriptService.modules:WaitForChild("dataManager"))
 		if DataManager.GetCurrentWeapon(self.Player) == name then
 			DataManager.SetCurrentWeapon(self.Player, "")
 		end
 	end
 
-	-- Process the item the player dragged
 	if targetType == "Equipment" then
-		RemovePhysicalTool(itemData.Name) -- Going on the back, take away the tool
+		RemovePhysicalTool(itemData.Name)
 	elseif sourceType == "Equipment" then
-		GrantPhysicalTool(itemData.Name) -- Coming off the back, give them the tool
+		GrantPhysicalTool(itemData.Name)
 	end
 
-	-- Process the item that got swapped (if any)
 	if swappedItem then
 		if sourceType == "Equipment" then
 			RemovePhysicalTool(swappedItem.Name)
@@ -504,19 +527,23 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		end
 	end
 
-	-- [[ 7. SAVE AND SYNC ]] --
 	self:SaveState()
 	return true
 end
 
--- // Remove Item Logic
+-- InventoryManager:RemoveItem() - remove an amount of an item from the grid
+-- @itemId: the item ID
+-- @amount: the amount to remove
+--
+-- An empty stack is also cleared from the hotbar and equipment. Syncs, does not save.
+--
+-- Return: true if the item was found, false otherwise.
 function InventoryManager:RemoveItem(itemId, amount)
 	for i, item in ipairs(self.Inventory) do
 		if item.Id == itemId then
 			item.Amount -= amount
 			if item.Amount <= 0 then
 				table.remove(self.Inventory, i)
-				-- Also clear from hotbar/equip if it was there
 				self:ClearFromQuickSlots(itemId)
 			end
 			self:Sync()
@@ -526,7 +553,10 @@ function InventoryManager:RemoveItem(itemId, amount)
 	return false
 end
 
--- // Utility: Find item by unique ID
+-- InventoryManager:GetItemById() - find an item in the grid
+-- @itemId: the item ID
+--
+-- Return: the grid index and the item, or nil, nil.
 function InventoryManager:GetItemById(itemId)
 	for i, item in ipairs(self.Inventory) do
 		if item.Id == itemId then
@@ -536,12 +566,16 @@ function InventoryManager:GetItemById(itemId)
 	return nil, nil
 end
 
--- // Auto-sort tools from the Backpack
+-- InventoryManager:BuildFromBackpack() - build the hotbar from the Backpack
+--
+-- Only for a player with no saved hotbar: the first 9 tools go to the hotbar and the
+-- rest to the grid, and the layout is saved. Otherwise it only syncs.
+--
+-- Return: nothing. Yields for the Backpack.
 function InventoryManager:BuildFromBackpack()
 	local backpack = self.Player:WaitForChild("Backpack")
 	local tools = backpack:GetChildren()
 
-	-- Check if the player already has a saved hotbar layout
 	local hasSavedHotbar = false
 	for i = 1, 9 do
 		if self.Hotbar[tostring(i)] ~= nil or self.Hotbar[i] ~= nil then
@@ -550,9 +584,8 @@ function InventoryManager:BuildFromBackpack()
 		end
 	end
 
-	-- If they have no saved layout, generate it based on Backpack order
 	if not hasSavedHotbar then
-		self.Inventory = {} -- Clear existing just in case
+		self.Inventory = {}
 
 		for index, tool in ipairs(tools) do
 			if not tool:IsA("Tool") then
@@ -562,27 +595,26 @@ function InventoryManager:BuildFromBackpack()
 			local itemData = {
 				Id = game:GetService("HttpService"):GenerateGUID(false),
 				Name = tool.Name,
-				Amount = 1, -- Assuming tools don't stack natively in your current setup
+				Amount = 1,
 			}
 
 			if index <= 9 then
-				-- First 9 go to Hotbar
 				self.Hotbar[index] = itemData
 			else
-				-- Overflow goes to Inventory
 				table.insert(self.Inventory, itemData)
 			end
 		end
 
-		-- Save this new layout so it persists next time they join
 		self:SaveState()
 	else
-		-- If they DO have a saved layout, we just sync it to the UI
 		self:Sync()
 	end
 end
 
--- // Utility: Clean up hotbar/equipment if item is dropped/removed
+-- InventoryManager:ClearFromQuickSlots() - remove an item from the hotbar and equipment
+-- @itemId: the item ID
+--
+-- Return: nothing.
 function InventoryManager:ClearFromQuickSlots(itemId)
 	for i, v in pairs(self.Hotbar) do
 		if v and v.Id == itemId then
@@ -596,14 +628,17 @@ function InventoryManager:ClearFromQuickSlots(itemId)
 	end
 end
 
--- // Remove Visual 3D Equipment
+-- InventoryManager:RemoveCharacterVisuals() - remove the 3D visual of an equipment slot
+-- @category: the equipment category
+--
+-- Return: nothing.
 function InventoryManager:RemoveCharacterVisuals(category)
 	local char = self.Player.Character
 	if not char then
 		return
 	end
 
-	-- 1. Check for manual welds (like the Lantern) in the visual folder
+	-- Welded visuals, such as the Lantern, are in the VisualEquipment folder.
 	local visFolder = char:FindFirstChild("VisualEquipment")
 	if visFolder then
 		local existingVisual = visFolder:FindFirstChild(category)
@@ -612,7 +647,7 @@ function InventoryManager:RemoveCharacterVisuals(category)
 		end
 	end
 
-	-- 2. [[ FIXED: Loop to destroy ALL segmented accessories for this slot ]]
+	-- An accessory item can have several pieces, so remove every one for the slot.
 	local safeName = "EquipSlot_" .. category
 	for _, child in ipairs(char:GetChildren()) do
 		if child.Name == safeName and child:IsA("Accessory") then
@@ -621,7 +656,14 @@ function InventoryManager:RemoveCharacterVisuals(category)
 	end
 end
 
--- // Weld or Wrap 3D Equipment to Character
+-- InventoryManager:ApplyCharacterVisuals() - show the 3D visual of an equipped item
+-- @itemName: the item name
+-- @category: the equipment category
+--
+-- An item under ServerStorage.Equipments/<category> is added as accessories. Any other
+-- item is welded to the torso.
+--
+-- Return: nothing.
 function InventoryManager:ApplyCharacterVisuals(itemName, category)
 	self:RemoveCharacterVisuals(category)
 
@@ -631,9 +673,7 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 		return
 	end
 
-	-- [[ ACCESSORY PATH: Equipments/<category>/<itemName> ]]
-	-- Handles Head, Torso, Legs, or any future accessory-based slot generically.
-	-- Just put a matching subfolder under ServerStorage.Equipments and it works automatically.
+	-- Any slot with a matching folder under ServerStorage.Equipments works this way.
 	local equipmentsFolder = ServerStorage:FindFirstChild("Equipments")
 	local categoryFolder = equipmentsFolder and equipmentsFolder:FindFirstChild(category)
 	local itemPrefab = categoryFolder and categoryFolder:FindFirstChild(itemName)
@@ -641,7 +681,7 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 	if itemPrefab then
 		local slotName = "EquipSlot_" .. category
 		if itemPrefab:IsA("Folder") then
-			-- Multi-piece item (e.g. Black Trench Coat with 3 accessory children)
+			-- A multi-piece item, such as Black Trench Coat with 3 accessories.
 			for _, piece in ipairs(itemPrefab:GetChildren()) do
 				if piece:IsA("Accessory") then
 					local clone = piece:Clone()
@@ -650,7 +690,7 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 				end
 			end
 		elseif itemPrefab:IsA("Accessory") then
-			-- Single-piece item (e.g. Prayer Beads)
+			-- A single-piece item, such as Prayer Beads.
 			local clone = itemPrefab:Clone()
 			clone.Name = slotName
 			humanoid:AddAccessory(clone)
@@ -658,7 +698,7 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 		return
 	end
 
-	-- [[ WELD PATH: For non-accessory items (Back, Lanterns, etc.) ]]
+	-- Items that are not accessories, such as Back items and lanterns, are welded.
 	local weldPrefab = ServerStorage.Weapons:FindFirstChild(itemName)
 		or ServerStorage:FindFirstChild("Equipment")
 			and ServerStorage.Equipment:FindFirstChild(itemName)
@@ -702,7 +742,11 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 	end
 end
 
--- // Load all visuals on spawn
+-- InventoryManager:LoadAllVisuals() - show the visuals of every equipped item
+--
+-- Call this on spawn.
+--
+-- Return: nothing.
 function InventoryManager:LoadAllVisuals()
 	for category, itemData in pairs(self.Equipment) do
 		if itemData then
@@ -711,10 +755,8 @@ function InventoryManager:LoadAllVisuals()
 	end
 end
 
--- // Resolve an item's slot category for the client.
--- Weapons (ServerStorage.Weapons) return nil; equipment (ServerStorage.Equipment)
--- returns its ItemType attribute (Head/Torso/Legs/Back). Used by the client UI
--- for tooltips and click-to-equip.
+-- Returns the ItemType of an equipment item (Head, Torso, Legs, or Back), or nil for
+-- a weapon. The client UI uses it for tooltips and click-to-equip.
 local function GetItemCategory(itemName)
 	local equipmentFolder = ServerStorage:FindFirstChild("Equipment")
 	local prefab = equipmentFolder and equipmentFolder:FindFirstChild(itemName)
@@ -724,7 +766,7 @@ local function GetItemCategory(itemName)
 	return nil
 end
 
--- Shallow-copy an item and attach its Category without mutating stored data.
+-- Copies an item and adds its Category, without changing the stored data.
 local function DecorateItem(item)
 	if not item then
 		return nil
@@ -737,7 +779,9 @@ local function DecorateItem(item)
 	return copy
 end
 
--- // Sync Data to Client UI
+-- InventoryManager:Sync() - send the inventory to the client UI
+--
+-- Return: nothing.
 function InventoryManager:Sync()
 	local UpdateUIEvent =
 		game:GetService("ReplicatedStorage"):WaitForChild("remotes"):WaitForChild("UpdateUI")
