@@ -922,7 +922,7 @@ function module.RunM1(plr, cfg, opts)
 				Func = "UppercutRise",
 				FolderName = getEquippedTool(plr),
 			}, kchar)
-		elseif StateHandler.GetState(kchar, "Combo") == 5 then
+		elseif StateHandler.GetState(kchar, "Combo") == MAX_COMBO then
 			Helper.ApplyKnockback(ktargetChar, direction, knockbackDistance * 2, 0.2)
 			StateHandler.SetStun(ktargetChar, true, 0.5, HITSTUN_STUNSPEED)
 		else
