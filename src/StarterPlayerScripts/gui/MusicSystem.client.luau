@@ -1,15 +1,17 @@
--- Services
+-- SPDX-License-Identifier: MIT
+--
+-- The music player: menu, zone, and combat playlists with fades, and the play/pause and
+-- skip buttons. The zone comes from a downward raycast against Workspace.Locations.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
--- Player Variables
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- Folders & Remotes
 local MusicFolder = ReplicatedStorage:WaitForChild("music")
 local AmbianceFolder = MusicFolder:WaitForChild("ambiance")
 local MenuFolder = MusicFolder:WaitForChild("main_menu")
@@ -19,7 +21,6 @@ local LocationsFolder = Workspace:WaitForChild("Locations")
 local Remotes = ReplicatedStorage:WaitForChild("remotes")
 local CombatRemote = Remotes:WaitForChild("CombatTagUpdate")
 
--- System Variables
 local currentZone = nil
 local currentAudio = nil
 local currentPlaylist = nil
@@ -27,26 +28,21 @@ local isPlaying = true
 local inMainMenu = true
 local inCombat = false
 
--- The currently running volume tween, tracked so play/pause spam can cancel it before
--- starting a new one. Two tweens on the same Volume property fight and desync state.
+-- The running volume tween, so a new one can cancel it. Two tweens on Volume fight.
 local activeVolumeTween = nil
 
 local FADE_DURATION = 1.5
 local RAYCAST_INTERVAL = 0.5
 local timeSinceLastCast = 0
 
--- GUI references. Resolved by BindGui(); kept as upvalues so this script works whether or
--- not MusicUI has ResetOnSpawn = false.
+-- Set by BindGui, so the script works whether or not MusicUI resets on spawn.
 local ControlFrame = nil
 local PlayPauseBtn = nil
 local SkipBtn = nil
 
--- Raycast Parameters
 local zoneRayParams = RaycastParams.new()
 zoneRayParams.FilterType = Enum.RaycastFilterType.Include
 zoneRayParams.FilterDescendantsInstances = { LocationsFolder }
-
--- [[ ---------------- HELPERS ---------------- ]] --
 
 local function cancelVolumeTween()
 	if activeVolumeTween then
@@ -67,8 +63,6 @@ local function refreshButtonVisual()
 		PlayPauseBtn.ImageTransparency = isPlaying and 0 or 0.5
 	end
 end
-
--- [[ ---------------- MUSIC LOGIC ---------------- ]] --
 
 local PlayRandomTrackFromFolder
 
@@ -95,7 +89,7 @@ local function PlayTrack(newAudioObject)
 		currentAudio.Volume = 0
 		currentAudio.Looped = false
 
-		-- A new track is taking over; any in-flight fade is now irrelevant.
+		-- The new track owns the tween now.
 		cancelVolumeTween()
 
 		if isPlaying then
@@ -110,7 +104,7 @@ local function PlayTrack(newAudioObject)
 		currentAudio.Ended:Once(function()
 			if currentAudio == newAudioObject then
 				if currentPlaylist then
-					-- Pass 'true' to indicate this is a natural skip to the next song
+					-- A natural skip to the next song.
 					PlayRandomTrackFromFolder(currentPlaylist, true)
 				end
 			end
@@ -118,8 +112,7 @@ local function PlayTrack(newAudioObject)
 	end
 
 	if oldAudio then
-		-- Old track gets its own fade-out (separate from the tracked tween, which now
-		-- belongs to the incoming track). Stop once silent.
+		-- The old track fades out on its own tween and stops when silent.
 		local fadeOut = TweenService:Create(oldAudio, TweenInfo.new(FADE_DURATION), { Volume = 0 })
 		fadeOut:Play()
 		fadeOut.Completed:Once(function()
@@ -131,7 +124,7 @@ local function PlayTrack(newAudioObject)
 end
 
 PlayRandomTrackFromFolder = function(folder, isSkip)
-	-- If we are already playing this folder, and we aren't explicitly skipping, do nothing.
+	-- Keep playing the same playlist unless this is a skip.
 	if folder == currentPlaylist and not isSkip then
 		return
 	end
@@ -185,10 +178,7 @@ local function CheckZone()
 	end
 end
 
--- [[ ---------------- GUI BINDING ---------------- ]] --
--- All button connections live here so they bind to the LIVE GUI instances. If MusicUI
--- resets on spawn, BindGui can be re-run to re-acquire the new buttons instead of holding
--- dead references.
+-- BindGui connects the buttons of the current MusicUI. It can run again after a reset.
 
 local playPauseDebounce = false
 local skipDebounce = false
@@ -224,8 +214,7 @@ local function BindGui()
 		end
 		playPauseDebounce = true
 
-		-- Capture this click's intended state up front so a later click can't invalidate
-		-- the pause decision mid-fade (the old desync bug).
+		-- Decide the state now, so a later click cannot change this pause during the fade.
 		isPlaying = not isPlaying
 		local shouldPlay = isPlaying
 		refreshButtonVisual()
@@ -238,8 +227,7 @@ local function BindGui()
 			local audioAtClick = currentAudio
 			local fadeOut = tweenVolume(currentAudio, 0.5, 0)
 			fadeOut.Completed:Once(function(state)
-				-- Only pause if the fade actually completed (not cancelled by a newer
-				-- click) and we're still meant to be paused on the same track.
+				-- Pause only if the fade finished without a newer click, on the same track.
 				if
 					state == Enum.PlaybackState.Completed
 					and not isPlaying
@@ -286,8 +274,6 @@ local function BindMainMenuButton()
 	end)
 end
 
--- [[ ---------------- EVENT CONNECTIONS ---------------- ]] --
-
 CombatRemote.OnClientEvent:Connect(function(isInCombat, duration)
 	if inCombat == isInCombat then
 		return
@@ -311,7 +297,6 @@ RunService.Heartbeat:Connect(function(dt)
 	end
 end)
 
--- [[ ---------------- INITIALIZATION ---------------- ]] --
 local function Init()
 	BindMainMenuButton()
 	BindGui()

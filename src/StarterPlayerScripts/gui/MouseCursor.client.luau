@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The custom mouse cursor: a default icon, a hover icon over buttons, and a lock icon
+-- at the screen center while Shift Lock holds the mouse.
+
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -5,7 +10,8 @@ local player = Players.LocalPlayer
 
 local DEFAULT_ICON = "rbxassetid://4127959394"
 local HOVER_ICON = "rbxassetid://4127964114"
-local LOCK_ICON = "rbxassetid://4586653091" -- shift-lock decal (was DEFAULT_MOUSE_LOCK_CURSOR in MouseLockController)
+-- The Shift Lock icon, the same as the PlayerModule MouseLockController default.
+local LOCK_ICON = "rbxassetid://4586653091"
 local CURSOR_SIZE = UDim2.new(0, 64, 0, 64)
 
 local screenGui = Instance.new("ScreenGui")
@@ -27,16 +33,13 @@ cursor.Parent = screenGui
 
 UserInputService.MouseIconEnabled = false
 
--- which buttons are currently hovered, keyed by the button instance.
--- a set (not a counter) so a button that disappears mid-hover can be
--- cleared cleanly. MouseLeave does NOT fire when a hovered button is
--- destroyed, hidden, or has its ScreenGui disabled (the menu Play button
--- hides itself, the controls X button disables its whole ScreenGui), which
--- is what kept getting the cursor stuck on HOVER_ICON.
+-- The hovered buttons, as a set. MouseLeave does not fire when a hovered button is
+-- destroyed, hidden, or its ScreenGui is disabled, so a counter could stick on the hover
+-- icon.
 local hovered = {}
 
--- a hovered button only counts if it's actually on screen: itself visible,
--- every GuiObject ancestor visible, and its ScreenGui still enabled.
+-- A hovered button counts only if it is on screen: visible, with visible GuiObject
+-- ancestors and an enabled ScreenGui.
 local function isOnScreen(button)
 	if not button.Parent then
 		return false
@@ -54,8 +57,8 @@ local function isOnScreen(button)
 	return false
 end
 
--- the controller locks the mouse to screen centre when shift lock (or
--- right-click pan) is active. that's our signal to show the lock decal.
+-- The camera locks the mouse to the screen center during Shift Lock or right-click
+-- pan. That is the signal for the lock icon.
 local function isLocked()
 	return UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter
 end
@@ -72,7 +75,7 @@ end
 
 RunService.RenderStepped:Connect(function()
 	if isLocked() then
-		-- mouse is pinned to centre by the camera, so park the decal there
+		-- The mouse is pinned to the center, so put the icon there.
 		local vp = workspace.CurrentCamera.ViewportSize
 		cursor.Position = UDim2.fromOffset(vp.X / 2, vp.Y / 2)
 	else
@@ -80,9 +83,7 @@ RunService.RenderStepped:Connect(function()
 		cursor.Position = UDim2.fromOffset(pos.X, pos.Y)
 	end
 
-	-- safety net: drop any hovered button that's no longer on screen.
-	-- catches destroy / Visible=false / ScreenGui disabled in one place,
-	-- regardless of which (if any) event fired.
+	-- Drop any hovered button that is no longer on screen, whichever event fired.
 	for button in pairs(hovered) do
 		if not isOnScreen(button) then
 			hovered[button] = nil

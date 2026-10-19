@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The weapon XP bar: the level and XP of the equipped weapon's family.
+
 task.wait(1)
 
 local Players = game:GetService("Players")

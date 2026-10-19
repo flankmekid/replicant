@@ -1,11 +1,9 @@
 --!strict
--- DayNightClient
--- Reads Lighting.ClockTime every frame and interpolates mood properties between
--- keyframes. Visibility is held flat across the whole cycle (night reads through
--- colour/atmosphere only, never reduced light) per design.
+-- SPDX-License-Identifier: MIT
 --
--- Tune the look by editing KEYFRAMES below. Each keyframe is anchored to a clock
--- hour; the system finds the two surrounding keyframes and lerps between them.
+-- Blends the lighting mood between keyframes by Lighting.ClockTime, which the server
+-- sets. Visibility stays flat over the whole cycle: night shows only through color and
+-- atmosphere, never through less light. Tune the look in KEYFRAMES.
 
 local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
@@ -13,12 +11,11 @@ local RunService = game:GetService("RunService")
 local atmos = Lighting:FindFirstChildOfClass("Atmosphere")
 local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
 
--- === KEYFRAMES ===
--- hour: clock time this frame is anchored to (0..24)
--- Daytime values (dawn/noon/dusk) seeded from the existing tuned look.
--- Midnight is bright-but-blue: ambient stays high so visibility never drops.
+-- Each keyframe is anchored to a clock hour (0 to 24), and the mood lerps between the
+-- two around the current time. Midnight is blue but bright, so visibility never drops.
 local KEYFRAMES = {
-	{ -- midnight (cool, void-blue, still bright)
+	-- Midnight: cool and blue, still bright.
+	{
 		hour = 0,
 		outdoorAmbient = Color3.fromRGB(58, 64, 92),
 		ambient = Color3.fromRGB(78, 82, 110),
@@ -30,7 +27,8 @@ local KEYFRAMES = {
 		atmosHaze = 1.1,
 		fogColor = Color3.fromRGB(96, 110, 150),
 	},
-	{ -- dawn (warm transition)
+	-- Dawn: a warm transition.
+	{
 		hour = 6,
 		outdoorAmbient = Color3.fromRGB(120, 114, 100),
 		ambient = Color3.fromRGB(132, 124, 110),
@@ -42,7 +40,8 @@ local KEYFRAMES = {
 		atmosHaze = 0.95,
 		fogColor = Color3.fromRGB(180, 165, 158),
 	},
-	{ -- noon (exact current tuned look)
+	-- Noon.
+	{
 		hour = 12,
 		outdoorAmbient = Color3.fromRGB(72, 71, 63),
 		ambient = Color3.fromRGB(118, 117, 107),
@@ -54,7 +53,8 @@ local KEYFRAMES = {
 		atmosHaze = 0.80,
 		fogColor = Color3.fromRGB(192, 192, 192),
 	},
-	{ -- dusk (warm transition, mirror of dawn)
+	-- Dusk: a warm transition, the mirror of dawn.
+	{
 		hour = 18,
 		outdoorAmbient = Color3.fromRGB(72, 71, 63),
 		ambient = Color3.fromRGB(126, 116, 104),
@@ -67,17 +67,17 @@ local KEYFRAMES = {
 		fogColor = Color3.fromRGB(182, 158, 150),
 	},
 }
--- keyframes loop: hour 24 wraps back to the hour-0 frame.
+-- The keyframes loop: hour 24 wraps to the hour-0 keyframe.
 
--- tiny brightness nudge for a full moon (phase index 1). kept small so it never
--- breaks the flat-visibility rule. set to 0 to disable entirely.
+-- A small brightness boost for a full moon (phase 1), small enough to keep visibility
+-- flat. Set it to 0 to turn it off.
 local FULL_MOON_BRIGHTNESS_BONUS = 0.015
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
 end
 
--- find the two keyframes bracketing the given hour and the blend factor
+-- Returns the two keyframes around an hour and the blend factor between them.
 local function bracket(hour: number)
 	local n = #KEYFRAMES
 	for i = 1, n do
@@ -85,9 +85,10 @@ local function bracket(hour: number)
 		local b = KEYFRAMES[(i % n) + 1]
 		local aH = a.hour
 		local bH = b.hour
+		-- Wrap past midnight, for example from 18 to 24.
 		if bH <= aH then
 			bH = bH + 24
-		end -- wrap (e.g. 18 -> 24/0)
+		end
 		local h = hour
 		if h < aH then
 			h = h + 24
@@ -111,11 +112,10 @@ RunService.RenderStepped:Connect(function()
 	if cc then
 		cc.TintColor = a.ccTint:Lerp(b.ccTint, t)
 		local brightness = lerp(a.ccBrightness, b.ccBrightness, t)
-		-- full-moon nudge, scaled by how deep into night we are (near midnight)
+		-- The full-moon boost grows toward midnight.
 		local phaseIndex = Lighting:GetAttribute("MoonPhaseIndex")
 		if phaseIndex == 1 and FULL_MOON_BRIGHTNESS_BONUS > 0 then
 			local nightness = math.clamp(1 - math.abs(((hour + 12) % 24) - 12) / 12, 0, 1)
-			-- nightness peaks at midnight, 0 at noon
 			local darkness = 1 - math.clamp(math.abs((hour % 24) - 12) / 12, 0, 1)
 			brightness = brightness + FULL_MOON_BRIGHTNESS_BONUS * darkness
 		end

@@ -1,7 +1,7 @@
--- [[ LEVEL UP INDICATOR ]]
--- Location: StarterPlayerScripts
--- Watches PlayerStats.WeaponData.[Weapon].Level for changes
--- and fires an FFXIV-inspired level up effect on the local client.
+-- SPDX-License-Identifier: MIT
+--
+-- Plays the level-up effect, a ring, a sound, and a toast, when one of the local
+-- player's weapon levels in PlayerStats.WeaponData rises.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -12,28 +12,24 @@ local player = Players.LocalPlayer
 local playerGui = player.PlayerGui
 local character = player.Character or player.CharacterAdded:Wait()
 
--- ── CONFIGURATION ─────────────────────────────────────────────────────────────
 local CFG = {
-	-- Ring
-	RING_DURATION = 1, -- seconds the ring expands
-	RING_MAX_SIZE = 18, -- studs diameter at peak
-	RING_THICKNESS = 0.18, -- ring wall thickness
+	RING_DURATION = 1, -- Seconds.
+	RING_MAX_SIZE = 18, -- Diameter in studs.
+	RING_THICKNESS = 0.18,
 	RING_COLOR = Color3.fromRGB(255, 220, 100),
-	RING_EMISSION = 2, -- surface light emission
+	RING_EMISSION = 2,
 
-	-- Inner flash
 	FLASH_DURATION = 0.2,
 	FLASH_COLOR = Color3.fromRGB(255, 245, 180),
 
-	-- UI toast
-	TOAST_HOLD = 3.5, -- seconds the toast stays fully visible
-	TOAST_FADE = 0.5, -- fade in/out duration
+	TOAST_HOLD = 3.5, -- Seconds fully visible.
+	TOAST_FADE = 0.5, -- Seconds per fade.
 	TOAST_BG = Color3.fromRGB(20, 14, 8),
 	TOAST_BORDER = Color3.fromRGB(200, 160, 50),
 	TOAST_LABEL_COLOR = Color3.fromRGB(255, 220, 100),
 	TOAST_SUB_COLOR = Color3.fromRGB(220, 200, 160),
 
-	-- Milestone labels (matches your spreadsheet milestones)
+	-- Weapon levels that unlock trainer steps.
 	MILESTONES = {
 		[10] = "You are ready to specialise. Seek out a trainer to further your knowledge.",
 		[15] = "A new technique has awakened. Return to your trainer.",
@@ -41,25 +37,22 @@ local CFG = {
 		[25] = "Mastery achieved. Return to your trainer.",
 	},
 
-	-- Sound (replace with your own asset IDs if you have them)
-	SOUND_ID = "rbxassetid://108161825312558", -- bright chime, swap freely
+	SOUND_ID = "rbxassetid://108161825312558",
 	SOUND_VOLUME = 1,
 	SOUND_PITCH = 1.0,
 }
 
 local WEAPON_TYPES = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
 
--- ── WAIT FOR DATA ──────────────────────────────────────────────────────────────
 local function waitForStats()
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
 		return stats
 	end
-	-- PlayerStats is created server-side in dataManager shortly after spawn
+	-- The server creates PlayerStats shortly after spawn.
 	return player:WaitForChild("PlayerStats", 15)
 end
 
--- ── SOUND ──────────────────────────────────────────────────────────────────────
 local function playLevelUpSound(root)
 	local s = Instance.new("Sound")
 	s.SoundId = CFG.SOUND_ID
@@ -71,13 +64,7 @@ local function playLevelUpSound(root)
 	game:GetService("Debris"):AddItem(s, 4)
 end
 
--- ── WORLD EFFECT: EXPANDING RING ───────────────────────────────────────────────
---
--- A flat torus-like ring made from a scaled cylinder shell.
--- We fake the ring by using a very short, hollow-looking cylinder:
--- outer cylinder slightly larger than inner, clipped by CFrame.
--- Roblox doesn't have a torus primitive, so we use a SpecialMesh (ring shape).
---
+-- Plays the level-up particles at the root part.
 local function spawnFX(root)
 	local spawnFXTemplate =
 		game.ReplicatedStorage.assets.FX:FindFirstChild("LevelUpParticle").Main.partic
@@ -89,7 +76,6 @@ local function spawnFX(root)
 	end
 end
 
--- ── WORLD EFFECT: CHARACTER FLASH ─────────────────────────────────────────────
 local function spawnFlash(root)
 	local flashPart = Instance.new("Part")
 	flashPart.Anchored = true
@@ -112,14 +98,10 @@ local function spawnFlash(root)
 	game:GetService("Debris"):AddItem(flashPart, CFG.FLASH_DURATION + 0.1)
 end
 
--- ── UI TOAST ───────────────────────────────────────────────────────────────────
---
--- FFXIV-style: dark bordered panel slides down from top-center,
--- holds, then fades out. Shows weapon name, new level, and
--- milestone text if applicable.
---
+-- Shows the level-up toast at the top center: the weapon, the new level, and any
+-- milestone text.
 local function buildToastGui()
-	-- Reuse existing ScreenGui if present (prevents stacking on rapid level-ups)
+	-- Reuse the toast GUI, so rapid level-ups do not stack.
 	local existing = playerGui:FindFirstChild("LevelUpToast")
 	if existing then
 		existing:Destroy()
@@ -132,7 +114,6 @@ local function buildToastGui()
 	gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	gui.Parent = playerGui
 
-	-- Outer container — centred top
 	local container = Instance.new("CanvasGroup")
 	container.Name = "Container"
 	container.AnchorPoint = Vector2.new(0.5, 0)
@@ -142,12 +123,10 @@ local function buildToastGui()
 	container.BorderSizePixel = 0
 	container.Parent = gui
 
-	-- Corner rounding
 	local corner = Instance.new("UICorner")
 	corner.CornerRadius = UDim.new(0, 6)
 	corner.Parent = container
 
-	-- "LEVEL UP" eyebrow label
 	local eyebrow = Instance.new("TextLabel")
 	eyebrow.Name = "Eyebrow"
 	eyebrow.Size = UDim2.new(1, -20, 0, 18)
@@ -160,20 +139,18 @@ local function buildToastGui()
 	eyebrow.TextXAlignment = Enum.TextXAlignment.Center
 	eyebrow.Parent = container
 
-	-- Main label: "[Weapon] · Level [N]"
 	local mainLabel = Instance.new("TextLabel")
 	mainLabel.Name = "MainLabel"
 	mainLabel.Size = UDim2.new(1, -20, 0, 30)
 	mainLabel.Position = UDim2.new(0, 10, 0, 28)
 	mainLabel.BackgroundTransparency = 1
-	mainLabel.Text = "" -- filled in at call time
+	mainLabel.Text = ""
 	mainLabel.TextColor3 = CFG.TOAST_LABEL_COLOR
 	mainLabel.TextSize = 22
 	mainLabel.Font = Enum.Font.Fondamento
 	mainLabel.TextXAlignment = Enum.TextXAlignment.Center
 	mainLabel.Parent = container
 
-	-- Sub label: milestone text or blank
 	local subLabel = Instance.new("TextLabel")
 	subLabel.Name = "SubLabel"
 	subLabel.Size = UDim2.new(1, -20, 0, 18)
@@ -196,18 +173,15 @@ local function showToast(weaponName, newLevel)
 	mainLabel.Text = string.upper(weaponName) .. "  <->  LEVEL " .. newLevel
 	subLabel.Text = CFG.MILESTONES[newLevel] or ""
 
-	-- Start fully transparent
 	container.GroupTransparency = 1
 	container.Position = UDim2.new(0.5, 0, 0.08, 0)
 
-	-- Fade in over 0.5s
 	TweenService:Create(
 		container,
 		TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
 		{ GroupTransparency = 0 }
 	):Play()
 
-	-- Hold for 2s, then fade out over 0.5s
 	task.delay(0.5 + 2.0, function()
 		if not gui.Parent then
 			return
@@ -226,9 +200,8 @@ local function showToast(weaponName, newLevel)
 	end)
 end
 
--- ── MASTER LEVEL-UP HANDLER ────────────────────────────────────────────────────
 local function onLevelUp(weaponName, newLevel)
-	-- Guard: don't fire on initial data load (level starts at 1)
+	-- Skip level 1, which the first data load sets.
 	if newLevel <= 1 then
 		return
 	end
@@ -238,25 +211,18 @@ local function onLevelUp(weaponName, newLevel)
 		return
 	end
 
-	-- World effects (run in parallel, non-blocking)
 	task.spawn(playLevelUpSound, root)
 	task.spawn(spawnFX, root)
-	--task.spawn(spawnFlash, root)
 
-	-- UI toast
 	showToast(weaponName, newLevel)
 end
 
--- ── WATCHER ───────────────────────────────────────────────────────────────────
---
--- Connects to each weapon's Level IntValue.
--- Uses the previous value to confirm an actual increase
--- (guards against data reconciliation setting level to 1 on first load).
---
+-- Watches each weapon's Level value and fires only on a real increase, so the first
+-- data load does not count.
 local function watchWeaponLevels(stats)
 	local weaponDataFolder = stats:WaitForChild("WeaponData", 10)
 	if not weaponDataFolder then
-		warn("[LevelUp] WeaponData folder not found in PlayerStats.")
+		warn("[LevelUpIndicator] WeaponData not found in PlayerStats.")
 		return
 	end
 
@@ -268,7 +234,6 @@ local function watchWeaponLevels(stats)
 				local previousLevel = levelValue.Value
 
 				levelValue.Changed:Connect(function(newLevel)
-					-- Only fire if the level genuinely increased
 					if newLevel > previousLevel then
 						onLevelUp(weaponName, newLevel)
 					end
@@ -279,17 +244,16 @@ local function watchWeaponLevels(stats)
 	end
 end
 
--- ── INIT ──────────────────────────────────────────────────────────────────────
 task.spawn(function()
 	local stats = waitForStats()
 	if stats then
 		watchWeaponLevels(stats)
 	else
-		warn("[LevelUp] PlayerStats did not load in time.")
+		warn(`[LevelUpIndicator] PlayerStats did not load for {player.Name}.`)
 	end
 end)
 
--- Handle character respawns — root part reference needs refreshing
+-- Keep the current character, for its root part.
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
 end)

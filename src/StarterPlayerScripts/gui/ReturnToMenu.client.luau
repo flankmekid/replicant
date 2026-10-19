@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Adds the topbar Menu button, which returns the player to the main menu. It shows only
+-- after the player pressed Play.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -7,7 +12,6 @@ local player = Players.LocalPlayer
 local ReturnToMenuRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("ReturnToMenu")
 
 local menuIcon = Icon.new()
---menuIcon:setImage("rbxassetid://114967221912590")
 menuIcon:setLabel("Menu")
 menuIcon:setOrder(-1)
 menuIcon:setEnabled(false)

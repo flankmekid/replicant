@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The skill HUD: the Z, X, C, and V slots with their equipped skills and cooldown bars.
+-- Cooldowns survive a HUD rebuild.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -6,10 +11,8 @@ local player = Players.LocalPlayer
 local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 local TriggerCooldownEvent = ReplicatedStorage.remotes:WaitForChild("TriggerCooldown")
 
--- Key Mapping for Display
 local KEY_NAMES = { [1] = "Z", [2] = "X", [3] = "C", [4] = "V" }
 
--- [[ GUI CREATION ]] --
 local playerGui = player:WaitForChild("PlayerGui")
 
 if playerGui:FindFirstChild("WeaponSkillHUD") then
@@ -40,12 +43,9 @@ listLayout.Padding = UDim.new(0, 8)
 
 local activeSkillFrames = {}
 
--- [[ STATE TRACKING ]] --
--- This table remembers cooldowns even if the UI is deleted/refreshed
--- Format: { [skillName] = { endTime = number, totalDuration = number } }
+-- Active cooldowns, kept when the HUD is rebuilt:
+-- { [skillName] = { endTime, totalDuration } }.
 local activeCooldowns = {}
-
--- [[ FUNCTIONS ]] --
 
 local function createSkillBar(skillName, slotIndex, isRace)
 	local frame = Instance.new("Frame")
@@ -86,7 +86,8 @@ local function createSkillBar(skillName, slotIndex, isRace)
 
 	local cdBar = Instance.new("Frame")
 	cdBar.Name = "CooldownBar"
-	cdBar.Size = UDim2.new(0, 0, 1, 0) -- Starts empty (visuals only appear when CD active)
+	-- Empty until a cooldown runs.
+	cdBar.Size = UDim2.new(0, 0, 1, 0)
 	cdBar.BackgroundColor3 = isRace and Color3.fromRGB(120, 60, 180) or Color3.fromRGB(180, 40, 40)
 	cdBar.BackgroundTransparency = 0.6
 	cdBar.BorderSizePixel = 0
@@ -100,22 +101,18 @@ local function createSkillBar(skillName, slotIndex, isRace)
 	return frame, cdBar
 end
 
--- Helper to apply the tween logic to a specific bar
+-- Shrinks a cooldown bar from the time left to empty.
 local function ApplyCooldownAnimation(bar, remainingTime, totalDuration)
-	-- Calculate percentage left (e.g., 0.5 = 50% width)
 	local scale = remainingTime / totalDuration
 
-	-- Snap size immediately to current progress
 	bar.Size = UDim2.new(scale, 0, 1, 0)
 
-	-- Tween to 0
 	local tweenInfo = TweenInfo.new(remainingTime, Enum.EasingStyle.Linear)
 	local tween = TweenService:Create(bar, tweenInfo, { Size = UDim2.new(0, 0, 1, 0) })
 	tween:Play()
 end
 
 local function RefreshHUD()
-	-- Clear existing GUI
 	for _, child in pairs(container:GetChildren()) do
 		if child:IsA("Frame") then
 			child:Destroy()
@@ -128,9 +125,7 @@ local function RefreshHUD()
 		return
 	end
 
-	-- 1. WEAPON SKILLS (Slots 1-3)
-	-- Read the player's equipped loadout per family (set in the spellbook), not the
-	-- static branch list, so spellbook swaps and newly-learned skills show correctly.
+	-- Weapon skills come from the equipped spellbook loadout, so swaps and new skills show.
 	local tool = char:FindFirstChildWhichIsA("Tool")
 	if tool then
 		local family = SkillConfig.WeaponFamily[tool.Name]
@@ -152,7 +147,7 @@ local function RefreshHUD()
 		end
 	end
 
-	-- 2. RACE SKILL (Slot 4 - "V")
+	-- The racial skill on V.
 	local stats = player:FindFirstChild("PlayerStats")
 	local raceVal = stats and stats:FindFirstChild("Race") and stats.Race.Value
 	if raceVal then
@@ -164,18 +159,15 @@ local function RefreshHUD()
 		end
 	end
 
-	-- 3. RESUME ANIMATIONS (The Fix)
-	-- Loop through active frames and check if we have a saved cooldown for them
+	-- Resume the bars of cooldowns that are still running.
 	for skillName, bar in pairs(activeSkillFrames) do
 		local cdData = activeCooldowns[skillName]
 		if cdData then
 			local remaining = cdData.endTime - os.clock()
 
 			if remaining > 0 then
-				-- It's still on cooldown, resume animation
 				ApplyCooldownAnimation(bar, remaining, cdData.totalDuration)
 			else
-				-- It expired while the UI was refreshing/gone
 				activeCooldowns[skillName] = nil
 				bar.Size = UDim2.new(0, 0, 1, 0)
 			end
@@ -184,26 +176,21 @@ local function RefreshHUD()
 end
 
 local function OnCooldownTriggered(skillName, duration)
-	-- 1. Save State
 	activeCooldowns[skillName] = {
 		endTime = os.clock() + duration,
 		totalDuration = duration,
 	}
 
-	-- 2. Animate if visible
 	local bar = activeSkillFrames[skillName]
 	if bar then
 		ApplyCooldownAnimation(bar, duration, duration)
 	end
 end
 
--- [[ CONNECTIONS ]] --
-
 TriggerCooldownEvent.Event:Connect(OnCooldownTriggered)
 
--- Refresh the HUD whenever the equipped loadout changes (spellbook swap or a
--- newly-learned skill auto-equipping). Connected once; the folder persists across
--- respawns so we don't re-hook per character.
+-- Rebuild the HUD when the loadout changes. The folder survives respawns, so this
+-- connects once.
 local equippedHooked = false
 local function hookEquippedSkills()
 	if equippedHooked then
@@ -223,14 +210,13 @@ local function hookEquippedSkills()
 			sv:GetPropertyChangedSignal("Value"):Connect(RefreshHUD)
 		end
 	end
-	-- Existing family folders + their slot values.
 	for _, famFolder in ipairs(equippedFolder:GetChildren()) do
 		for _, sv in ipairs(famFolder:GetChildren()) do
 			watchSlot(sv)
 		end
 		famFolder.ChildAdded:Connect(watchSlot)
 	end
-	-- Family folders created later (first skill in a new family).
+	-- A family folder appears with its first skill.
 	equippedFolder.ChildAdded:Connect(function(famFolder)
 		for _, sv in ipairs(famFolder:GetChildren()) do
 			watchSlot(sv)

@@ -1,7 +1,6 @@
--- [[ TITLE EARNED NOTIFICATION CLIENT ]]
--- Location: StarterPlayerScripts
--- Listens for TitleEarned remote and shows the QuestCompleteFrame
--- with the title name and Liturgy reward, same as quest completion.
+-- SPDX-License-Identifier: MIT
+--
+-- Shows a newly earned title and its Liturgy reward in the quest-complete frame.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -19,7 +18,6 @@ local queue = {}
 local playing = false
 
 local function playNotification(titleName, liturgyReward)
-	-- Reuse QuestCompleteFrame from QuestGUI
 	local questGui = PlayerGui:FindFirstChild("QuestGUI")
 	if not questGui then
 		return

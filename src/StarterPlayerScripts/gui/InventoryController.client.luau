@@ -1,6 +1,9 @@
--- inventory controller script
+-- SPDX-License-Identifier: MIT
+--
+-- The inventory UI: the item grid, the hotbar, and the equipment slots, with tooltips,
+-- click-to-equip, and drag and drop. The server owns the inventory and syncs it through
+-- UpdateUI. This replaces the default Backpack.
 
--- // StarterPlayerScripts.InventoryController
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -10,23 +13,19 @@ local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 local InventoryGui = PlayerGui:WaitForChild("BackpackUI")
 
--- UI References
 local Grid = InventoryGui:WaitForChild("MainPanel"):WaitForChild("Grid")
 local HotbarFrame = InventoryGui:WaitForChild("Hotbar")
 local EquipPanel = InventoryGui:WaitForChild("EquipmentPanel")
 local DragLayer = InventoryGui:WaitForChild("DragLayer")
 
--- Asset References
 local HotbarTemplate = ReplicatedStorage:WaitForChild("assets"):WaitForChild("hotbarFrame")
 
--- Remotes
 local InventoryRemotes = ReplicatedStorage:WaitForChild("remotes")
 local UpdateUIEvent = InventoryRemotes:WaitForChild("UpdateUI")
 local MoveItemRemote = InventoryRemotes:WaitForChild("MoveItem")
 local UseHotbarRemote = InventoryRemotes:WaitForChild("UseHotbar")
 local RequestSyncRemote = InventoryRemotes:WaitForChild("RequestSync")
 
--- Disable Default Backpack
 local StarterGui = game:GetService("StarterGui")
 pcall(function()
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
@@ -35,13 +34,13 @@ end)
 local DragState =
 	{ IsDragging = false, ItemData = nil, SourceType = nil, SourceIndex = nil, VisualClone = nil }
 
--- Tracks a pending press that hasn't yet decided between "click" and "drag".
+-- A press that has not yet become a click or a drag.
 local PendingPress = nil
-local DRAG_THRESHOLD = 8 -- pixels of movement before a press becomes a drag
+-- Pixels of movement before a press becomes a drag.
+local DRAG_THRESHOLD = 8
 
--- [[ TOOLTIP ]] --
--- One reusable tooltip frame. Weapons show just the name; equipment shows the
--- name as a title plus the slot it fits (Category comes from the server sync).
+-- One shared tooltip. A weapon shows its name. Equipment shows the name and the slot
+-- it fits, from the Category the server sends.
 local Tooltip = Instance.new("Frame")
 Tooltip.Name = "ItemTooltip"
 Tooltip.AnchorPoint = Vector2.new(0, 0)
@@ -111,12 +110,10 @@ local function ShowTooltip(itemData)
 	end
 	TooltipTitle.Text = itemData.Name
 	if itemData.Category then
-		-- Equipment: title + slot line
 		TooltipSub.Visible = true
 		TooltipSub.Text = "Slot: " .. tostring(itemData.Category)
 		Tooltip.Size = UDim2.fromOffset(160, 44)
 	else
-		-- Weapon (or anything uncategorized): name only
 		TooltipSub.Visible = false
 		TooltipSub.Text = ""
 		Tooltip.Size = UDim2.fromOffset(160, 28)
@@ -130,12 +127,12 @@ end
 
 UserInputService.InputChanged:Connect(function(input)
 	if Tooltip.Visible and input.UserInputType == Enum.UserInputType.MouseMovement then
-		-- Float the tooltip just above-right of the cursor
+		-- Place the tooltip just above and right of the cursor.
 		Tooltip.Position = UDim2.fromOffset(input.Position.X + 16, input.Position.Y + 22)
 	end
 end)
 
--- Wire hover behaviour onto a slot for a given item.
+-- Shows the tooltip of an item while its slot is hovered.
 local function BindTooltip(slot, itemData)
 	if not itemData then
 		return
@@ -148,26 +145,15 @@ local function BindTooltip(slot, itemData)
 	end)
 end
 
--- [[ 1. UI INFO GENERATION ]] --
+-- Adds the name and amount labels of an item to a slot.
 local function CreateSlotInfo(itemData, parentFrame)
 	if not itemData then
 		return
 	end
 
-	--[[
-	-- 1. The Icon
-	local icon = Instance.new("ImageLabel")
-	icon.Size = UDim2.fromScale(0.7, 0.7)
-	icon.Position = UDim2.fromScale(0.5, 0.4)
-	icon.AnchorPoint = Vector2.new(0.5, 0.5)
-	icon.BackgroundTransparency = 1
-	icon.Image = itemData.IsSpell and "rbxassetid://0" or "rbxassetid://0" -- Replace with real IDs
-	icon.Parent = parentFrame
-]]
-
-	-- 2. The Item Name (Sleek text at the bottom)
 	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Name = "ItemName" -- Explicitly named so we can read it later for selection
+	-- The selection code finds the equipped item by this label.
+	nameLabel.Name = "ItemName"
 	nameLabel.Size = UDim2.fromScale(1, 1)
 	nameLabel.Position = UDim2.fromScale(0, 0)
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Center
@@ -182,7 +168,6 @@ local function CreateSlotInfo(itemData, parentFrame)
 	nameLabel.TextWrapped = true
 	nameLabel.Parent = parentFrame
 
-	-- 3. Quantity (If applicable)
 	if itemData.Amount and itemData.Amount > 1 then
 		local qtyLabel = Instance.new("TextLabel")
 		qtyLabel.Size = UDim2.fromScale(0.3, 0.3)
@@ -196,7 +181,6 @@ local function CreateSlotInfo(itemData, parentFrame)
 	end
 end
 
--- [[ NEW: TWEENED SELECTION VISUALS ]] --
 local selectionTweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
 
 local function UpdateSelectionVisuals()
@@ -209,28 +193,27 @@ local function UpdateSelectionVisuals()
 			local nameLabel = slot:FindFirstChild("ItemName")
 			local stroke = slot:FindFirstChild("SelectionStroke")
 
-			-- If this slot holds the currently equipped item
+			-- Outline the slot of the equipped item.
 			if nameLabel and nameLabel.Text == equippedName and equippedName ~= nil then
 				if not stroke then
 					stroke = Instance.new("UIStroke")
 					stroke.Name = "SelectionStroke"
-					stroke.Color = Color3.new(1, 1, 1) -- White outline
+					stroke.Color = Color3.new(1, 1, 1)
 					stroke.Thickness = 3
-					stroke.Transparency = 1 -- Start invisible so it can tween in
+					-- Start invisible, so the outline fades in.
+					stroke.Transparency = 1
 					stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 					stroke.Parent = slot
 				end
 
-				-- Tween it to visible
 				TweenService:Create(stroke, selectionTweenInfo, { Transparency = 0 }):Play()
 			else
-				-- If it's NOT equipped but has a visible stroke, tween it out and remove it
+				-- Not equipped: fade the outline out and remove it.
 				if stroke and stroke.Transparency < 1 then
 					local tweenOut =
 						TweenService:Create(stroke, selectionTweenInfo, { Transparency = 1 })
 					tweenOut:Play()
 
-					-- Clean up the stroke entirely after it fades out
 					tweenOut.Completed:Connect(function()
 						if stroke and stroke.Transparency >= 0.99 then
 							stroke:Destroy()
@@ -242,7 +225,6 @@ local function UpdateSelectionVisuals()
 	end
 end
 
--- [[ CHARACTER EQUIP LISTENERS ]] --
 local function SetupCharacterListeners(char)
 	char.ChildAdded:Connect(function(child)
 		if child:IsA("Tool") then
@@ -262,7 +244,7 @@ if player.Character then
 	SetupCharacterListeners(player.Character)
 end
 
--- Is the player currently holding (as an equipped Tool) the item with this name?
+-- Returns true if the player holds the named item as an equipped Tool.
 local function IsHoldingItem(itemName)
 	local char = player.Character
 	if not char then
@@ -272,7 +254,6 @@ local function IsHoldingItem(itemName)
 	return tool ~= nil and tool.Name == itemName
 end
 
--- [[ 2. UI RENDERING ]] --
 local function ClearChildren(parent)
 	for _, child in ipairs(parent:GetChildren()) do
 		if
@@ -285,7 +266,7 @@ local function ClearChildren(parent)
 	end
 end
 
--- Arm a press on a slot. Decides click-vs-drag on release/movement.
+-- Starts a press on a slot. Release or movement decides between click and drag.
 local function ArmPress(slot, item, sourceType, sourceIndex, startPos)
 	PendingPress = {
 		Slot = slot,
@@ -298,12 +279,12 @@ local function ArmPress(slot, item, sourceType, sourceIndex, startPos)
 end
 
 UpdateUIEvent.OnClientEvent:Connect(function(syncData)
-	-- Render Inventory Grid
 	ClearChildren(Grid)
 	for index, item in pairs(syncData.Items or {}) do
 		local slot = HotbarTemplate:Clone()
 		slot.Name = "InvSlot_" .. tostring(index)
-		slot.Active = true -- Ensures clicking works even if the template is a Frame instead of a TextButton
+		-- Active, so the click works when the template is a Frame and not a TextButton.
+		slot.Active = true
 
 		CreateSlotInfo(item, slot)
 		BindTooltip(slot, item)
@@ -316,14 +297,13 @@ UpdateUIEvent.OnClientEvent:Connect(function(syncData)
 		end)
 	end
 
-	-- Render Hotbar
 	ClearChildren(HotbarFrame)
 	for i = 1, 9 do
 		local slot = HotbarTemplate:Clone()
 		slot.Name = "HotbarSlot_" .. tostring(i)
 		slot.Active = true
 
-		-- Add the number label if your template doesn't already have one built-in
+		-- Add the slot number unless the template has one.
 		if not slot:FindFirstChild("SlotNumber") then
 			local numberLabel = Instance.new("TextLabel")
 			numberLabel.Name = "SlotNumber"
@@ -351,14 +331,13 @@ UpdateUIEvent.OnClientEvent:Connect(function(syncData)
 		end)
 	end
 
-	-- [[ 3. RENDER EQUIPMENT (FIXED) ]] --
-	-- Hardcode the slots so we guarantee every UI box gets checked and cleared
+	-- Visit every equipment slot, so each one is cleared or filled.
 	local equipmentSlots = { "Head", "Torso", "Legs", "Back" }
 
 	for _, slotName in ipairs(equipmentSlots) do
 		local equipSlot = EquipPanel:FindFirstChild(slotName)
 		if equipSlot then
-			-- Always clear the slot first, just in case the item was removed (nil)
+			-- Clear the slot first, because the item may have been removed.
 			for _, child in ipairs(equipSlot:GetChildren()) do
 				if child.Name == "ItemName" or child:IsA("ImageLabel") then
 					child:Destroy()
@@ -366,11 +345,11 @@ UpdateUIEvent.OnClientEvent:Connect(function(syncData)
 			end
 
 			if equipSlot:FindFirstChild("DragConnection") then
-				equipSlot.DragConnection:Fire() -- Triggers the disconnect event we made
+				-- Disconnects the old drag handler.
+				equipSlot.DragConnection:Fire()
 				equipSlot.DragConnection:Destroy()
 			end
 
-			-- Now check if the server sent data for this specific slot
 			local item = syncData.Equipment and syncData.Equipment[slotName]
 
 			if item then
@@ -394,11 +373,9 @@ UpdateUIEvent.OnClientEvent:Connect(function(syncData)
 		end
 	end
 
-	-- Refresh selection visuals after UI rebuilds
 	UpdateSelectionVisuals()
 end)
 
--- [[ 3. DRAG LOGIC ]] --
 function StartDrag(uiSlot, itemData, sourceType, sourceIndex, mousePos)
 	if DragState.IsDragging then
 		return
@@ -413,32 +390,31 @@ function StartDrag(uiSlot, itemData, sourceType, sourceIndex, mousePos)
 	DragState.SourceIndex = sourceIndex
 
 	DragState.VisualClone = uiSlot:Clone()
-	-- Make the dragged clone slightly smaller or keep it the same size
 	DragState.VisualClone.Size = UDim2.fromOffset(60, 60)
 	DragState.VisualClone.AnchorPoint = Vector2.new(0.5, 0.5)
 	DragState.VisualClone.Position = UDim2.fromOffset(mousePos.X, mousePos.Y)
 
-	-- Strip the selection stroke from the dragging clone if it was equipped
+	-- The dragged copy has no selection outline.
 	local cloneStroke = DragState.VisualClone:FindFirstChild("SelectionStroke")
 	if cloneStroke then
 		cloneStroke:Destroy()
 	end
 
-	-- The tooltip shouldn't follow a dragged clone around
+	-- The tooltip does not follow a dragged copy.
 	HideTooltip()
 
 	DragState.VisualClone.Parent = DragLayer
 end
 
--- A click (no drag) on an equipment item we're currently holding equips it.
+-- A click on an equipment item the player holds equips it. Returns true if it did.
 local function TryClickEquip(press)
 	local item = press.Item
 	if not item or not item.Category then
 		return false
-	end -- not equipment
+	end
 	if not IsHoldingItem(item.Name) then
 		return false
-	end -- not holding it
+	end
 
 	MoveItemRemote:FireServer(
 		item.Id,
@@ -455,7 +431,7 @@ UserInputService.InputChanged:Connect(function(input)
 		return
 	end
 
-	-- Promote a pending press to a real drag once it moves far enough
+	-- A press that moves far enough becomes a drag.
 	if PendingPress and not PendingPress.Started and not DragState.IsDragging then
 		local delta = (Vector2.new(input.Position.X, input.Position.Y) - PendingPress.StartPos).Magnitude
 		if delta >= DRAG_THRESHOLD then
@@ -470,7 +446,6 @@ UserInputService.InputChanged:Connect(function(input)
 		end
 	end
 
-	-- Move the active drag clone
 	if DragState.IsDragging and DragState.VisualClone then
 		DragState.VisualClone.Position = UDim2.fromOffset(input.Position.X, input.Position.Y)
 	end
@@ -481,7 +456,7 @@ UserInputService.InputEnded:Connect(function(input)
 		return
 	end
 
-	-- Case A: a real drag is in progress -> resolve the drop
+	-- A drag ends with a drop.
 	if DragState.IsDragging then
 		local guisAtPosition = PlayerGui:GetGuiObjectsAtPosition(input.Position.X, input.Position.Y)
 		local targetType, targetIndex = nil, nil
@@ -520,7 +495,7 @@ UserInputService.InputEnded:Connect(function(input)
 		return
 	end
 
-	-- Case B: press released without ever becoming a drag -> it's a click
+	-- A press released without a drag is a click.
 	if PendingPress then
 		TryClickEquip(PendingPress)
 		PendingPress = nil
@@ -552,5 +527,5 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- [[ FIX FOR RESPAWNING ]] --
+-- Ask for a sync, so a respawned UI shows the inventory.
 RequestSyncRemote:FireServer()

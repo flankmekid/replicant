@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shows floating damage numbers for the hits that the server reports.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -20,7 +24,7 @@ DamageNumberRemote.OnClientEvent:Connect(function(anchorPart, damage)
 	bb.AlwaysOnTop = true
 	bb.LightInfluence = 0
 	bb.MaxDistance = 120
-	-- random horizontal scatter so stacked hits don't perfectly overlap
+	-- Scatter sideways, so stacked hits do not overlap exactly.
 	bb.StudsOffsetWorldSpace = Vector3.new(math.random(-15, 15) / 10, 2, 0)
 	bb.Adornee = anchorPart
 	bb.Parent = anchorPart
@@ -36,7 +40,6 @@ DamageNumberRemote.OnClientEvent:Connect(function(anchorPart, damage)
 	label.TextTransparency = 0
 	label.Parent = bb
 
-	-- pop in
 	label.TextSize = 1
 	local popIn = TweenService:Create(
 		bb,
@@ -45,7 +48,6 @@ DamageNumberRemote.OnClientEvent:Connect(function(anchorPart, damage)
 	)
 	popIn:Play()
 
-	-- float up
 	local floatUp = TweenService:Create(
 		bb,
 		TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -53,7 +55,6 @@ DamageNumberRemote.OnClientEvent:Connect(function(anchorPart, damage)
 	)
 	floatUp:Play()
 
-	-- fade out near the end
 	task.delay(0.45, function()
 		local fade = TweenService:Create(
 			label,

@@ -1,5 +1,6 @@
--- [[ LEADERBOARD CLIENT ]]
--- Location: StarterPlayerScripts
+-- SPDX-License-Identifier: MIT
+--
+-- The custom player list, with each player's title.
 
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
@@ -16,8 +17,6 @@ end)
 
 local remotes = ReplicatedStorage:WaitForChild("remotes")
 local TitleUpdated = remotes:WaitForChild("TitleUpdated")
-
--- ── GUI ───────────────────────────────────────────────────────────────────────
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "ReplicantLeaderboard"
@@ -53,8 +52,6 @@ local layout = Instance.new("UIListLayout")
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 5)
 layout.Parent = listFrame
-
--- ── ENTRY BUILDER ─────────────────────────────────────────────────────────────
 
 local function buildDisplayText(player)
 	local title = player:GetAttribute("Title") or ""
@@ -100,13 +97,10 @@ local function addPlayerEntry(player)
 	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
 	nameLabel.Parent = entry
 
-	-- Update label when this player's title changes
 	player:GetAttributeChangedSignal("Title"):Connect(function()
 		nameLabel.Text = buildDisplayText(player)
 	end)
 end
-
--- ── LIST MANAGEMENT ───────────────────────────────────────────────────────────
 
 local function updateList()
 	for _, child in ipairs(listFrame:GetChildren()) do

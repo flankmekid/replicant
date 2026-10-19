@@ -1,3 +1,9 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The spire client: attune and rest prompts on the spire parts, the rest menu, and its
+-- panels for travel, stat points, the spellbook, and the armory. The server owns every
+-- action. The panels render the snapshots it returns.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -15,7 +21,6 @@ local ArmorConfig = require(ReplicatedStorage.modules:WaitForChild("ArmorConfig"
 local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 
--- ── GUI REFERENCES ────────────────────────────────────────────────────────────
 local SpireGui = PlayerGui:WaitForChild("SpireGui")
 local MapFrame = SpireGui:WaitForChild("MapFrame")
 local SpireList = MapFrame:WaitForChild("SpireList")
@@ -28,7 +33,6 @@ local ErrorLabel = Footer:WaitForChild("ErrorLabel")
 local AttunementToast = SpireGui:WaitForChild("AttunementToast")
 local ToastLabel = AttunementToast:WaitForChild("Inner"):WaitForChild("ToastLabel")
 
--- ── COLOURS ───────────────────────────────────────────────────────────────────
 local COLOR_GOLD = Color3.fromRGB(212, 175, 55)
 local COLOR_GOLD_DIM = Color3.fromRGB(140, 110, 35)
 local COLOR_WHITE = Color3.fromRGB(235, 225, 205)
@@ -38,13 +42,11 @@ local COLOR_BTN_NORMAL = Color3.fromRGB(38, 30, 18)
 local COLOR_BTN_SELECT = Color3.fromRGB(60, 50, 30)
 local COLOR_BTN_HOVER = Color3.fromRGB(48, 40, 24)
 
--- ── TWEENS ────────────────────────────────────────────────────────────────────
 local FADE_IN = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local FADE_OUT = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 local TOAST_IN = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 local TOAST_OUT = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
--- ── STATE ─────────────────────────────────────────────────────────────────────
 local attunedSpires = {}
 local selectedSpireId = nil
 local mapOpen = false
@@ -52,7 +54,6 @@ local listButtons = {}
 local toastPlaying = false
 local toastQueue = {}
 
--- ── REST / STAT MENU ──────────────────────────────────────────────────────────
 local StatAction = ReplicatedStorage.SpireSystem:WaitForChild("StatAction")
 
 local character = player.Character or player.CharacterAdded:Wait()
@@ -83,7 +84,7 @@ local function reasonText(code)
 	return REASON_TEXT[code] or tostring(code)
 end
 
--- Resting animation (lifted from the bonfire system).
+-- The resting animation, shared with the bonfire system.
 local REST_ANIM_ID = "rbxassetid://133831523774694"
 local restTrack = nil
 local function loadRestAnim()
@@ -97,15 +98,15 @@ local function loadRestAnim()
 	restTrack = animator:LoadAnimation(anim)
 end
 
--- Build the rest GUI in code (middle-left). Returns the root frame.
+-- The rest GUI, built in code by buildRestGui.
 local restGui, restPanel, statPanel, restDim
 local statRows = {}
 local liturgyLabel, nextCostLabel
 local skillPointLabel, availableLabel, buySkillBtn
 local localOwned, localAvailable, localMaxSP, localNextCost = 0, 0, 150, 0
-local localStats = {} -- client mirror updated from server replies
--- Forward declarations (these functions are defined later but referenced by the
--- rest-menu buttons built above).
+-- The last stats the server sent.
+local localStats = {}
+-- Forward declarations for the rest-menu buttons built above their definitions.
 local openMap, closeMap
 local openStatPanel, buildStatPanel, refreshStatPanel, applySnapshot, doRespec, requestEndRest, beginRestLocal, endRestLocal
 local openSpellbookPanel, buildSpellbookPanel, refreshSpellbookPanel
@@ -148,18 +149,18 @@ local function buildRestGui()
 	restGui.Enabled = false
 	restGui.Parent = PlayerGui
 
-	-- Full-screen dim overlay (behind the panels)
+	-- A full-screen dim behind the panels.
 	restDim = Instance.new("Frame")
 	restDim.Name = "Dim"
 	restDim.Size = UDim2.new(1, 0, 1, 0)
 	restDim.Position = UDim2.new(0, 0, 0, 0)
 	restDim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-	restDim.BackgroundTransparency = 1 -- tweened to ~0.45 on rest
+	-- Tweened to about 0.45 during a rest.
+	restDim.BackgroundTransparency = 1
 	restDim.BorderSizePixel = 0
 	restDim.ZIndex = 0
 	restDim.Parent = restGui
 
-	-- Main menu panel (middle-left)
 	restPanel = Instance.new("Frame")
 	restPanel.Name = "RestPanel"
 	restPanel.AnchorPoint = Vector2.new(0, 0.5)
@@ -236,13 +237,11 @@ local function buildRestGui()
 	buildArmoryPanel()
 end
 
--- ── ATTUNEMENT SOUND ──────────────────────────────────────────────────────────
 local attunementSound = Instance.new("Sound")
 attunementSound.SoundId = "rbxassetid://6895079185"
 attunementSound.Volume = 0.8
 attunementSound.Parent = PlayerGui
 
--- ── TOAST ─────────────────────────────────────────────────────────────────────
 local function playToast(text)
 	ToastLabel.Text = text
 	AttunementToast.GroupTransparency = 1
@@ -282,7 +281,6 @@ local function queueToast(text)
 	end)
 end
 
--- ── SPIRE WORLD EFFECT ────────────────────────────────────────────────────────
 local function playAttunementEffect(spirePartName)
 	local part = Workspace:FindFirstChild(spirePartName, true)
 	if not part then
@@ -319,7 +317,6 @@ local function playAttunementEffect(spirePartName)
 	light:Destroy()
 end
 
--- ── LIST BUILDER ──────────────────────────────────────────────────────────────
 local function selectEntry(spireId)
 	selectedSpireId = spireId
 
@@ -372,7 +369,6 @@ local function buildList()
 		btnCorner.CornerRadius = UDim.new(0, 6)
 		btnCorner.Parent = btn
 
-		-- Attunement pip
 		local pip = Instance.new("Frame")
 		pip.Size = UDim2.new(0, 6, 0, 6)
 		pip.Position = UDim2.new(0, 14, 0.5, -3)
@@ -383,7 +379,6 @@ local function buildList()
 		pipCorner.CornerRadius = UDim.new(1, 0)
 		pipCorner.Parent = pip
 
-		-- Location name
 		local nameLbl = Instance.new("TextLabel")
 		nameLbl.Size = UDim2.new(1, -40, 0, 26)
 		nameLbl.Position = UDim2.new(0, 30, 0, 8)
@@ -396,7 +391,6 @@ local function buildList()
 		nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
 		nameLbl.Parent = btn
 
-		-- Zone subtitle
 		local zoneLbl = Instance.new("TextLabel")
 		zoneLbl.Size = UDim2.new(1, -40, 0, 16)
 		zoneLbl.Position = UDim2.new(0, 30, 0, 30)
@@ -408,7 +402,7 @@ local function buildList()
 		zoneLbl.TextXAlignment = Enum.TextXAlignment.Left
 		zoneLbl.Parent = btn
 
-		-- Lock icon for unattuned
+		-- A lock icon on an unattuned spire.
 		if not isAttuned then
 			local lockLbl = Instance.new("TextLabel")
 			lockLbl.Size = UDim2.new(0, 20, 0, 20)
@@ -443,7 +437,6 @@ local function buildList()
 	end
 end
 
--- ── STAT PANEL (Level Up) ──────────────────────────────────────────────────────
 buildStatPanel = function()
 	if statPanel then
 		return
@@ -451,7 +444,8 @@ buildStatPanel = function()
 	statPanel = Instance.new("Frame")
 	statPanel.Name = "StatPanel"
 	statPanel.AnchorPoint = Vector2.new(0, 0.5)
-	statPanel.Position = UDim2.new(0.04, 256, 0.5, 0) -- sits to the right of the rest panel
+	-- To the right of the rest panel.
+	statPanel.Position = UDim2.new(0.04, 256, 0.5, 0)
 	statPanel.Size = UDim2.new(0, 300, 0, 430)
 	statPanel.BackgroundColor3 = Color3.fromRGB(18, 15, 10)
 	statPanel.BackgroundTransparency = 0.08
@@ -572,7 +566,7 @@ buildStatPanel = function()
 		pc.Parent = plus
 
 		plus.MouseButton1Click:Connect(function()
-			-- Assigning a stat point is FREE; it just spends an available skill point.
+			-- Assigning a stat point costs nothing but an available skill point.
 			local result = StatAction:InvokeServer("Assign", stat)
 			if result and result.ok then
 				applySnapshot(result)
@@ -585,7 +579,6 @@ buildStatPanel = function()
 		statRows[stat] = valLbl
 	end
 
-	-- ── BOTTOM SKILL-POINT BAR (the new UI element) ──────────────────────────
 	local bottom = Instance.new("Frame")
 	bottom.Name = "SkillPointBar"
 	bottom.AnchorPoint = Vector2.new(0, 1)
@@ -653,13 +646,13 @@ buildStatPanel = function()
 	end)
 end
 
--- ── SPELLBOOK PANEL ────────────────────────────────────────────────────────────
--- Family + per-slot options come from the server (resolved off CurrentWeapon),
--- so the panel works whether the weapon is held or sheathed, and never guesses.
+-- The family and the slot options come from the server, from CurrentWeapon, so the
+-- panel works whether the weapon is held or sheathed.
 local currentSnapshot = nil
 
 local spellHeader, spellSubHeader, spellSlotsFrame, spellEmptyLabel
-local spellRowRefs = {} -- [slotKey] = { options = {[skillName]=button}, container = frame }
+-- Layout: spellRowRefs[slotKey] = { options = { [skillName] = button }, container = frame }.
+local spellRowRefs = {}
 
 buildSpellbookPanel = function()
 	if spellPanel then
@@ -722,7 +715,6 @@ buildSpellbookPanel = function()
 	spellEmptyLabel.Visible = false
 	spellEmptyLabel.Parent = spellPanel
 
-	-- Scroll container for the three slot groups.
 	spellSlotsFrame = Instance.new("ScrollingFrame")
 	spellSlotsFrame.Position = UDim2.new(0, 0, 0, 50)
 	spellSlotsFrame.Size = UDim2.new(1, 0, 1, -50)
@@ -739,9 +731,8 @@ buildSpellbookPanel = function()
 	sl.Parent = spellSlotsFrame
 end
 
--- Rebuild collapsible slot rows from a server snapshot.
--- Each slot is a header button showing the equipped skill; clicking it expands
--- the list of owned skills for that slot so the player can swap. One open at a time.
+-- Rebuilds the slot rows from a server snapshot. Each slot is a header with the equipped
+-- skill that expands to the owned skills for the slot. One slot is open at a time.
 local expandedSlot = nil
 
 refreshSpellbookPanel = function(snap)
@@ -771,11 +762,12 @@ refreshSpellbookPanel = function(snap)
 	spellSlotsFrame.Visible = true
 	spellEmptyLabel.Visible = false
 
-	local OPT_H = 32 -- height of one option button
-	local OPT_PAD = 4 -- padding between options
+	-- Height of one option, and the gap between options.
+	local OPT_H = 32
+	local OPT_PAD = 4
 	local EXPAND_TW = TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
-	-- Collapse any currently-open slot, optionally skipping one.
+	-- Collapses every open slot except keep.
 	local collapseFns = {}
 	local function collapseAllExcept(keep)
 		for k, fn in pairs(collapseFns) do
@@ -791,7 +783,6 @@ refreshSpellbookPanel = function(snap)
 		local owned = slotData.owned or {}
 		local equipped = slotData.equipped
 
-		-- Wrapper for this slot (header + options stacked).
 		local group = Instance.new("Frame")
 		group.Name = "Slot_" .. slotKey
 		group.Size = UDim2.new(1, -4, 0, 0)
@@ -804,7 +795,7 @@ refreshSpellbookPanel = function(snap)
 		gl.SortOrder = Enum.SortOrder.LayoutOrder
 		gl.Parent = group
 
-		-- Header button: "Z   <equipped skill>" + a chevron.
+		-- The header shows the key, the equipped skill, and a chevron.
 		local header = Instance.new("TextButton")
 		header.Size = UDim2.new(1, 0, 0, 40)
 		header.BackgroundColor3 = COLOR_BTN_NORMAL
@@ -850,7 +841,7 @@ refreshSpellbookPanel = function(snap)
 		chevron.Font = Enum.Font.Merriweather
 		chevron.Parent = header
 
-		-- Options container (clipped, height-tweened).
+		-- The options are clipped, and their height is tweened.
 		local optWrap = Instance.new("Frame")
 		optWrap.Name = "Options"
 		optWrap.Size = UDim2.new(1, 0, 0, 0)
@@ -877,12 +868,11 @@ refreshSpellbookPanel = function(snap)
 		end)
 
 		if #owned == 0 then
-			-- No owned skills: header is non-interactive, shows muted note inline.
+			-- With no owned skills, the header is inactive and shows a muted note.
 			eqLbl.Text = "No skills unlocked"
 			eqLbl.TextColor3 = COLOR_MUTED
 			chevron.Visible = false
 		else
-			-- Build option buttons inside the wrapper.
 			local fullHeight = 0
 			for i, skillName in ipairs(owned) do
 				local isEq = (skillName == equipped)
@@ -944,7 +934,6 @@ refreshSpellbookPanel = function(snap)
 						then
 							currentSnapshot.slots[slotKey].equipped = capturedSkill
 						end
-						-- Repaint options in this slot.
 						for name, refs in pairs(spellRowRefs[slotKey].options) do
 							local on = (name == capturedSkill)
 							refs.button.BackgroundColor3 = on and COLOR_BTN_SELECT
@@ -952,7 +941,6 @@ refreshSpellbookPanel = function(snap)
 							refs.button.TextColor3 = on and COLOR_GOLD or COLOR_WHITE
 							refs.pip.Visible = on
 						end
-						-- Update the header label to the new equipped skill.
 						eqLbl.Text = capturedSkill
 						eqLbl.TextColor3 = COLOR_WHITE
 					end
@@ -1012,22 +1000,24 @@ openSpellbookPanel = function()
 		:Play()
 end
 
--- ── ARMORY PANEL ───────────────────────────────────────────────────────────────
--- Browse owned armors, view each on a stand, Equip (stats+vanity) or Transmog
--- (vanity only). Server (ArmorAction) is authoritative; the client only renders
--- the ownership-filtered snapshot it gets back and re-queries after each action.
+-- The armory: browse owned armors on a stand, then Equip (stats and looks) or Transmog
+-- (looks only). The server, through ArmorAction, filters the snapshot by ownership, and
+-- the panel queries it again after each action.
 local armoryListFrame, armoryDetail, armoryCurrentLbl
 local armoryViewport, armoryWorldModel
 local armoryDetailTitle, armoryDetailStats, armoryEquipBtn, armoryTransmogBtn
-local armorySnapshot = nil -- last server snapshot
-local armorySelected = nil -- currently selected armor name in the detail view
-local armoryListButtons = {} -- [armorName] = button
+local armorySnapshot = nil
+-- The armor shown in the detail view.
+local armorySelected = nil
+-- Layout: armoryListButtons[armorName] = button.
+local armoryListButtons = {}
 
-local ARM_LIST_W = 150 -- width of the list compartment
+-- Width of the list.
+local ARM_LIST_W = 150
 local ARM_TW = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
--- Build (once) the armor stand inside the viewport: clone the template rig and
--- park a camera in front of it. Clothing gets swapped per-selection.
+-- Builds the armor stand in the viewport once: a copy of the template rig and a camera
+-- in front of it.
 local function ensureArmoryStand()
 	if armoryWorldModel and armoryWorldModel.Parent then
 		return
@@ -1039,7 +1029,6 @@ local function ensureArmoryStand()
 	armoryWorldModel = template:Clone()
 	armoryWorldModel.Parent = armoryViewport
 
-	-- Drop a camera looking at the rig.
 	local cam = Instance.new("Camera")
 	cam.Parent = armoryViewport
 	armoryViewport.CurrentCamera = cam
@@ -1048,14 +1037,12 @@ local function ensureArmoryStand()
 		or armoryWorldModel:FindFirstChildWhichIsA("BasePart", true)
 	if prim then
 		local center = prim.Position
-		-- Camera orbits to the model's -Z side, 180 degrees round from where it used to
-		-- sit. A Roblox rig faces -Z by default, so parking the camera at +Z showed the
-		-- BACK of the armor stand. This shows the front.
+		-- A rig faces -Z, so the camera sits on the -Z side to show the front.
 		cam.CFrame = CFrame.new(center + Vector3.new(0, 0.5, -6), center + Vector3.new(0, 0.5, 0))
 	end
 end
 
--- Apply an armor's clothing to the stand's Armor model.
+-- Puts the clothing of an armor on the stand.
 local function dressStand(armorName)
 	if not armoryWorldModel then
 		return
@@ -1080,7 +1067,7 @@ local function dressStand(armorName)
 	pants.PantsTemplate = cfg.PantsID
 end
 
--- Refresh the small "current" readout (stats-armor + vanity-armor names).
+-- Shows the names of the stats armor and the looks armor.
 local function refreshArmoryCurrent()
 	if not armoryCurrentLbl or not armorySnapshot then
 		return
@@ -1100,7 +1087,7 @@ local function refreshArmoryCurrent()
 	end
 end
 
--- Repaint Equip/Transmog enabled/greyed state for the selected armor.
+-- Enables or greys out Equip and Transmog for the selected armor.
 local function refreshArmoryButtons()
 	if not armorySelected or not armorySnapshot then
 		return
@@ -1109,8 +1096,7 @@ local function refreshArmoryButtons()
 	local vanity = armorySnapshot.currentVanity or armorySnapshot.currentArmor
 	local isVanity = (vanity == armorySelected)
 
-	-- Equip is redundant only when this armor is BOTH the stats-armor and the
-	-- active vanity (i.e. fully equipped with no transmog override on top).
+	-- Equip does nothing only when this armor gives the stats and no transmog covers it.
 	local equipRedundant = isStats and (armorySnapshot.currentVanity == nil)
 	if equipRedundant then
 		armoryEquipBtn.Text = "Equipped"
@@ -1137,7 +1123,7 @@ local function refreshArmoryButtons()
 	end
 end
 
--- Open the detail compartment for an armor: slide the list left, fill + show detail.
+-- Opens the detail view of an armor: the list slides left and the detail fills in.
 local function selectArmor(armorName)
 	armorySelected = armorName
 	local info = armorySnapshot and armorySnapshot.armors[armorName]
@@ -1145,7 +1131,6 @@ local function selectArmor(armorName)
 		return
 	end
 
-	-- Highlight the chosen list row.
 	for name, btn in pairs(armoryListButtons) do
 		btn.BackgroundColor3 = (name == armorName) and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
 	end
@@ -1161,7 +1146,6 @@ local function selectArmor(armorName)
 	dressStand(armorName)
 	refreshArmoryButtons()
 
-	-- Slide the list to the left edge and reveal the detail compartment.
 	TweenService:Create(armoryListFrame, ARM_TW, { Position = UDim2.new(0, 0, 0, 40) }):Play()
 	armoryDetail.Visible = true
 	armoryDetail.GroupTransparency = 1
@@ -1206,7 +1190,6 @@ buildArmoryPanel = function()
 	hdr.TextXAlignment = Enum.TextXAlignment.Left
 	hdr.Parent = armoryPanel
 
-	-- Current readout (stats-armor + vanity-armor).
 	armoryCurrentLbl = Instance.new("TextLabel")
 	armoryCurrentLbl.Size = UDim2.new(1, 0, 0, 16)
 	armoryCurrentLbl.Position = UDim2.new(0, 0, 0, 24)
@@ -1218,10 +1201,9 @@ buildArmoryPanel = function()
 	armoryCurrentLbl.TextXAlignment = Enum.TextXAlignment.Left
 	armoryCurrentLbl.Parent = armoryPanel
 
-	-- Left list compartment (scrolling list of owned armor names).
 	armoryListFrame = Instance.new("ScrollingFrame")
 	armoryListFrame.Name = "ArmorList"
-	-- Starts centred-ish; tweens to x=0 when a detail opens. Initial open re-centres.
+	-- The list is centered by refreshArmoryPanel and moved to x = 0 by selectArmor.
 	armoryListFrame.Position = UDim2.new(0, 0, 0, 40)
 	armoryListFrame.Size = UDim2.new(0, ARM_LIST_W, 1, -50)
 	armoryListFrame.BackgroundTransparency = 1
@@ -1236,7 +1218,7 @@ buildArmoryPanel = function()
 	ll.SortOrder = Enum.SortOrder.LayoutOrder
 	ll.Parent = armoryListFrame
 
-	-- Right detail compartment (hidden until an armor is picked).
+	-- The detail view is hidden until an armor is picked.
 	armoryDetail = Instance.new("CanvasGroup")
 	armoryDetail.Name = "ArmorDetail"
 	armoryDetail.Position = UDim2.new(0, ARM_LIST_W + 14, 0, 40)
@@ -1256,7 +1238,6 @@ buildArmoryPanel = function()
 	armoryDetailTitle.TextXAlignment = Enum.TextXAlignment.Left
 	armoryDetailTitle.Parent = armoryDetail
 
-	-- Viewport (armor stand).
 	armoryViewport = Instance.new("ViewportFrame")
 	armoryViewport.Position = UDim2.new(0, 0, 0, 30)
 	armoryViewport.Size = UDim2.new(1, 0, 0, 190)
@@ -1268,7 +1249,6 @@ buildArmoryPanel = function()
 	vc.CornerRadius = UDim.new(0, 8)
 	vc.Parent = armoryViewport
 
-	-- Stats block.
 	armoryDetailStats = Instance.new("TextLabel")
 	armoryDetailStats.Position = UDim2.new(0, 0, 0, 228)
 	armoryDetailStats.Size = UDim2.new(1, 0, 0, 70)
@@ -1281,7 +1261,6 @@ buildArmoryPanel = function()
 	armoryDetailStats.TextYAlignment = Enum.TextYAlignment.Top
 	armoryDetailStats.Parent = armoryDetail
 
-	-- Equip / Transmog buttons (bottom of detail).
 	armoryEquipBtn = Instance.new("TextButton")
 	armoryEquipBtn.AnchorPoint = Vector2.new(0, 1)
 	armoryEquipBtn.Position = UDim2.new(0, 0, 1, 0)
@@ -1336,7 +1315,7 @@ buildArmoryPanel = function()
 	end)
 end
 
--- Rebuild the owned-armor list from a snapshot.
+-- Rebuilds the owned-armor list from a snapshot.
 refreshArmoryPanel = function(snap)
 	if not armoryPanel then
 		return
@@ -1351,7 +1330,7 @@ refreshArmoryPanel = function(snap)
 		end
 	end
 
-	-- Detail hidden until a pick; list sits at full width, centred under header.
+	-- With no pick, the list is centered under the header.
 	armoryDetail.Visible = false
 	armoryListFrame.Position = UDim2.new(0.5, -ARM_LIST_W / 2, 0, 40)
 
@@ -1417,7 +1396,7 @@ openArmoryPanel = function()
 		:Play()
 end
 
--- Apply a full server snapshot to every part of the panel.
+-- Applies a server snapshot to every part of the panel.
 applySnapshot = function(snap)
 	if not statPanel or not snap then
 		return
@@ -1454,13 +1433,12 @@ applySnapshot = function(snap)
 			buySkillBtn.BackgroundColor3 = COLOR_BTN_SELECT
 		end
 	end
-	-- clear any transient error text on a successful refresh
+	-- A good refresh clears any error text.
 	if snap.ok and nextCostLabel then
 		nextCostLabel.Text = ""
 	end
 end
 
--- Back-compat shim (older calls passed liturgy/nextCost directly).
 refreshStatPanel = function(liturgy, nextCost)
 	applySnapshot({ liturgy = liturgy, nextCost = nextCost, ok = true })
 end
@@ -1475,12 +1453,11 @@ openStatPanel = function()
 	if armoryPanel then
 		armoryPanel.Visible = false
 	end
-	-- pull a fresh snapshot
 	local result = StatAction:InvokeServer("Query")
 	if result and result.ok then
 		applySnapshot(result)
 	end
-	-- slide + fade the stat panel in from just behind the rest panel
+	-- Slide the panel in from behind the rest panel.
 	statPanel.Visible = true
 	statPanel.Position = UDim2.new(0.04, 180, 0.5, 0)
 	TweenService
@@ -1490,7 +1467,7 @@ openStatPanel = function()
 		:Play()
 end
 
--- Performs the actual respec after confirmation.
+-- Respecs after the player confirms.
 local function performRespec()
 	local result = StatAction:InvokeServer("Respec")
 	if result and result.ok then
@@ -1507,7 +1484,7 @@ local function performRespec()
 	end
 end
 
--- Yes/No confirmation modal before respeccing.
+-- Asks the player to confirm a respec.
 local respecConfirm
 doRespec = function()
 	if respecConfirm then
@@ -1584,10 +1561,9 @@ doRespec = function()
 	end)
 end
 
--- ── REST OPEN / CLOSE (client visuals; server owns the real lock) ──────────────
 local REST_DIM = 0.45
 
--- Play the heal/rest VFX (LevelUpParticle) at the character + the rest sound.
+-- Plays the rest effect (LevelUpParticle) and the rest sound at the character.
 local function playRestFX()
 	local char = character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -1602,7 +1578,7 @@ local function playRestFX()
 		fx.Transparency = 1
 		fx.CFrame = root.CFrame
 		fx.Parent = workspace
-		-- weld-follow not needed; player is anchored while resting
+		-- No weld: the player is anchored while resting.
 		for _, em in ipairs(fx:GetDescendants()) do
 			if em:IsA("ParticleEmitter") then
 				em.Enabled = true
@@ -1636,7 +1612,6 @@ beginRestLocal = function(spireId)
 
 	restGui.Enabled = true
 
-	-- Slide the panel in from the left + fade the dim in.
 	restDim.BackgroundTransparency = 1
 	TweenService:Create(restDim, FADE_IN, { BackgroundTransparency = REST_DIM }):Play()
 
@@ -1684,7 +1659,6 @@ requestEndRest = function()
 	SpireRemote:FireServer("EndRest")
 end
 
--- ── MAP OPEN / CLOSE ──────────────────────────────────────────────────────────
 openMap = function()
 	mapOpen = true
 	selectedSpireId = nil
@@ -1726,7 +1700,6 @@ OpenMapBindable.OnInvoke = function()
 	end
 end
 
--- ── BUTTONS ───────────────────────────────────────────────────────────────────
 TeleportButton.MouseButton1Click:Connect(function()
 	if not selectedSpireId then
 		return
@@ -1740,11 +1713,9 @@ CloseButton.MouseButton1Click:Connect(function()
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	-- Pressing the spire key (E) again while resting closes the rest GUI.
-	-- Checked BEFORE the gameProcessed guard because the ProximityPrompt may or may
-	-- not consume the keypress while the character is anchored/locked during rest;
-	-- this direct-input path works either way. endRest is idempotent server-side,
-	-- so a double-fire (prompt + this) is harmless.
+	-- E during a rest ends it. This runs before the gameProcessed check, because the
+	-- prompt may or may not take the key during a rest. EndRest is idempotent on the
+	-- server, so a double send is harmless.
 	if input.KeyCode == Enum.KeyCode.E and resting then
 		SpireRemote:FireServer("EndRest")
 		return
@@ -1758,7 +1729,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- ── PROXIMITY PROMPTS ─────────────────────────────────────────────────────────
 local function setupSpirePrompts()
 	for _, spire in ipairs(SpireConfig.Spires) do
 		local part = Workspace:FindFirstChild(spire.PartName, true)
@@ -1771,7 +1741,6 @@ local function setupSpirePrompts()
 			local prompt = Instance.new("ProximityPrompt")
 			prompt.Name = "AttunePrompt"
 			prompt.ObjectText = spire.Zone
-			--prompt.ActionText            = attunedSpires[spire.Id] --and "Travel" or "Attune"
 			prompt.KeyboardKeyCode = Enum.KeyCode.E
 			prompt.MaxActivationDistance = 16
 			prompt.RequiresLineOfSight = false
@@ -1780,16 +1749,16 @@ local function setupSpirePrompts()
 			local spireId = spire.Id
 
 			prompt.Triggered:Connect(function()
-				-- Re-interacting while resting toggles the rest off (closes the GUI).
+				-- Using the prompt during a rest ends the rest.
 				if resting then
 					SpireRemote:FireServer("EndRest")
 					return
 				end
 				if attunedSpires[spireId] then
-					-- Already attuned: rest here (server opens the menu via RestStarted).
+					-- Attuned: rest here. The server opens the menu through RestStarted.
 					SpireRemote:FireServer("Rest", spireId)
 				else
-					-- Not attuned: attune, which auto-rests server-side.
+					-- Not attuned: attune, and the server starts a rest.
 					SpireRemote:FireServer("Attune", spireId)
 				end
 			end)
@@ -1803,13 +1772,12 @@ local function refreshPromptLabels()
 		if part then
 			local prompt = part:FindFirstChild("AttunePrompt")
 			if prompt then
-				--prompt.ActionText = attunedSpires[spire.Id] --and "Travel" or "Attune"
+				-- TODO: label the prompt by attunement. Nothing sets ActionText yet.
 			end
 		end
 	end
 end
 
--- ── REMOTE HANDLER ────────────────────────────────────────────────────────────
 SpireUpdate.OnClientEvent:Connect(function(action, payload)
 	if action == "Restore" then
 		attunedSpires = {}
@@ -1845,7 +1813,7 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 		local spireId = payload and payload.spireId
 		local wasNew = payload and payload.wasNew
 		if wasNew then
-			-- brand-new attunement: play the world effect + toast as before
+			-- A new attunement plays the world effect and the toast.
 			local spireDef = nil
 			for _, sp in ipairs(SpireConfig.Spires) do
 				if sp.Id == spireId then
@@ -1865,8 +1833,7 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 	elseif action == "RestEnded" then
 		endRestLocal()
 	elseif action == "TeleportSuccess" then
-		-- Travelling leaves the old spire: the server ended the rest, so close the
-		-- whole rest UI and let the player arrive free.
+		-- Travel leaves the spire: the server ended the rest, so close the rest UI.
 		endRestLocal()
 		local sound = Instance.new("Sound")
 		sound.Parent = workspace
@@ -1879,16 +1846,15 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 	end
 end)
 
--- ── INIT ──────────────────────────────────────────────────────────────────────
 MapFrame.Visible = false
 AttunementToast.Visible = false
 
 task.spawn(setupSpirePrompts)
 
--- Refresh cached character + rest animation on respawn; clear any stale rest.
+-- On respawn, keep the new character, reload the rest animation, and end a stale rest.
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
-	restTrack = nil -- will be reloaded on next rest
+	restTrack = nil
 	if resting then
 		endRestLocal()
 	end

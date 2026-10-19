@@ -1,19 +1,11 @@
 --!strict
--- WorldMapController
--- Phase 3: full-screen world map UI (toggle, tween, pan, zoom).
--- Phase 4: live player position marker with facing arrow.
+-- SPDX-License-Identifier: MIT
 --
---   * Toggled with N (M is taken by ChronicleUI; rebind later if desired).
---   * Smooth open/close tween.
---   * Drag to pan, scroll wheel to zoom THE MAP (character camera zoom is
---     locked while the map is open so the world doesn't zoom underneath).
---   * Pan clamped so the map image can never be dragged off into empty space.
---   * Player marker tracks the local character every frame, mapped through
---     MapTransform, and rides inside MarkerLayer so it pans/zooms with the map.
---   * Facing arrow is drawn from a rotated frame (no external image asset),
---     so it renders identically on every client.
---
--- POIs and fog of war are Phases 5-6 and will hook into MarkerLayer too.
+-- The full-screen world map, toggled with TOGGLE_KEY, with drag to pan and the wheel to
+-- zoom. The camera zoom is locked while the map is open, so the world does not zoom
+-- underneath. Panning is clamped to the image. A marker with a facing arrow follows the
+-- local character through MapTransform, inside MarkerLayer, so it pans and zooms with
+-- the map.
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -28,9 +20,6 @@ local MapTransform = require(ReplicatedStorage.modules.MapTransform)
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- ---------------------------------------------------------------------------
--- Tunables
--- ---------------------------------------------------------------------------
 local TOGGLE_KEY = Enum.KeyCode.Tab
 local OPEN_TIME = 0.28
 local CLOSE_TIME = 0.20
@@ -40,9 +29,6 @@ local ZOOM_STEP = 0.15
 local ZOOM_LERP = 0.18
 local MARKER_SIZE_PX = 18
 
--- ---------------------------------------------------------------------------
--- State
--- ---------------------------------------------------------------------------
 local isOpen = false
 local currentZoom = 1.0
 local targetZoom = 1.0
@@ -53,9 +39,6 @@ local lastDragPos: Vector2? = nil
 local savedMinZoom: number? = nil
 local savedMaxZoom: number? = nil
 
--- ---------------------------------------------------------------------------
--- Build the GUI in code
--- ---------------------------------------------------------------------------
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "WorldMapGui"
 screenGui.ResetOnSpawn = false
@@ -130,8 +113,8 @@ pmStroke.Color = Color3.fromRGB(255, 255, 255)
 pmStroke.Thickness = 2
 pmStroke.Parent = playerMarker
 
--- Facing arrow: a pivot frame centered on the dot. Rotating THIS aims a small
--- diamond pointer that sits just above the dot. No external image asset.
+-- The facing arrow is a pivot frame on the dot that turns a diamond above it, so it
+-- needs no image asset.
 local facingArrow = Instance.new("Frame")
 facingArrow.Name = "FacingArrow"
 facingArrow.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -145,8 +128,9 @@ local pointer = Instance.new("Frame")
 pointer.Name = "Pointer"
 pointer.AnchorPoint = Vector2.new(0.5, 0.5)
 pointer.Size = UDim2.fromScale(0.6, 0.6)
-pointer.Position = UDim2.fromScale(0.5, -0.2) -- above the dot center
-pointer.Rotation = 45 -- square -> diamond -> reads as a tip
+pointer.Position = UDim2.fromScale(0.5, -0.2)
+-- A square turned 45 degrees reads as a tip.
+pointer.Rotation = 45
 pointer.BackgroundColor3 = Color3.fromRGB(140, 205, 255)
 pointer.BorderSizePixel = 0
 pointer.ZIndex = 4
@@ -165,9 +149,6 @@ hint.TextTransparency = 1
 hint.Text = "Drag to pan  -  Scroll to zoom  -  N to close"
 hint.Parent = dimmer
 
--- ---------------------------------------------------------------------------
--- Sizing & transform
--- ---------------------------------------------------------------------------
 local function baseImageSize(): Vector2
 	local vpAbs = viewport.AbsoluteSize
 	local mapAspect = MapConfig.getImageAspect()
@@ -196,16 +177,12 @@ local function applyTransform()
 	mapImage.Size = UDim2.fromOffset(scaled.X, scaled.Y)
 	panOffset = clampPan(panOffset, scaled)
 	mapImage.Position = UDim2.new(0.5, panOffset.X, 0.5, panOffset.Y)
-	-- Counter-scale the marker so the dot stays a constant on-screen size
-	-- regardless of map zoom.
+	-- Counter-scale the marker, so it keeps its screen size at any zoom.
 	local s = MARKER_SIZE_PX / currentZoom
 	playerMarker.Size = UDim2.fromOffset(s, s)
 	facingArrow.Size = UDim2.fromOffset(s, s)
 end
 
--- ---------------------------------------------------------------------------
--- Player marker update (Phase 4)
--- ---------------------------------------------------------------------------
 local function getRootPart(): BasePart?
 	local char = player.Character
 	if not char then
@@ -230,19 +207,13 @@ local function updatePlayerMarker()
 	playerMarker.Position = UDim2.fromScale(cu, cv)
 	playerMarker.Visible = true
 
-	-- Heading. Map orientation: +X = screen right, +Z = screen down.
-	-- World north (-Z) should point the arrow UP (rotation 0).
-	-- A frame's Rotation is clockwise-positive in screen space.
-	-- look = (lookX, _, lookZ). Screen vector = (lookX -> right, lookZ -> down).
-	-- atan2(screenRight, -screenDown) gives clockwise-from-up angle.
+	-- On the map, +X is screen right and +Z is screen down. Rotation is clockwise.
+	-- FIXME: north (-Z) gives 180 here, so the arrow may point backwards.
 	local look = hrp.CFrame.LookVector
 	local angle = math.deg(math.atan2(look.X, look.Z))
 	facingArrow.Rotation = angle
 end
 
--- ---------------------------------------------------------------------------
--- Camera zoom lock
--- ---------------------------------------------------------------------------
 local function lockCameraZoom()
 	savedMinZoom = player.CameraMinZoomDistance
 	savedMaxZoom = player.CameraMaxZoomDistance
@@ -254,7 +225,7 @@ local function lockCameraZoom()
 			current = (cam.CFrame.Position - head.Position).Magnitude
 		end
 	end
-	-- Avoid pinning to 0 (would force first person); keep a sane floor.
+	-- Zoom 0 would force first person.
 	current = math.max(current, 0.5)
 	player.CameraMinZoomDistance = current
 	player.CameraMaxZoomDistance = current
@@ -271,9 +242,6 @@ local function restoreCameraZoom()
 	savedMaxZoom = nil
 end
 
--- ---------------------------------------------------------------------------
--- Open / close
--- ---------------------------------------------------------------------------
 local function openMap()
 	if isOpen then
 		return
@@ -337,9 +305,6 @@ local function toggleMap()
 	end
 end
 
--- ---------------------------------------------------------------------------
--- Input
--- ---------------------------------------------------------------------------
 local function isInsideViewport(pos: Vector2): boolean
 	local tl = viewport.AbsolutePosition
 	local br = tl + viewport.AbsoluteSize
@@ -416,9 +381,6 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- ---------------------------------------------------------------------------
--- Per-frame: smooth zoom, live marker, resize safety
--- ---------------------------------------------------------------------------
 RunService.RenderStepped:Connect(function()
 	if not isOpen then
 		return
@@ -447,5 +409,3 @@ player.CharacterAdded:Connect(function()
 		lockCameraZoom()
 	end
 end)
-
-print("[WorldMapController] Ready. Press '" .. TOGGLE_KEY.Name .. "' to open the map.")

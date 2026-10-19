@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The low-health effect: blurs the screen and types the race's panic messages in the
+-- corners while the server keeps HealthAlertEvent started.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -7,7 +12,6 @@ local AlertRemote = ReplicatedStorage:WaitForChild("HealthAlertEvent")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- [[ CONFIGURATION ]] --
 local TEXT_FONT = Enum.Font.Merriweather
 local TEXT_COLOR = Color3.fromRGB(255, 40, 40)
 local TYPE_SPEED = 0.05
@@ -17,11 +21,11 @@ local LOOP_DELAY_MIN = 1.0
 local LOOP_DELAY_MAX = 3.0
 local BLUR_SIZE = 8
 
--- [[ SETUP VISUALS ]] --
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "PanicOverlay"
 screenGui.IgnoreGuiInset = true
-screenGui.ResetOnSpawn = false -- We handle the reset manually now
+-- CharacterAdded resets the effect, not the ScreenGui.
+screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
 local blurEffect = Lighting:FindFirstChild("LowHealthBlur")
@@ -34,22 +38,21 @@ end
 
 local isPanicMode = false
 
--- [[ HELPER FUNCTIONS ]] --
-
+-- Returns a random position in one of the four screen corners.
 local function GetNonIntrusivePosition()
 	local zone = math.random(1, 4)
 	local xScale, yScale
 
-	if zone == 1 then -- Top Left
+	if zone == 1 then
 		xScale = math.random(10, 35) / 100
 		yScale = math.random(15, 35) / 100
-	elseif zone == 2 then -- Top Right
+	elseif zone == 2 then
 		xScale = math.random(65, 90) / 100
 		yScale = math.random(15, 35) / 100
-	elseif zone == 3 then -- Bottom Left
+	elseif zone == 3 then
 		xScale = math.random(10, 35) / 100
 		yScale = math.random(65, 85) / 100
-	else -- Bottom Right
+	else
 		xScale = math.random(65, 90) / 100
 		yScale = math.random(65, 85) / 100
 	end
@@ -60,7 +63,7 @@ local function PlayTypewriter(label, text)
 	for i = 1, #text do
 		if not label.Parent or not isPanicMode then
 			break
-		end -- Stop if destroyed or panic over
+		end
 		label.Text = string.sub(text, 1, i)
 		label.Rotation = label.Rotation + math.random(-1, 1)
 		task.wait(TYPE_SPEED)
@@ -90,15 +93,12 @@ local function SpawnSingleMessage(message)
 	label.Rotation = math.random(-10, 10)
 	label.Parent = screenGui
 
-	-- 1. Typewriter Effect
 	PlayTypewriter(label, message)
 
-	-- 2. Linger
 	if isPanicMode then
 		task.wait(LINGER_TIME)
 	end
 
-	-- 3. Fade Out
 	if label.Parent then
 		local info = TweenInfo.new(FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 		local t1 = TweenService:Create(label, info, { TextTransparency = 1 })
@@ -110,19 +110,15 @@ local function SpawnSingleMessage(message)
 	end
 end
 
--- [[ MAIN LOOP & CLEANUP ]] --
-
 local function StartPanicLoop(messages)
 	if isPanicMode then
 		return
-	end -- Don't start twice
+	end
 	isPanicMode = true
 
-	-- Tween Blur IN
 	local blurInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(blurEffect, blurInfo, { Size = BLUR_SIZE }):Play()
 
-	-- Start Message Loop
 	task.spawn(function()
 		while isPanicMode do
 			if messages and #messages > 0 then
@@ -132,7 +128,6 @@ local function StartPanicLoop(messages)
 				end)
 			end
 
-			-- Random Delay before next message
 			local waitTime = (TYPE_SPEED * 20)
 				+ LINGER_TIME
 				+ math.random(LOOP_DELAY_MIN, LOOP_DELAY_MAX)
@@ -140,7 +135,7 @@ local function StartPanicLoop(messages)
 			while elapsed < waitTime do
 				if not isPanicMode then
 					break
-				end -- Exit wait early if stopped
+				end
 				task.wait(0.1)
 				elapsed += 0.1
 			end
@@ -152,27 +147,25 @@ local function StopPanicLoop(instant)
 	isPanicMode = false
 
 	if instant then
-		-- Instant reset (for death/respawn)
+		-- An instant reset, on respawn.
 		blurEffect.Size = 0
-		screenGui:ClearAllChildren() -- Deletes all active text immediately
+		screenGui:ClearAllChildren()
 	else
-		-- Smooth reset (for healing up)
+		-- A smooth reset, after healing.
 		local blurInfo = TweenInfo.new(1.0, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 		TweenService:Create(blurEffect, blurInfo, { Size = 0 }):Play()
 	end
 end
 
--- [[ EVENT HANDLERS ]] --
-
 AlertRemote.OnClientEvent:Connect(function(action, data)
 	if action == "Start" then
 		StartPanicLoop(data)
 	elseif action == "Stop" then
-		StopPanicLoop(false) -- False means "Tween out smoothly"
+		StopPanicLoop(false)
 	end
 end)
 
--- [FIX] Reset visuals immediately when the player respawns
+-- Reset the effect at once on respawn.
 player.CharacterAdded:Connect(function()
-	StopPanicLoop(true) -- True means "Instant reset"
+	StopPanicLoop(true)
 end)

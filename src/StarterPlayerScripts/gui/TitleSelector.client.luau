@@ -1,5 +1,6 @@
--- [[ TITLE SELECTOR CLIENT ]]
--- Location: StarterPlayerScripts
+-- SPDX-License-Identifier: MIT
+--
+-- The title selector panel: lists the unlocked titles and equips one.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -14,8 +15,6 @@ local SetTitleRemote = remotes:WaitForChild("SetTitle")
 local RequestTitles = remotes:WaitForChild("RequestTitles")
 local TitleUpdated = remotes:WaitForChild("TitleUpdated")
 
--- ── COLOURS ───────────────────────────────────────────────────────────────────
-
 local C = {
 	bg = Color3.fromRGB(14, 12, 10),
 	panel = Color3.fromRGB(22, 18, 14),
@@ -28,8 +27,6 @@ local C = {
 
 local FADE_IN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local FADE_OUT = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-
--- ── GUI ───────────────────────────────────────────────────────────────────────
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "TitleSelector"
@@ -59,7 +56,6 @@ panelStroke.Thickness = 1
 panelStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 panelStroke.Parent = panel
 
--- Header
 local header = Instance.new("Frame")
 header.Name = "Header"
 header.Size = UDim2.new(1, 0, 0, 48)
@@ -98,7 +94,6 @@ headerDiv.BackgroundTransparency = 0.5
 headerDiv.BorderSizePixel = 0
 headerDiv.Parent = panel
 
--- Current title display
 local currentFrame = Instance.new("Frame")
 currentFrame.Size = UDim2.new(1, -24, 0, 32)
 currentFrame.Position = UDim2.new(0, 12, 0, 56)
@@ -123,7 +118,6 @@ currentLbl.TextColor3 = C.muted
 currentLbl.TextXAlignment = Enum.TextXAlignment.Left
 currentLbl.Parent = currentFrame
 
--- Scroll list
 local scroll = Instance.new("ScrollingFrame")
 scroll.Name = "TitleList"
 scroll.Size = UDim2.new(1, -24, 1, -112)
@@ -146,7 +140,6 @@ listPad.PaddingTop = UDim.new(0, 20)
 listPad.PaddingBottom = UDim.new(0, 20)
 listPad.Parent = scroll
 
--- Empty label
 local emptyLbl = Instance.new("TextLabel")
 emptyLbl.Name = "EmptyLabel"
 emptyLbl.Size = UDim2.new(1, 0, 0, 40)
@@ -159,13 +152,9 @@ emptyLbl.TextXAlignment = Enum.TextXAlignment.Center
 emptyLbl.Visible = false
 emptyLbl.Parent = scroll
 
--- ── STATE ─────────────────────────────────────────────────────────────────────
-
 local isOpen = false
 local currentTitle = ""
 local titleButtons = {}
-
--- ── HELPERS ───────────────────────────────────────────────────────────────────
 
 local function getSoulColor()
 	return player:GetAttribute("SoulColor") or Color3.fromRGB(212, 175, 55)
@@ -208,7 +197,7 @@ local function buildList(unlocked)
 
 	emptyLbl.Visible = #unlocked == 0
 
-	-- "No title" option always at top
+	-- The "No title" option is always first.
 	local clearBtn = Instance.new("TextButton")
 	clearBtn.Name = "ClearTitle"
 	clearBtn.Size = UDim2.new(1, 0, 0, 40)
@@ -328,8 +317,6 @@ local function buildList(unlocked)
 	end
 end
 
--- ── OPEN / CLOSE ──────────────────────────────────────────────────────────────
-
 local function openPanel()
 	isOpen = true
 
@@ -354,7 +341,7 @@ local function closePanel()
 	end)
 end
 
--- The journal's X button closes this panel too, via a shared bindable.
+-- The journal's close button closes this panel too, through a shared BindableEvent.
 local CloseTitlePanel = remotes:WaitForChild("CloseTitlePanel")
 CloseTitlePanel.Event:Connect(function()
 	if isOpen then
@@ -391,8 +378,7 @@ task.spawn(function()
 	end
 end)
 
--- ── LISTEN FOR TITLE UNLOCK (so panel refreshes if open) ─────────────────────
--- fired from server when a new title is granted mid-session
+-- The server fires this when a title is granted during the session.
 local TitleUnlocked = remotes:WaitForChild("TitleUnlocked", 5)
 if TitleUnlocked then
 	TitleUnlocked.OnClientEvent:Connect(function(title)

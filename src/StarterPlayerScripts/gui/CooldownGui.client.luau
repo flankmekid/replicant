@@ -1,20 +1,9 @@
---[[
-	CooldownGui
-	DISPLAY ONLY. Reads CooldownTracker each frame and renders cooldown bars.
-	Bottom-right, nudged up. Invisible when nothing active.
-
-	Stacking: newest bar enters at the TOP of the stack, older bars sit below it. When a bar
-	expires the bars above it slide down to fill the gap. (Newest-on-top toast stack.)
-
-	Each bar: a horizontal fill spanning the full height. Starts FULLY red and drains away
-	LEFT->RIGHT as the cooldown counts down (full at cast, empty when ready). The red is
-	anchored to the RIGHT edge, so it shrinks off the left side. Centered label
-	"<name> (<countdown>)" on top.
-
-	Animations: bars tween in on appear and tween out on expire; the fill glides smoothly
-	rather than snapping. Because exit is animated, the GUI keeps a bar alive briefly after
-	the tracker drops it (during the exit tween), so it does not purely mirror the tracker.
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- Shows the active cooldowns from CooldownTracker as bars in the bottom-right corner.
+-- Display only. The newest bar enters at the top, and the bars above an expired one
+-- slide down. Each red fill drains from left to right, from full at the cast to empty
+-- when ready. A bar stays a moment after its cooldown ends, for the exit tween.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -26,7 +15,6 @@ local CooldownTracker = require(ReplicatedStorage.modules.CooldownTracker)
 local plr = Players.LocalPlayer
 local playerGui = plr:WaitForChild("PlayerGui")
 
--- ---- tunables ----------------------------------------------------------------
 local BAR_WIDTH = 160
 local BAR_HEIGHT = 30
 local BAR_PADDING = 6
@@ -41,7 +29,6 @@ local FONT = Enum.Font.RobotoMono
 local ENTER_TIME = 0.18
 local EXIT_TIME = 0.18
 local FILL_SMOOTH = 0.1
--- ------------------------------------------------------------------------------
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CooldownGui"
@@ -66,9 +53,10 @@ layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, BAR_PADDING)
 layout.Parent = container
 
--- frames[id] = { root, fill, label, stroke, order, exiting }
+-- Layout: frames[id] = { root, fill, label, stroke, order, exiting }.
 local frames = {}
-local seq = 0 -- monotonic; newer bars get higher seq -> lower LayoutOrder -> render on top
+-- Rises with each new bar, so a newer bar gets a lower LayoutOrder and shows on top.
+local seq = 0
 
 local function makeBar(id)
 	local root = Instance.new("Frame")
@@ -91,13 +79,12 @@ local function makeBar(id)
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Parent = root
 
-	-- horizontal fill: full height, anchored RIGHT, starts full width and drains off the
-	-- left as the cooldown counts down (red recedes left->right).
+	-- The fill is anchored right, so it shrinks off the left side.
 	local fill = Instance.new("Frame")
 	fill.Name = "Fill"
 	fill.AnchorPoint = Vector2.new(1, 0)
 	fill.Position = UDim2.new(1, 0, 0, 0)
-	fill.Size = UDim2.new(1, 0, 1, 0) -- full width at start
+	fill.Size = UDim2.new(1, 0, 1, 0)
 	fill.BackgroundColor3 = COLOR_FILL
 	fill.BackgroundTransparency = 0.45
 	fill.BorderSizePixel = 0
@@ -121,7 +108,6 @@ local function makeBar(id)
 	label.Text = ""
 	label.Parent = root
 
-	-- enter animation
 	root.BackgroundTransparency = 1
 	stroke.Transparency = 1
 	label.TextTransparency = 1
@@ -182,7 +168,7 @@ RunService.RenderStepped:Connect(function()
 		end
 		f.root.LayoutOrder = -f.order
 
-		-- fill drains left->right: width = fraction (full at cast, 0 when ready), anchored right
+		-- The fill width is the fraction left: full at the cast, 0 when ready.
 		local target = math.clamp(entry.fraction, 0, 1)
 		TweenService:Create(
 			f.fill,
