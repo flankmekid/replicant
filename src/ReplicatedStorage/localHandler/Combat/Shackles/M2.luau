@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the Shackles M2: checks the state, plays the ground or air
+-- animation and the air dash at once, and plays the effects that the server
+-- replicates.
 local module = {}
 
 local Players = game:GetService("Players")
@@ -8,7 +13,6 @@ local ServerRemote = RP.remotes.server
 local Sounds = RP.assets.sounds
 
 local plr = Players.LocalPlayer
---local char = plr.Character or plr.CharacterAdded:Wait()
 
 local animationHndlr = require(RP.modules.animationHandler)
 local CooldownTracker = require(RP.modules.CooldownTracker)
@@ -33,7 +37,6 @@ local function getEquippedTool()
 
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
-	-- Crucial: Check if the tool is actually equipped (not just in Backpack/StarterGear)
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
 	end
@@ -68,6 +71,9 @@ local function dashEff()
 	end
 end
 
+-- M2.OnM2Activated() - use the M2
+--
+-- Return: nothing. Yields for the cooldown.
 function module.OnM2Activated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
@@ -108,7 +114,6 @@ function module.OnM2Activated()
 	if char:GetAttribute("Downed") then
 		return
 	end
-	--if not char:GetAttribute("Equip") then return end
 	canAttack = false
 	CooldownTracker.Register("Shackles_M2", "Critical", 4)
 
@@ -144,6 +149,11 @@ function module.OnM2Activated()
 	canAttack = true
 end
 
+-- M2.ServerResponse() - handle the server's reply to an attack request
+-- @plr: the local player
+-- @response: "Declined" when the server rejected the attack
+--
+-- Return: nothing.
 function module.ServerResponse(plr, response)
 	if not plr then
 		return
@@ -152,16 +162,28 @@ function module.ServerResponse(plr, response)
 
 	if response == "Declined" then
 		animationHndlr.StopAnim(char, "M2", animID)
-		print(response)
 	end
 end
 
+-- M2.PunchSound() - play the punch sound
+-- @ochar: the attacking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.PunchSound = function(ochar)
 	local s = Sounds.PunchSound:Clone()
 	s.Parent = ochar.Torso
 	s:Play()
 end
 
+-- M2.Hit() - play the hit sound and FX
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hit = function(ochar, echar)
 	local s = Sounds.PunchHit:Clone()
 	s.Parent = echar.Torso
@@ -171,6 +193,13 @@ module.Hit = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.Blocked() - play the block sound and FX
+-- @ochar: the attacking character
+-- @echar: the blocking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Blocked = function(ochar, echar)
 	local s = Sounds.BlockingHit:Clone()
 	s.Parent = echar.Torso
@@ -180,6 +209,13 @@ module.Blocked = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.Parry() - play the parry sound and FX
+-- @ochar: the parried attacker
+-- @echar: the parrying character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Parry = function(ochar, echar)
 	local s = Sounds.ParrySound:Clone()
 	s.Parent = ochar.Torso
@@ -189,6 +225,13 @@ module.Parry = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.GB() - play the guard-break sound and FX
+-- @ochar: the attacking character
+-- @echar: the guard-broken character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.GB = function(ochar, echar)
 	local s = Sounds.PunchHit:Clone()
 	s.Parent = echar.Torso
