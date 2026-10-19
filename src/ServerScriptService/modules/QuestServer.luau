@@ -15,7 +15,7 @@ local DataManager = require(ServerScriptService.modules.dataManager)
 local QuestManager = {}
 
 -- The Liturgy cost of completing a class quest, by milestone.
-local CLASS_QUEST_LITURGY_COST = {
+local classQuestLiturgyCost = {
 	[15] = 500,
 	[20] = 750,
 	[25] = 1000,
@@ -152,7 +152,7 @@ function QuestManager.CompleteQuest(player, questId)
 	end
 
 	if questDef.ClassQuest and questDef.Milestone and questDef.Milestone > 10 then
-		local cost = CLASS_QUEST_LITURGY_COST[questDef.Milestone] or 0
+		local cost = classQuestLiturgyCost[questDef.Milestone] or 0
 		if cost > 0 then
 			local success = DataManager.RemoveLiturgy(player, cost)
 			if not success then
@@ -233,7 +233,7 @@ function QuestManager.SetTracked(player, questId)
 	end
 end
 
-local CLASS_MILESTONES = { 10, 15, 20, 25 }
+local classMilestones = { 10, 15, 20, 25 }
 
 -- Returns the open class quest of a family, or nil. Only one is open at a time.
 local function getActiveClassQuest(player, family)
@@ -275,7 +275,7 @@ function QuestManager.ReconcileClassQuests(player, family)
 	end
 
 	-- The lowest milestone that the level has earned and that is not completed.
-	for _, milestone in ipairs(CLASS_MILESTONES) do
+	for _, milestone in ipairs(classMilestones) do
 		if level >= milestone then
 			local questId = "ClassQuest_" .. family .. "_" .. milestone
 			if QuestConfig.Quests[questId] and not table.find(questData.Completed, questId) then

@@ -25,8 +25,8 @@ local C = {
 	white = Color3.fromRGB(230, 218, 195),
 }
 
-local FADE_IN = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local FADE_OUT = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local fadeIn = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local fadeOut = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "TitleSelector"
@@ -329,12 +329,12 @@ local function openPanel()
 
 	panel.GroupTransparency = 1
 	panel.Visible = true
-	TweenService:Create(panel, FADE_IN, { GroupTransparency = 0 }):Play()
+	TweenService:Create(panel, fadeIn, { GroupTransparency = 0 }):Play()
 end
 
 local function closePanel()
 	isOpen = false
-	local out = TweenService:Create(panel, FADE_OUT, { GroupTransparency = 1 })
+	local out = TweenService:Create(panel, fadeOut, { GroupTransparency = 1 })
 	out:Play()
 	out.Completed:Connect(function()
 		panel.Visible = false

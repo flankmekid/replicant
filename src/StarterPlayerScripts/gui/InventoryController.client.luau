@@ -37,7 +37,7 @@ local DragState =
 -- A press that has not yet become a click or a drag.
 local PendingPress = nil
 -- Pixels of movement before a press becomes a drag.
-local DRAG_THRESHOLD = 8
+local dragThreshold = 8
 
 -- One shared tooltip. A weapon shows its name. Equipment shows the name and the slot
 -- it fits, from the Category the server sends.
@@ -434,7 +434,7 @@ UserInputService.InputChanged:Connect(function(input)
 	-- A press that moves far enough becomes a drag.
 	if PendingPress and not PendingPress.Started and not DragState.IsDragging then
 		local delta = (Vector2.new(input.Position.X, input.Position.Y) - PendingPress.StartPos).Magnitude
-		if delta >= DRAG_THRESHOLD then
+		if delta >= dragThreshold then
 			PendingPress.Started = true
 			StartDrag(
 				PendingPress.Slot,

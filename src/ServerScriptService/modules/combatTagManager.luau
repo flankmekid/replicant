@@ -9,7 +9,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local CombatManager = {}
 local ActiveTags = {}
-local TAG_DURATION = 30
+local tagDuration = 30
 
 -- Create the HUD remote if the place does not have it.
 local Events = ReplicatedStorage:FindFirstChild("remotes")
@@ -49,7 +49,7 @@ function CombatManager.TagPlayer(victim, attacker)
 		return
 	end
 
-	local expiryTime = os.clock() + TAG_DURATION
+	local expiryTime = os.clock() + tagDuration
 	local currentTag = ActiveTags[victim]
 
 	if currentTag then
@@ -72,7 +72,7 @@ function CombatManager.TagPlayer(victim, attacker)
 	-- DataManager reads this attribute, so it does not need this module.
 	victim:SetAttribute("CombatLogExpiry", expiryTime)
 
-	CombatEvent:FireClient(victim, true, TAG_DURATION)
+	CombatEvent:FireClient(victim, true, tagDuration)
 
 	-- Other scripts and NPCs read InCombat.
 	if victim.Character then

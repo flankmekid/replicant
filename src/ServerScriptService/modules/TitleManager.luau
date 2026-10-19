@@ -50,14 +50,14 @@ TitleManager.Titles = {
 	["the Dragon Knight"] = { Liturgy = 6700, Description = "???", UserId = 1718017878 },
 }
 
-local KILL_TITLES = {
+local killTitles = {
 	{ Threshold = 10, Title = "the Butcher" },
 	{ Threshold = 100, Title = "the Ghost" },
 	{ Threshold = 250, Title = "the Wraith" },
 	{ Threshold = 500, Title = "the Phantom" },
 }
 
-local DEATH_TITLES = {
+local deathTitles = {
 	{ Threshold = 1, Title = "the Victim" },
 	{ Threshold = 10, Title = "the Hunted" },
 	{ Threshold = 50, Title = "the Prey" },
@@ -65,7 +65,7 @@ local DEATH_TITLES = {
 	{ Threshold = 500, Title = "the Vengeful" },
 }
 
-local WEAPON_TITLES = {
+local weaponTitles = {
 	Sword = "the Hero",
 	Greatsword = "the Berserker",
 	Dagger = "the Shade",
@@ -73,7 +73,7 @@ local WEAPON_TITLES = {
 	Fists = "the Iron Fist",
 }
 
-local ALL_WEAPONS = { "Sword", "Greatsword", "Dagger", "Katana", "Fists" }
+local allWeapons = { "Sword", "Greatsword", "Dagger", "Katana", "Fists" }
 
 local remotes = ReplicatedStorage:WaitForChild("remotes")
 
@@ -119,7 +119,7 @@ end
 -- Return: nothing.
 function TitleManager.CheckKills(player)
 	local kills = DataManager.GetKills(player)
-	for _, entry in ipairs(KILL_TITLES) do
+	for _, entry in ipairs(killTitles) do
 		if kills >= entry.Threshold then
 			grantTitle(player, entry.Title)
 		end
@@ -132,7 +132,7 @@ end
 -- Return: nothing.
 function TitleManager.CheckDeaths(player)
 	local deaths = DataManager.GetDeaths(player)
-	for _, entry in ipairs(DEATH_TITLES) do
+	for _, entry in ipairs(deathTitles) do
 		if deaths >= entry.Threshold then
 			grantTitle(player, entry.Title)
 		end
@@ -148,7 +148,7 @@ end
 --
 -- Return: nothing.
 function TitleManager.CheckWeaponMastery(player, weaponName)
-	local weaponTitle = WEAPON_TITLES[weaponName]
+	local weaponTitle = weaponTitles[weaponName]
 	if weaponTitle then
 		grantTitle(player, weaponTitle)
 	end
@@ -161,7 +161,7 @@ function TitleManager.CheckWeaponMastery(player, weaponName)
 	end
 
 	local allMax = true
-	for _, wName in ipairs(ALL_WEAPONS) do
+	for _, wName in ipairs(allWeapons) do
 		local wData = profile.Data.WeaponProgression[wName]
 		if not wData or wData.Level < 25 then
 			allMax = false

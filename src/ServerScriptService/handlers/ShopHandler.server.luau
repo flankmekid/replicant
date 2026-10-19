@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local DataManager = require(ServerScriptService.modules.dataManager)
 local BuySpinsRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("BuySpins")
 
-local SPIN_COST = 1000
+local spinCost = 1000
 
 BuySpinsRemote.OnServerEvent:Connect(function(player, amount)
 	-- Only packs of 1 and 10 exist.
@@ -17,7 +17,7 @@ BuySpinsRemote.OnServerEvent:Connect(function(player, amount)
 		return
 	end
 
-	local totalCost = amount * SPIN_COST
+	local totalCost = amount * spinCost
 
 	-- TODO: Tell the client when the player cannot afford the spins.
 	if DataManager.GetLiturgy(player) >= totalCost then

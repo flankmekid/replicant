@@ -20,7 +20,7 @@ local DamageNumberRemote = game.ReplicatedStorage.remotes:WaitForChild("DamageNu
 local CameraShakeRemote = game.ReplicatedStorage.remotes:WaitForChild("CameraShake")
 
 -- Damage above which a hit shakes the camera, the same as the red damage indicator.
-local SHAKE_DAMAGE_THRESHOLD = 20
+local shakeDamageThreshold = 20
 
 -- Reads a stat from a character attribute, then from PlayerStats, for players and NPCs.
 local function getStatValue(character, statName, defaultValue)
@@ -215,7 +215,7 @@ function module.CalculateDamage(
 	end
 
 	-- Taking a big hit shakes the camera harder than landing one.
-	if finalDamage > SHAKE_DAMAGE_THRESHOLD then
+	if finalDamage > shakeDamageThreshold then
 		if targetPlayer then
 			CameraShakeRemote:FireClient(targetPlayer, { kind = "Damage", taken = true })
 		end

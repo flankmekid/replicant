@@ -11,7 +11,7 @@ local player = Players.LocalPlayer
 local playerStats = player:WaitForChild("PlayerStats", 10)
 local weaponData = playerStats:WaitForChild("WeaponData", 10)
 
-local UI_THEME = {
+local uiTheme = {
 	BackgroundColor = Color3.fromRGB(15, 15, 15),
 	ItemColor = Color3.fromRGB(30, 30, 30),
 	TextColor = Color3.fromRGB(220, 220, 220),
@@ -30,15 +30,15 @@ local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
 mainFrame.Size = UDim2.new(0, 350, 0, 450)
 mainFrame.Position = UDim2.new(0.9, -175, 0.5, -225)
-mainFrame.BackgroundColor3 = UI_THEME.BackgroundColor
-mainFrame.BackgroundTransparency = UI_THEME.Transparency
+mainFrame.BackgroundColor3 = uiTheme.BackgroundColor
+mainFrame.BackgroundTransparency = uiTheme.Transparency
 mainFrame.BorderSizePixel = 0
 mainFrame.Visible = false
 mainFrame.Parent = screenGui
 
 local topStroke = Instance.new("Frame")
 topStroke.Size = UDim2.new(1, 0, 0, 2)
-topStroke.BackgroundColor3 = UI_THEME.Accent
+topStroke.BackgroundColor3 = uiTheme.Accent
 topStroke.BorderSizePixel = 0
 topStroke.Parent = mainFrame
 
@@ -48,7 +48,7 @@ title.Size = UDim2.new(1, 0, 0, 50)
 title.BackgroundTransparency = 1
 title.Font = Enum.Font.Fantasy
 title.TextSize = 22
-title.TextColor3 = UI_THEME.TextColor
+title.TextColor3 = uiTheme.TextColor
 title.Parent = mainFrame
 
 local scrollFrame = Instance.new("ScrollingFrame")
@@ -56,7 +56,7 @@ scrollFrame.Size = UDim2.new(1, -20, 1, -60)
 scrollFrame.Position = UDim2.new(0, 10, 0, 55)
 scrollFrame.BackgroundTransparency = 1
 scrollFrame.ScrollBarThickness = 2
-scrollFrame.ScrollBarImageColor3 = UI_THEME.Accent
+scrollFrame.ScrollBarImageColor3 = uiTheme.Accent
 scrollFrame.Parent = mainFrame
 
 local layout = Instance.new("UIListLayout")
@@ -73,14 +73,14 @@ local function createWeaponEntry(weaponFolder)
 	local entry = Instance.new("Frame")
 	entry.Name = weaponName
 	entry.Size = UDim2.new(1, -5, 0, 60)
-	entry.BackgroundColor3 = UI_THEME.ItemColor
+	entry.BackgroundColor3 = uiTheme.ItemColor
 	entry.BackgroundTransparency = 0.5
 	entry.BorderSizePixel = 0
 	entry.Parent = scrollFrame
 
 	local deco = Instance.new("Frame")
 	deco.Size = UDim2.new(0, 3, 1, 0)
-	deco.BackgroundColor3 = UI_THEME.Accent
+	deco.BackgroundColor3 = uiTheme.Accent
 	deco.BorderSizePixel = 0
 	deco.Parent = entry
 
@@ -92,7 +92,7 @@ local function createWeaponEntry(weaponFolder)
 	nameLabel.Font = Enum.Font.Fantasy
 	nameLabel.TextSize = 18
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.TextColor3 = UI_THEME.TextColor
+	nameLabel.TextColor3 = uiTheme.TextColor
 	nameLabel.Parent = entry
 
 	local levelLabel = Instance.new("TextLabel")
@@ -103,19 +103,19 @@ local function createWeaponEntry(weaponFolder)
 	levelLabel.Font = Enum.Font.RobotoMono
 	levelLabel.TextSize = 16
 	levelLabel.TextXAlignment = Enum.TextXAlignment.Right
-	levelLabel.TextColor3 = UI_THEME.TextColor
+	levelLabel.TextColor3 = uiTheme.TextColor
 	levelLabel.Parent = entry
 
 	local barBg = Instance.new("Frame")
 	barBg.Size = UDim2.new(1, -30, 0, 8)
 	barBg.Position = UDim2.new(0, 15, 0, 40)
-	barBg.BackgroundColor3 = UI_THEME.BarBackground
+	barBg.BackgroundColor3 = uiTheme.BarBackground
 	barBg.BorderSizePixel = 0
 	barBg.Parent = entry
 
 	local barFill = Instance.new("Frame")
 	barFill.Name = "Fill"
-	barFill.BackgroundColor3 = UI_THEME.BarFill
+	barFill.BackgroundColor3 = uiTheme.BarFill
 	barFill.BorderSizePixel = 0
 	barFill.Size = UDim2.new(0, 0, 1, 0)
 	barFill.Parent = barBg

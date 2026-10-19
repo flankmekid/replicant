@@ -18,10 +18,10 @@ local ParryService = require(ServerScriptService.modules.parryService)
 
 local BossAI = {}
 
-local UPDATE_RATE = 0.1
-local MOVE_UPDATE_RATE = 0.3
-local AGGRO_LEASH_TIME = 10
-local AOE_WINDUP = 1.5
+local updateRate = 0.1
+local moveUpdateRate = 0.3
+local aggroLeashTime = 10
+local aoeWindup = 1.5
 
 local BossAtks = ReplicatedStorage.assets.BossAtks
 
@@ -231,7 +231,7 @@ local function aoeCircle(boss, aoeDef, cfg)
 	indicator.CFrame = CFrame.new(root.Position.X, floorY + 0.1, root.Position.Z) * rot
 	indicator.Parent = workspace
 
-	pulseIndicator(indicator, AOE_WINDUP)
+	pulseIndicator(indicator, aoeWindup)
 	if indicator.Parent then
 		indicator:Destroy()
 	end
@@ -284,7 +284,7 @@ local function aoeLine(boss, aoeDef, target, cfg)
 	indicator.CFrame = flatCFrame(midPoint, forward) * CFrame.Angles(0, math.rad(90), 0)
 	indicator.Parent = workspace
 
-	pulseIndicator(indicator, AOE_WINDUP)
+	pulseIndicator(indicator, aoeWindup)
 	if indicator.Parent then
 		indicator:Destroy()
 	end
@@ -338,7 +338,7 @@ local function aoeDonut(boss, aoeDef, cfg)
 	indicator.CFrame = CFrame.new(root.Position.X, floorY + 0.1, root.Position.Z) * rot
 	indicator.Parent = workspace
 
-	pulseIndicator(indicator, AOE_WINDUP)
+	pulseIndicator(indicator, aoeWindup)
 	if indicator.Parent then
 		indicator:Destroy()
 	end
@@ -397,7 +397,7 @@ local function aoeCone(boss, aoeDef, target, cfg)
 	indicator.CFrame = flatCFrame(midPoint, forward)
 	indicator.Parent = workspace
 
-	pulseIndicator(indicator, AOE_WINDUP)
+	pulseIndicator(indicator, aoeWindup)
 	if indicator.Parent then
 		indicator:Destroy()
 	end
@@ -433,11 +433,11 @@ local function aoeCone(boss, aoeDef, target, cfg)
 	end
 end
 
-local AOE_TYPES = { "Circle", "Line", "Donut" }
+local aoeTypes = { "Circle", "Line", "Donut" }
 
 local function fireAOE(boss, target, cfg)
-	boss.AOEIndex = ((boss.AOEIndex or 0) % #AOE_TYPES) + 1
-	local aoeType = AOE_TYPES[boss.AOEIndex]
+	boss.AOEIndex = ((boss.AOEIndex or 0) % #aoeTypes) + 1
+	local aoeType = aoeTypes[boss.AOEIndex]
 
 	local aoeDef = {}
 	if cfg.AOEAttacks then
@@ -1252,7 +1252,7 @@ end
 -- BossAI.Update() - run one AI tick for a boss
 -- @boss: the boss object from Spawn
 --
--- MobServer calls this every frame. The boss acts at most every UPDATE_RATE seconds.
+-- MobServer calls this every frame. The boss acts at most every updateRate seconds.
 --
 -- Return: nothing.
 function BossAI.Update(boss)
@@ -1262,7 +1262,7 @@ function BossAI.Update(boss)
 	if boss.Dead then
 		return
 	end
-	if os.clock() - (boss.LastUpdate or 0) < UPDATE_RATE then
+	if os.clock() - (boss.LastUpdate or 0) < updateRate then
 		return
 	end
 	boss.LastUpdate = os.clock()
@@ -1312,7 +1312,7 @@ function BossAI.Update(boss)
 	if dist > cfg.SeekRange or not isPlayerTargetable(target) then
 		if not boss.AggroLostTime then
 			boss.AggroLostTime = os.clock()
-		elseif os.clock() - boss.AggroLostTime > AGGRO_LEASH_TIME then
+		elseif os.clock() - boss.AggroLostTime > aggroLeashTime then
 			boss.CurrentTarget = nil
 			boss.AggroLostTime = nil
 			boss.ThreatTable = {}
@@ -1393,7 +1393,7 @@ function BossAI.Update(boss)
 				end)
 			end
 		else
-			if os.clock() - (boss.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+			if os.clock() - (boss.LastMoveUpdate or 0) >= moveUpdateRate then
 				boss.LastMoveUpdate = os.clock()
 				boss.Model.Humanoid:MoveTo(target.PrimaryPart.Position)
 			end
@@ -1428,7 +1428,7 @@ function BossAI.Update(boss)
 		boss.IsAttacking = true
 		task.spawn(dispatchAttack, boss, target, cfg)
 	else
-		if os.clock() - (boss.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+		if os.clock() - (boss.LastMoveUpdate or 0) >= moveUpdateRate then
 			boss.LastMoveUpdate = os.clock()
 			boss.Model.Humanoid:MoveTo(target.PrimaryPart.Position)
 		end

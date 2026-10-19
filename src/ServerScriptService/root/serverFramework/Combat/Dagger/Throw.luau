@@ -20,18 +20,18 @@ local HitboxTypes = require(RP.modules.hitboxClass.Types)
 local ragdollManager = require(SSS.modules.ragdollManager)
 
 -- TODO: Replace the placeholder attacker animation.
-local ANIM_ATTACKER_SUCCESS = "rbxassetid://0000000001"
-local ANIM_VICTIM_THROWN = "rbxassetid://96311777205911"
+local animAttackerSuccess = "rbxassetid://0000000001"
+local animVictimThrown = "rbxassetid://96311777205911"
 
 local DataManager = require(game.ServerScriptService.modules.dataManager)
 
 local DAMAGE = 10
 -- The grab is active only briefly, and a miss has a long recovery.
-local ACTIVE_FRAMES = 0.15
-local RECOVERY_TIME = 1.5
-local RAGDOLL_DURATION = 2.5
+local activeFrames = 0.15
+local recoveryTime = 1.5
+local ragdollDuration = 2.5
 -- Fling velocity relative to the attacker's facing: up and backward.
-local FLING_FORCE_RELATIVE = Vector3.new(0, 15, -30)
+local flingForceRelative = Vector3.new(0, 15, -30)
 
 local danger = RP.assets.FX.danger
 
@@ -139,8 +139,8 @@ function module.ServerCheck(plr)
 	playerThrowDebounces[plr] = true
 
 	-- The lock covers the active frames and the recovery. A hit shortens it.
-	StateHandler.SetState(char, "Attacking", true, ACTIVE_FRAMES + RECOVERY_TIME)
-	StateHandler.SetState(char, "CantAnything", true, ACTIVE_FRAMES + RECOVERY_TIME)
+	StateHandler.SetState(char, "Attacking", true, activeFrames + recoveryTime)
+	StateHandler.SetState(char, "CantAnything", true, activeFrames + recoveryTime)
 
 	local humrp = char.HumanoidRootPart
 	local Hitbox, connected = HitboxClass.new(hitboxParams)
@@ -224,7 +224,7 @@ function module.ServerCheck(plr)
 			-- BeingThrown stops the victim from being grabbed again right away.
 			StateHandler.SetState(targetChar, "BeingThrown", true, 1)
 			StateHandler.SetStun(targetChar, true, 1.5, 0)
-			AnimationHandler.LoadAnim(targetChar, "Reaction", ANIM_VICTIM_THROWN, nil, false)
+			AnimationHandler.LoadAnim(targetChar, "Reaction", animVictimThrown, nil, false)
 
 			local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 			dmgModule.CalculateDamage(char, targetChar, DAMAGE, 0, false)
@@ -239,9 +239,9 @@ function module.ServerCheck(plr)
 			-- Let the animations start before the fling.
 			task.delay(0.15, function()
 				if targetChar and targetHRP then
-					ragdollManager.Ragdoll(targetChar, RAGDOLL_DURATION)
+					ragdollManager.Ragdoll(targetChar, ragdollDuration)
 
-					local flingVelocityWorld = humrp.CFrame:VectorToWorldSpace(FLING_FORCE_RELATIVE)
+					local flingVelocityWorld = humrp.CFrame:VectorToWorldSpace(flingForceRelative)
 					local bv = Instance.new("BodyVelocity")
 					bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
 					bv.Velocity = flingVelocityWorld
@@ -254,7 +254,7 @@ function module.ServerCheck(plr)
 		end
 	end)
 
-	task.delay(ACTIVE_FRAMES, function()
+	task.delay(activeFrames, function()
 		if not hasHit then
 			Helper.SetSpeed(char, 0, 16)
 			Hitbox:Destroy()
@@ -264,10 +264,10 @@ function module.ServerCheck(plr)
 				Func = "ExecuteEffect",
 				FolderName = getEquippedTool(),
 			}, char, "Whiff")
-			-- The Attacking and CantAnything states expire on their own after RECOVERY_TIME.
+			-- The Attacking and CantAnything states expire on their own after recoveryTime.
 		end
 
-		task.delay(RECOVERY_TIME, function()
+		task.delay(recoveryTime, function()
 			playerThrowDebounces[plr] = nil
 			Helper.ResetSpeed(char)
 		end)

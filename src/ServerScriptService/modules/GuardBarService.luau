@@ -13,15 +13,15 @@ local AnimationHandler = require(RP.modules.animationHandler)
 local GuardBarService = {}
 
 local MAX = 100
-local BLOCK_BREAK_ANIM = "rbxassetid://131056155810963"
+local blockBreakAnim = "rbxassetid://131056155810963"
 -- The hard stun and CantAnything lockout on a break, in seconds.
-local BLOCK_BREAK_DURATION = 1.0
+local blockBreakDuration = 1.0
 -- WalkSpeed while guard-broken.
-local BLOCK_BREAK_STUNSPEED = 2
+local blockBreakStunspeed = 2
 
 -- After the stun ends, the bar starts full and drains to empty over this window. The
 -- player cannot block until it is empty.
-local GUARD_RECOVERY_DURATION = 5.0
+local guardRecoveryDuration = 5.0
 
 -- Fill added to the blocker's bar per blocked hit, by attack class. M2 is 0, because
 -- an M2 is a guard break and skips the bar.
@@ -35,13 +35,13 @@ local FILL = {
 
 -- Drain when the guarding player relieves pressure: a landed parry, or landing their
 -- own hit while the bar is up.
-local DRAIN_ON_PARRY = 40
-local DRAIN_ON_HIT = 12
+local drainOnParry = 40
+local drainOnHit = 12
 
--- After REGEN_DELAY seconds without a blocked hit, the bar drains at REGEN_RATE per
+-- After regenDelay seconds without a blocked hit, the bar drains at regenRate per
 -- second.
-local REGEN_RATE = 8
-local REGEN_DELAY = 3
+local regenRate = 8
+local regenDelay = 3
 
 -- The os.clock() time of each character's last fill, for the regen delay.
 local lastFillClock = {}
@@ -129,7 +129,7 @@ end
 --
 -- Return: nothing.
 function GuardBarService.DrainOnParry(char)
-	GuardBarService.Drain(char, DRAIN_ON_PARRY)
+	GuardBarService.Drain(char, drainOnParry)
 end
 
 -- GuardBarService.DrainOnHit() - drain the bar after the character lands a hit
@@ -137,7 +137,7 @@ end
 --
 -- Return: nothing.
 function GuardBarService.DrainOnHit(char)
-	GuardBarService.Drain(char, DRAIN_ON_HIT)
+	GuardBarService.Drain(char, drainOnHit)
 end
 
 -- GuardBarService.Break() - break a character's guard
@@ -145,7 +145,7 @@ end
 --
 -- Used for both a full bar and a guard-break attack. Applies the hard stun and
 -- lockout and the break animation, then drains the bar from full to empty over
--- GUARD_RECOVERY_DURATION. Blocking is disabled for the whole recovery.
+-- guardRecoveryDuration. Blocking is disabled for the whole recovery.
 --
 -- Return: nothing.
 function GuardBarService.Break(char)
@@ -154,10 +154,10 @@ function GuardBarService.Break(char)
 	end
 
 	StateHandler.RemoveStates(char, "Blocking")
-	StateHandler.SetStun(char, true, BLOCK_BREAK_DURATION, BLOCK_BREAK_STUNSPEED)
-	StateHandler.SetState(char, "CantAnything", true, BLOCK_BREAK_DURATION)
+	StateHandler.SetStun(char, true, blockBreakDuration, blockBreakStunspeed)
+	StateHandler.SetState(char, "CantAnything", true, blockBreakDuration)
 	AnimationHandler.StopAnim(char, "ALL")
-	AnimationHandler.LoadAnim(char, "GuardBreak", BLOCK_BREAK_ANIM, nil, false)
+	AnimationHandler.LoadAnim(char, "GuardBreak", blockBreakAnim, nil, false)
 
 	set(char, MAX)
 	char:SetAttribute("GuardBroken", true)
@@ -170,7 +170,7 @@ function GuardBarService.Break(char)
 
 	task.spawn(function()
 		local elapsed = 0
-		while elapsed < GUARD_RECOVERY_DURATION do
+		while elapsed < guardRecoveryDuration do
 			local dt = task.wait()
 			if recoveryToken[char] ~= token then
 				return
@@ -180,7 +180,7 @@ function GuardBarService.Break(char)
 				return
 			end
 			elapsed += dt
-			local ratio = math.clamp(1 - elapsed / GUARD_RECOVERY_DURATION, 0, 1)
+			local ratio = math.clamp(1 - elapsed / guardRecoveryDuration, 0, 1)
 			set(char, MAX * ratio)
 		end
 		if recoveryToken[char] ~= token then
@@ -204,8 +204,8 @@ RunService.Heartbeat:Connect(function(dt)
 			local v = get(char)
 			if v > 0 then
 				local last = lastFillClock[char]
-				if not last or (os.clock() - last) >= REGEN_DELAY then
-					set(char, v - REGEN_RATE * dt)
+				if not last or (os.clock() - last) >= regenDelay then
+					set(char, v - regenRate * dt)
 				end
 			end
 		end

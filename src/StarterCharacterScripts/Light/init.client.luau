@@ -6,11 +6,11 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
 -- The night window in ClockTime hours: from about 17:54 to about 06:18.
-local START_TIME = 17.9
-local END_TIME = 6.3
-local MAX_BRIGHTNESS = 1
+local startTime = 17.9
+local endTime = 6.3
+local maxBrightness = 1
 -- The fade length in seconds.
-local FADE_DURATION = 3
+local fadeDuration = 3
 
 local character = script.Parent
 local head = character:WaitForChild("Head")
@@ -31,15 +31,15 @@ local function updateLight()
 	local currentTime = Lighting.ClockTime
 
 	-- The night window wraps past midnight.
-	local shouldBeOn = (currentTime >= START_TIME or currentTime <= END_TIME)
+	local shouldBeOn = (currentTime >= startTime or currentTime <= endTime)
 
 	if shouldBeOn ~= isLightOn then
 		isLightOn = shouldBeOn
 
-		local targetBrightness = shouldBeOn and MAX_BRIGHTNESS or 0
+		local targetBrightness = shouldBeOn and maxBrightness or 0
 
 		local tweenInfo =
-			TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+			TweenInfo.new(fadeDuration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 		local tween = TweenService:Create(light, tweenInfo, { Brightness = targetBrightness })
 		tween:Play()
 	end

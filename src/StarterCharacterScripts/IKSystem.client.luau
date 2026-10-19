@@ -19,10 +19,10 @@ local originRightHipC0 = rightHip.C0
 local originLeftHipC0 = leftHip.C0
 
 -- How far down the ray looks for the ground, in studs.
-local RAY_LENGTH = 4
+local rayLength = 4
 -- How fast the legs follow: 0.1 is slow and heavy, 0.8 is snappy.
-local LERP_SPEED = 0.5
-local STRIDE_OFFSET = 0.5
+local lerpSpeed = 0.5
+local strideOffset = 0.5
 
 -- The current offsets, for smoothing.
 local rightLegOffset = 0
@@ -37,7 +37,7 @@ rayParams.FilterType = Enum.RaycastFilterType.Exclude
 -- Returns the smoothed vertical offset and rotation of one leg.
 local function solveIK(hipC0, hipPosition, currentOffset, currentRot)
 	local rayOrigin = hipPosition
-	local rayDirection = Vector3.new(0, -RAY_LENGTH, 0)
+	local rayDirection = Vector3.new(0, -rayLength, 0)
 
 	local rayResult = workspace:Raycast(rayOrigin, rayDirection, rayParams)
 
@@ -65,8 +65,8 @@ local function solveIK(hipC0, hipPosition, currentOffset, currentRot)
 		targetRotation = CFrame.fromMatrix(Vector3.zero, surfaceRight, upVector, surfaceBack)
 	end
 
-	local smoothedOffset = currentOffset + (targetOffset - currentOffset) * LERP_SPEED
-	local smoothedRot = currentRot:Lerp(targetRotation, LERP_SPEED)
+	local smoothedOffset = currentOffset + (targetOffset - currentOffset) * lerpSpeed
+	local smoothedRot = currentRot:Lerp(targetRotation, lerpSpeed)
 
 	return smoothedOffset, smoothedRot
 end

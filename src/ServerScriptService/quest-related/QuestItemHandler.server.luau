@@ -14,7 +14,7 @@ local InventoryManager = require(ServerScriptService.modules:WaitForChild("inven
 
 local ItemRewardManager = {}
 
-local ITEM_HANDLERS = {
+local itemHandlers = {
 	VoidSpire = function(player)
 		-- Only one per player.
 		if DataManager.HasItem(player, "Void Spire") then
@@ -48,7 +48,7 @@ local ITEM_HANDLERS = {
 --
 -- Return: nothing.
 ItemRewardManager.GiveReward = function(player, itemName)
-	local handler = ITEM_HANDLERS[itemName]
+	local handler = itemHandlers[itemName]
 	if handler then
 		handler(player)
 	end

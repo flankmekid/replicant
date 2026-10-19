@@ -1407,8 +1407,8 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
-	local MAX_DIST = 77.5
-	local GRAPPLE_SPEED = 0.2
+	local maxDist = 77.5
+	local grappleSpeed = 0.2
 
 	local AssetFolder = ReplicatedStorage.assets:FindFirstChild("grapple")
 	local cordTemplate = AssetFolder:FindFirstChild("Cord")
@@ -1421,7 +1421,7 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	-- The server checks the grapple target with its own raycast.
 	local startPos = hrp.Position
-	local direction = (mouseHit.Position - startPos).Unit * MAX_DIST
+	local direction = (mouseHit.Position - startPos).Unit * maxDist
 
 	local rayParams = RaycastParams.new()
 	rayParams.FilterDescendantsInstances =
@@ -1433,7 +1433,7 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local hitInstance = rayResult and rayResult.Instance
 
 	local dist = (targetPos - startPos).Magnitude
-	if dist > MAX_DIST then
+	if dist > maxDist then
 		return
 	end
 
@@ -1505,10 +1505,10 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	local tween =
 		game:GetService("TweenService")
-			:Create(grapplePart, TweenInfo.new(GRAPPLE_SPEED), { CFrame = CFrame.new(targetPos) })
+			:Create(grapplePart, TweenInfo.new(grappleSpeed), { CFrame = CFrame.new(targetPos) })
 	tween:Play()
 
-	task.wait(GRAPPLE_SPEED)
+	task.wait(grappleSpeed)
 
 	if not character:IsDescendantOf(workspace) then
 		return

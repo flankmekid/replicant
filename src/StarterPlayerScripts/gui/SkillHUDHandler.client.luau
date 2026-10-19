@@ -11,7 +11,7 @@ local player = Players.LocalPlayer
 local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 local TriggerCooldownEvent = ReplicatedStorage.remotes:WaitForChild("TriggerCooldown")
 
-local KEY_NAMES = { [1] = "Z", [2] = "X", [3] = "C", [4] = "V" }
+local keyNames = { [1] = "Z", [2] = "X", [3] = "C", [4] = "V" }
 
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -71,7 +71,7 @@ local function createSkillBar(skillName, slotIndex, isRace)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.Position = UDim2.new(0, 0, 0, 0)
 	label.BackgroundTransparency = 1
-	label.Text = string.format("[%s] %s", KEY_NAMES[slotIndex] or "?", skillName)
+	label.Text = string.format("[%s] %s", keyNames[slotIndex] or "?", skillName)
 	label.Font = Enum.Font.RobotoMono
 	label.TextSize = 14
 	label.TextColor3 = Color3.fromRGB(230, 230, 230)

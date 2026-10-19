@@ -14,10 +14,10 @@ local animationHndlr = require(RP.modules.animationHandler)
 
 -- TODO: Replace the placeholder grab and whiff animations.
 local ANIM = "rbxassetid://117582907989700"
-local ANIM_WHIFF = "rbxassetid://96311777205911"
+local animWhiff = "rbxassetid://96311777205911"
 
 -- A client-side debounce, for responsiveness. The server has its own cooldown.
-local THROW_COOLDOWN = 5
+local throwCooldown = 5
 local isThrowing = false
 
 local function getEquippedToolName()
@@ -73,7 +73,7 @@ function module.OnThrowActivated()
 	-- effect replaces it.
 	animationHndlr.LoadAnim(char, "ThrowStart", ANIM, nil, false)
 
-	task.delay(THROW_COOLDOWN, function()
+	task.delay(throwCooldown, function()
 		isThrowing = false
 	end)
 end
@@ -93,7 +93,7 @@ function module.ExecuteEffect(char, effectType)
 		game.Debris:AddItem(s, 2)
 
 		animationHndlr.StopAnim(char, "ThrowStart", ANIM)
-		animationHndlr.LoadAnim(char, "Whiff", ANIM_WHIFF, nil, false)
+		animationHndlr.LoadAnim(char, "Whiff", animWhiff, nil, false)
 	elseif effectType == "Hit" then
 		local s = RP.assets.sounds.PunchHit:Clone()
 		s.Parent = char.Torso

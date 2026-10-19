@@ -39,11 +39,11 @@ local DescLbl = LeftFrame:WaitForChild("Description")
 local StatsList = RightFrame:WaitForChild("StatsList")
 
 local SPEED = 700
-local TOTAL_ROLLS = 40
-local LABEL_HEIGHT = Labels[1].Size.Y.Offset
+local totalRolls = 40
+local labelHeight = Labels[1].Size.Y.Offset
 -- The label may have no pixel height yet, so fall back to a third of the frame.
-if LABEL_HEIGHT == 0 then
-	LABEL_HEIGHT = RollingFrame.AbsoluteSize.Y / 3
+if labelHeight == 0 then
+	labelHeight = RollingFrame.AbsoluteSize.Y / 3
 end
 local Debounce = false
 
@@ -248,9 +248,8 @@ local function AnimateRoll(finalRace)
 	conn = RunService.RenderStepped:Connect(function(dt)
 		local move = SPEED * dt
 
-		if counter > TOTAL_ROLLS * 0.7 then
-			move = move
-				* (1 - ((counter - (TOTAL_ROLLS * 0.7)) / (TOTAL_ROLLS - (TOTAL_ROLLS * 0.7))))
+		if counter > totalRolls * 0.7 then
+			move = move * (1 - ((counter - (totalRolls * 0.7)) / (totalRolls - (totalRolls * 0.7))))
 			if move < 5 then
 				move = 5
 			end
@@ -260,7 +259,7 @@ local function AnimateRoll(finalRace)
 
 		-- The UIListLayout positions the labels, so only swap the names when the offset passes
 		-- a label height.
-		if offset >= LABEL_HEIGHT then
+		if offset >= labelHeight then
 			offset = 0
 			counter += 1
 
@@ -270,7 +269,7 @@ local function AnimateRoll(finalRace)
 			Labels[2].Text = Labels[1].Text
 			Labels[2].TextColor3 = Labels[1].TextColor3
 
-			if counter < TOTAL_ROLLS then
+			if counter < totalRolls then
 				local newName = r2[math.random(1, #r2)]
 				Labels[1].Text = newName
 				Labels[1].TextColor3 = GetRaceColor(newName)
@@ -280,7 +279,7 @@ local function AnimateRoll(finalRace)
 			end
 		end
 
-		if counter >= TOTAL_ROLLS + 2 then
+		if counter >= totalRolls + 2 then
 			conn:Disconnect()
 
 			Labels[1].TextTransparency = 1

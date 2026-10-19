@@ -1,28 +1,28 @@
 -- SPDX-License-Identifier: MIT
 --
--- The Seer racial passive: highlights every living character within MAX_DISTANCE
+-- The Seer racial passive: highlights every living character within maxDistance
 -- through walls while the local character has the SeerESP attribute.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
-local ESP_COLOR = Color3.fromRGB(121, 11, 255)
+local espColor = Color3.fromRGB(121, 11, 255)
 -- In studs.
-local MAX_DISTANCE = 150
-local HIGHLIGHT_NAME = "SeerHighlight"
+local maxDistance = 150
+local highlightName = "SeerHighlight"
 
 -- The active highlights, so they are not created and destroyed every frame.
 local activeHighlights = {}
 
 local function AddHighlight(targetChar)
-	if targetChar:FindFirstChild(HIGHLIGHT_NAME) then
+	if targetChar:FindFirstChild(highlightName) then
 		return
 	end
 
 	local highlight = Instance.new("Highlight")
-	highlight.Name = HIGHLIGHT_NAME
-	highlight.FillColor = ESP_COLOR
+	highlight.Name = highlightName
+	highlight.FillColor = espColor
 	highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineTransparency = 0
@@ -34,7 +34,7 @@ local function AddHighlight(targetChar)
 end
 
 local function RemoveHighlight(targetChar)
-	local hl = targetChar:FindFirstChild(HIGHLIGHT_NAME)
+	local hl = targetChar:FindFirstChild(highlightName)
 	if hl then
 		hl:Destroy()
 	end
@@ -69,7 +69,7 @@ local function UpdateESP()
 			if targetChar and targetRoot and targetHum and targetHum.Health > 0 then
 				local distance = (myRoot.Position - targetRoot.Position).Magnitude
 
-				if distance <= MAX_DISTANCE then
+				if distance <= maxDistance then
 					if not activeHighlights[targetChar] then
 						AddHighlight(targetChar)
 					end

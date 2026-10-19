@@ -14,28 +14,28 @@ Hitstun is how long a hit victim is frozen. It decides what combos into what.
 
 The recovery of a basic M1 is the per-weapon client cooldown
 (`WeaponConfig[weapon].client.m1.cooldown`, from 0.4 s on the dagger to 1.1 s on the
-greatsword). M1 hitstun is that recovery plus `M1_ADVANTAGE`, with a floor of
-`M1_MIN_HITSTUN`. This keeps the link the same on every light and medium weapon,
+greatsword). M1 hitstun is that recovery plus `m1Advantage`, with a floor of
+`m1MinHitstun`. This keeps the link the same on every light and medium weapon,
 although their speeds are different. Startup and recovery change from weapon to
 weapon. The link does not. This is the same idea as a fast jab and a slow heavy jab
 that both link into the same follow-up.
 
-At `M1_ADVANTAGE = 0.20`, the next M1's startup lands while the victim is still
+At `m1Advantage = 0.20`, the next M1's startup lands while the victim is still
 frozen. A landed M1 is a true combo: the victim cannot walk out or dash out. The only
 escape is a parry, which is allowed during stun (see `_Shared/Block`).
 
-- Raise `M1_ADVANTAGE` to make M1 strings harder to parry out of.
+- Raise `m1Advantage` to make M1 strings harder to parry out of.
 - Lower it, or make it negative, to open the parry window.
 
 Greatsword-family weapons do not get a free M1 chain. Their M1 hitstun
-(`GREATSWORD_M1_HITSTUN`, 1.0 s) is shorter than their 1.1 s recovery, so the second
+(`greatswordM1Hitstun`, 1.0 s) is shorter than their 1.1 s recovery, so the second
 M1 is a read and never guaranteed.
 
 M2 and E are punctuation, not part of the tight M1 rhythm. They use a flat hitstun
-(`M2_HITSTUN`, `E_HITSTUN`) that is generous: landing one reliably leads into M1. A
+(`m2Hitstun`, `eHitstun`) that is generous: landing one reliably leads into M1. A
 burst can escape it. A reactive parry cannot.
 
-During weapon hitstun the victim's WalkSpeed is `HITSTUN_STUNSPEED` (1). The victim
+During weapon hitstun the victim's WalkSpeed is `hitstunStunspeed` (1). The victim
 is almost immobile, so holding S cannot walk them back out of a combo.
 
 ## M2 endlag
@@ -45,8 +45,8 @@ on the result:
 
 | Result | Constant | Purpose |
 |---|---|---|
-| Hit | `M2_ENDLAG_HIT` (0.1 s) | The player earned the cancel. They can chain into M1, E, a skill, or a dash, so M2 works as a combo extender. |
-| Whiff | `M2_ENDLAG_WHIFF` (0.65 s) | Missing a guard break still costs something. Otherwise M2 is a free spam button with no read attached. |
+| Hit | `m2EndlagHit` (0.1 s) | The player earned the cancel. They can chain into M1, E, a skill, or a dash, so M2 works as a combo extender. |
+| Whiff | `m2EndlagWhiff` (0.65 s) | Missing a guard break still costs something. Otherwise M2 is a free spam button with no read attached. |
 
 The endlag does not touch the M2 cooldown (`cfg.postCooldown`, 3 to 7 s). A player
 still cannot chain M2 into another M2. M2 opens a window. It does not become the
@@ -55,14 +55,14 @@ window.
 ## Whiff recovery for M1 and E
 
 M1 and E have one recovery for hit and whiff (the M1 client cooldown and
-`cfg.eRecovery`). `M1E_WHIFF_RECOVERY` adds an extra `CantAnything` lock only when the
+`cfg.eRecovery`). `m1eWhiffRecovery` adds an extra `CantAnything` lock only when the
 swing hit nothing. A landed swing never gets it, so combos keep their timing. Only a
 missed swing costs more.
 
 ## M2 as a combo ender
 
 M2 always works as a standalone heavy attack. When it lands while an M1 combo is open
-(the server's `Combo` counter is at `M2_FINISHER_MIN_COMBO` or higher), it becomes a
+(the server's `Combo` counter is at `m2FinisherMinCombo` or higher), it becomes a
 combo ender: it launches the victim up and back and stuns longer, instead of the plain
 push. The combo ender is the move that cashes in an M1 string. `Combo` is 1-indexed
 and set on the first M1, so 2 means "at least two M1s, and the combo window has not
@@ -76,7 +76,7 @@ to one behavior.
 The uppercut (slide + M1) lifts the attacker and the victim into a short hang. The
 attacker can then follow with an M1 string, E, or M2 while both are in the air.
 
-- The hang is a real hold against gravity for `LAUNCH_WINDOW`, not a one-frame pop.
+- The hang is a real hold against gravity for `launchWindow`, not a one-frame pop.
 - Both fighters get the `Launched` attribute for the hang. With it, M1 uses the
   ground combo in the air instead of the aerial attack.
 - The victim is held in a stun that can be hit. The victim is not ragdolled, because a
@@ -113,16 +113,16 @@ every frame, so a target who turns to face the attacker stops being chased.
 
 A target counts as running away if either test passes:
 
-- Facing: they are turned away from the attacker (`FLEE_FACING_DOT`).
-- Moving: their velocity away from the attacker is at least `FLEE_SPEED_MIN`.
+- Facing: they are turned away from the attacker (`fleeFacingDot`).
+- Moving: their velocity away from the attacker is at least `fleeSpeedMin`.
   Strafing adds nothing.
 
 Backing up while facing the attacker is spacing, not fleeing.
 
-The follow speed is the target's sprint times `CHASE_SPRINT_MULT`, capped at the
+The follow speed is the target's sprint times `chaseSprintMult`, capped at the
 weapon's boost speed. It depends on the target, not on the boost, because a 35-speed
 weapon would otherwise chase at 19 against a 28 sprint, slower than the runner. The
-drive stops within `STOP_DIST` of the target, so the attacker lands next to them
+drive stops within `stopDist` of the target, so the attacker lands next to them
 instead of passing through.
 
 Targeting follows the lock-on: the locked target if there is one (the server checks
@@ -170,8 +170,8 @@ with or without an active buff.
 The server owns the parry cooldown (`ParryService`). Clients keep a local copy only
 for input feel.
 
-- Pressing parry starts the full cooldown (`BASE_COOLDOWN`, 5 s) at once.
-- A landed parry shortens it to `RESET_COOLDOWN` (1 s). This partial reset keeps the
+- Pressing parry starts the full cooldown (`baseCooldown`, 5 s) at once.
+- A landed parry shortens it to `resetCooldown` (1 s). This partial reset keeps the
   exchange going.
 - A whiffed parry is never shortened, so it keeps the full lockout. No whiff
   detection is needed: the lockout is the default, and a landed parry pulls it back.
@@ -237,7 +237,7 @@ rules, chip damage, and frame advantage.
 The guard bar is a character attribute (`GuardBar`), so clients read it with
 `GetAttribute` and never get out of sync with a server-side table. Only
 `GuardBarService` writes it. After a break, the bar starts full and drains to empty over
-`GUARD_RECOVERY_DURATION` (5 s), and the player cannot block until it is empty. A burst
+`guardRecoveryDuration` (5 s), and the player cannot block until it is empty. A burst
 (T) calls `SetStun(char, false)` first, so it also escapes a block-break stun, at the
 normal burst cost.
 
@@ -249,17 +249,17 @@ no-block recovery are the same.
 
 Burst (T) is a universal panic button. `BurstHandler` checks its mana cost and
 cooldown. It works like a stripped Abyssal Scream: about one frame of startup, no
-damage, and no stun. It knocks back and briefly ragdolls everyone in `BURST_RADIUS`,
+damage, and no stun. It knocks back and briefly ragdolls everyone in `burstRadius`,
 so the user gets out of a combo, and it gives the user i-frames (the `Dodging` state,
-which every hit path treats as "negate this hit") for `BURST_ACTIVE`.
+which every hit path treats as "negate this hit") for `burstActive`.
 
 Burst clears the user's stun first, so a player caught in a combo can use it. It also
 escapes a block-break stun.
 
-`BURST_WHIFF_RECOVERY` is a `CantAnything` lock the user always takes. It outlasts the
+`burstWhiffRecovery` is a `CantAnything` lock the user always takes. It outlasts the
 i-frames, so a burst on nothing leaves the user exposed for about a second and open to
-a punish. The user is also rooted: `BURST_ROOT_WHIFF` on a whiff, and the shorter
-`BURST_ROOT_HIT` when the burst catches a target.
+a punish. The user is also rooted: `burstRootWhiff` on a whiff, and the shorter
+`burstRootHit` when the burst catches a target.
 
 Burst has its own handler (`BurstHandler`) instead of a SkillConfig entry in
 `SkillHandler`, for three reasons:

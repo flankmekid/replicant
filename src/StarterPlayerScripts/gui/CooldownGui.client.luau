@@ -15,20 +15,20 @@ local CooldownTracker = require(ReplicatedStorage.modules.CooldownTracker)
 local plr = Players.LocalPlayer
 local playerGui = plr:WaitForChild("PlayerGui")
 
-local BAR_WIDTH = 160
-local BAR_HEIGHT = 30
-local BAR_PADDING = 6
-local CONTAINER_OFFSET_X = -24
-local CONTAINER_OFFSET_Y = -140
-local COLOR_BG = Color3.fromRGB(36, 36, 36)
-local COLOR_FILL = Color3.fromRGB(220, 60, 60)
-local COLOR_TEXT = Color3.fromRGB(230, 230, 230)
-local COLOR_STROKE = Color3.fromRGB(50, 50, 50)
+local barWidth = 160
+local barHeight = 30
+local barPadding = 6
+local containerOffsetX = -24
+local containerOffsetY = -140
+local colorBg = Color3.fromRGB(36, 36, 36)
+local colorFill = Color3.fromRGB(220, 60, 60)
+local colorText = Color3.fromRGB(230, 230, 230)
+local colorStroke = Color3.fromRGB(50, 50, 50)
 local FONT = Enum.Font.RobotoMono
 
-local ENTER_TIME = 0.18
-local EXIT_TIME = 0.18
-local FILL_SMOOTH = 0.1
+local enterTime = 0.18
+local exitTime = 0.18
+local fillSmooth = 0.1
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CooldownGui"
@@ -40,8 +40,8 @@ screenGui.Parent = playerGui
 local container = Instance.new("Frame")
 container.Name = "Container"
 container.AnchorPoint = Vector2.new(1, 1)
-container.Position = UDim2.new(1, CONTAINER_OFFSET_X, 1, CONTAINER_OFFSET_Y)
-container.Size = UDim2.new(0, BAR_WIDTH, 1, 0)
+container.Position = UDim2.new(1, containerOffsetX, 1, containerOffsetY)
+container.Size = UDim2.new(0, barWidth, 1, 0)
 container.BackgroundTransparency = 1
 container.Parent = screenGui
 
@@ -50,7 +50,7 @@ layout.FillDirection = Enum.FillDirection.Vertical
 layout.HorizontalAlignment = Enum.HorizontalAlignment.Right
 layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Padding = UDim.new(0, BAR_PADDING)
+layout.Padding = UDim.new(0, barPadding)
 layout.Parent = container
 
 -- Layout: frames[id] = { root, fill, label, stroke, order, exiting }.
@@ -61,8 +61,8 @@ local seq = 0
 local function makeBar(id)
 	local root = Instance.new("Frame")
 	root.Name = id
-	root.Size = UDim2.new(0, BAR_WIDTH, 0, BAR_HEIGHT)
-	root.BackgroundColor3 = COLOR_BG
+	root.Size = UDim2.new(0, barWidth, 0, barHeight)
+	root.BackgroundColor3 = colorBg
 	root.BackgroundTransparency = 0.4
 	root.BorderSizePixel = 0
 	root.ClipsDescendants = true
@@ -75,7 +75,7 @@ local function makeBar(id)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 1
 	stroke.Transparency = 0.5
-	stroke.Color = COLOR_STROKE
+	stroke.Color = colorStroke
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Parent = root
 
@@ -85,7 +85,7 @@ local function makeBar(id)
 	fill.AnchorPoint = Vector2.new(1, 0)
 	fill.Position = UDim2.new(1, 0, 0, 0)
 	fill.Size = UDim2.new(1, 0, 1, 0)
-	fill.BackgroundColor3 = COLOR_FILL
+	fill.BackgroundColor3 = colorFill
 	fill.BackgroundTransparency = 0.45
 	fill.BorderSizePixel = 0
 	fill.ZIndex = 1
@@ -100,7 +100,7 @@ local function makeBar(id)
 	label.Size = UDim2.new(1, 0, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Font = FONT
-	label.TextColor3 = COLOR_TEXT
+	label.TextColor3 = colorText
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextYAlignment = Enum.TextYAlignment.Center
 	label.TextSize = 15
@@ -112,11 +112,11 @@ local function makeBar(id)
 	stroke.Transparency = 1
 	label.TextTransparency = 1
 	fill.BackgroundTransparency = 1
-	root.Size = UDim2.new(0, BAR_WIDTH, 0, 0)
+	root.Size = UDim2.new(0, barWidth, 0, 0)
 
-	local info = TweenInfo.new(ENTER_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local info = TweenInfo.new(enterTime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	TweenService:Create(root, info, {
-		Size = UDim2.new(0, BAR_WIDTH, 0, BAR_HEIGHT),
+		Size = UDim2.new(0, barWidth, 0, barHeight),
 		BackgroundTransparency = 0.4,
 	}):Play()
 	TweenService:Create(stroke, info, { Transparency = 0.5 }):Play()
@@ -131,9 +131,9 @@ local function exitBar(f)
 		return
 	end
 	f.exiting = true
-	local info = TweenInfo.new(EXIT_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+	local info = TweenInfo.new(exitTime, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	TweenService:Create(f.root, info, {
-		Size = UDim2.new(0, BAR_WIDTH, 0, 0),
+		Size = UDim2.new(0, barWidth, 0, 0),
 		BackgroundTransparency = 1,
 	}):Play()
 	TweenService:Create(f.stroke, info, { Transparency = 1 }):Play()
@@ -172,7 +172,7 @@ RunService.RenderStepped:Connect(function()
 		local target = math.clamp(entry.fraction, 0, 1)
 		TweenService:Create(
 			f.fill,
-			TweenInfo.new(FILL_SMOOTH, Enum.EasingStyle.Linear),
+			TweenInfo.new(fillSmooth, Enum.EasingStyle.Linear),
 			{ Size = UDim2.new(target, 0, 1, 0) }
 		):Play()
 

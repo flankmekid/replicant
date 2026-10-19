@@ -32,11 +32,11 @@ local hitboxParams = {
 local DataManager = require(game.ServerScriptService.modules.dataManager)
 
 local dmg = 12
-local GUARD_BREAK = true
-local WINDUP_DELAY = 0.9
-local AERIAL_WINDUP = 0.4
-local HITBOX_DURATION = 0.2
-local POST_ATTACK_COOLDOWN = 3
+local guardBreak = true
+local windupDelay = 0.9
+local aerialWindup = 0.4
+local hitboxDuration = 0.2
+local postAttackCooldown = 3
 
 local v = {}
 
@@ -116,7 +116,7 @@ function module.ServerCheck(plr)
 		effect2.Parent = char:WaitForChild("Right Leg")
 		effect1.Enabled = true
 		effect2.Enabled = true
-		task.delay(AERIAL_WINDUP, function()
+		task.delay(aerialWindup, function()
 			game:GetService("Debris"):AddItem(effect1, 0.2)
 			game:GetService("Debris"):AddItem(effect2, 0.2)
 		end)
@@ -128,7 +128,7 @@ function module.ServerCheck(plr)
 		effect2.Parent = char:WaitForChild("Right Arm")
 		effect1.Enabled = true
 		effect2.Enabled = true
-		task.delay(WINDUP_DELAY, function()
+		task.delay(windupDelay, function()
 			game:GetService("Debris"):AddItem(effect1, 0.2)
 			game:GetService("Debris"):AddItem(effect2, 0.2)
 		end)
@@ -164,19 +164,19 @@ function module.ServerCheck(plr)
 
 	-- Shackles does not use CombatCore, so it repeats the M2 endlag rule: the long lock
 	-- set here is replaced by a short endlag on a hit or a long one on a whiff.
-	local M2_ENDLAG_HIT = 0.1
-	local M2_ENDLAG_WHIFF = 0.65
+	local m2EndlagHit = 0.1
+	local m2EndlagWhiff = 0.65
 	local didHit = false
 
-	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5)
+	StateHandler.SetState(char, "CantAnything", true, windupDelay + hitboxDuration + 0.5)
 	playerM2Debounces[plr] = true
 
 	-- Every Shackles M2 is a guard break and has armor. A timer clears the attribute, so
 	-- every early return is covered.
-	local hyperArmored = GUARD_BREAK and true or false
+	local hyperArmored = guardBreak and true or false
 	if hyperArmored then
 		char:SetAttribute("HyperArmor", true)
-		task.delay(WINDUP_DELAY + HITBOX_DURATION + 0.3, function()
+		task.delay(windupDelay + hitboxDuration + 0.3, function()
 			if char then
 				char:SetAttribute("HyperArmor", nil)
 			end
@@ -249,7 +249,7 @@ function module.ServerCheck(plr)
 	end)
 
 	if aerial then
-		task.delay(AERIAL_WINDUP, function()
+		task.delay(aerialWindup, function()
 			Helper.ResetSpeed(char)
 		end)
 		task.delay(0.2, function()
@@ -260,11 +260,11 @@ function module.ServerCheck(plr)
 				FolderName = getEquippedTool(),
 			}, char)
 		end)
-		task.wait(AERIAL_WINDUP)
+		task.wait(aerialWindup)
 		leftSwing(char)
 		rightSwing(char)
 	else
-		task.delay(WINDUP_DELAY, function()
+		task.delay(windupDelay, function()
 			Helper.ResetSpeed(char)
 		end)
 		task.delay(0.75, function()
@@ -275,7 +275,7 @@ function module.ServerCheck(plr)
 				FolderName = getEquippedTool(),
 			}, char)
 		end)
-		task.wait(WINDUP_DELAY)
+		task.wait(windupDelay)
 
 		-- A stun or a down during the windup cancels the attack. Armored swings ignore it.
 		if not hyperArmored and StateHandler.IsInterrupted(char) then
@@ -301,7 +301,7 @@ function module.ServerCheck(plr)
 	Hitbox:WeldTo(humrp, CFrame.new(1, -1, -3))
 	Hitbox:Start()
 
-	StateHandler.SetState(char, "M2", true, HITBOX_DURATION)
+	StateHandler.SetState(char, "M2", true, hitboxDuration)
 
 	local alreadyHit = {}
 
@@ -481,7 +481,7 @@ function module.ServerCheck(plr)
 						target = targetChar,
 						attackerHRP = attackerHRP,
 						targetHRP = targetHRP,
-						guardbreak = GUARD_BREAK,
+						guardbreak = guardBreak,
 						attackClass = "M2",
 						dmg = dmg,
 					})
@@ -562,20 +562,20 @@ function module.ServerCheck(plr)
 		end
 	end)
 
-	task.delay(HITBOX_DURATION, function()
+	task.delay(hitboxDuration, function()
 		Hitbox:Destroy()
 		aerial = false
 
 		-- On a hit the player can cancel into M1, E, a skill, or a dash. The M2 cooldown
 		-- still blocks M2 into M2.
-		local endlag = didHit and M2_ENDLAG_HIT or M2_ENDLAG_WHIFF
+		local endlag = didHit and m2EndlagHit or m2EndlagWhiff
 		StateHandler.RemoveStates(char, "CantAnything")
 		if endlag > 0 then
 			StateHandler.SetState(char, "CantAnything", true, endlag)
 		end
 	end)
 
-	task.delay(POST_ATTACK_COOLDOWN, function()
+	task.delay(postAttackCooldown, function()
 		playerM2Debounces[plr] = nil
 	end)
 end

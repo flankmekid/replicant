@@ -63,7 +63,7 @@ function module.SetSpeed(char, speed, optionalPrevSpeed)
 end
 
 -- The base jump height, before the race multiplier.
-local BASE_JUMP_HEIGHT = 7.2
+local baseJumpHeight = 7.2
 
 -- A character's real jump height: base * their race's JumpBoost.
 local function getBaseJumpHeight(char)
@@ -71,7 +71,7 @@ local function getBaseJumpHeight(char)
 	local stats = player and player:FindFirstChild("PlayerStats")
 	local jb = stats and stats:FindFirstChild("JumpBoost")
 	local mult = (jb and jb.Value and jb.Value > 0) and jb.Value or 1
-	return BASE_JUMP_HEIGHT * mult
+	return baseJumpHeight * mult
 end
 
 -- helperModule.ResetSpeed() - end the attack slow and restore the jump height

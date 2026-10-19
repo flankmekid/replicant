@@ -12,12 +12,12 @@ local QuestUpdate = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
 local QuestStateRequest = ReplicatedStorage.QuestSystem:WaitForChild("QuestStateRequest")
 local PickupRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("ShardPickup")
 
-local QUEST_ID = "SidurguErrand"
-local SHARD_PART_NAME = "VoidStoneShard"
+local questId = "SidurguErrand"
+local shardPartName = "VoidStoneShard"
 
-local shardPart = workspace:WaitForChild(SHARD_PART_NAME, 10)
+local shardPart = workspace:WaitForChild(shardPartName, 10)
 if not shardPart then
-	warn(`[VoidShardVisibility] Part {SHARD_PART_NAME} not found in Workspace.`)
+	warn(`[VoidShardVisibility] Part {shardPartName} not found in Workspace.`)
 	return
 end
 
@@ -50,7 +50,7 @@ end
 
 local function checkState()
 	local success, state = pcall(function()
-		return QuestStateRequest:InvokeServer(QUEST_ID)
+		return QuestStateRequest:InvokeServer(questId)
 	end)
 	if not success or not state then
 		return
@@ -60,15 +60,15 @@ end
 
 prompt.Triggered:Connect(function()
 	setVisible(false)
-	PickupRemote:FireServer(QUEST_ID)
+	PickupRemote:FireServer(questId)
 end)
 
 QuestUpdate.OnClientEvent:Connect(function(action, payload)
-	if action == "New" and payload and payload.Id == QUEST_ID then
+	if action == "New" and payload and payload.Id == questId then
 		checkState()
-	elseif action == "Update" and payload and payload.Id == QUEST_ID then
+	elseif action == "Update" and payload and payload.Id == questId then
 		checkState()
-	elseif action == "Complete" and payload and payload.Id == QUEST_ID then
+	elseif action == "Complete" and payload and payload.Id == questId then
 		setVisible(false)
 	elseif action == "ListUpdate" then
 		checkState()

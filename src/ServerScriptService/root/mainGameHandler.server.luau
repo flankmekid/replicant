@@ -20,31 +20,31 @@ local BuffService = require(ServerScriptService.modules:WaitForChild("BuffServic
 local GuardBarService = require(ServerScriptService.modules:WaitForChild("GuardBarService"))
 local SpeedService = require(ServerScriptService.modules:WaitForChild("SpeedService"))
 
-local BASE_WALKSPEED = 16
-local BASE_JUMP_HEIGHT = 7.2
-local BASE_HP = 100
+local baseWalkspeed = 16
+local baseJumpHeight = 7.2
+local baseHp = 100
 
-local EVENTS_FOLDER = ReplicatedStorage:WaitForChild("remotes")
-local SPAWN_EVENT = EVENTS_FOLDER:WaitForChild("SpawnPlayer")
-local CHANGE_WEAPON_EVENT = EVENTS_FOLDER:WaitForChild("ChangeWeapon")
-local BUY_WEAPON_EVENT = EVENTS_FOLDER:WaitForChild("BuyWeapon")
-local BUY_SPELL_EVENT = EVENTS_FOLDER:WaitForChild("BuySpell")
-local ON_DEATH_EVENT = EVENTS_FOLDER:WaitForChild("OnDeath")
-local BUY_ARMOR_EVENT = EVENTS_FOLDER:WaitForChild("BuyArmor")
-local MOVE_ITEM_EVENT = EVENTS_FOLDER:WaitForChild("MoveItem")
-local BUY_ITEM_EVENT = EVENTS_FOLDER:WaitForChild("BuyItem")
-local USE_HOTBAR_EVENT = EVENTS_FOLDER:WaitForChild("UseHotbar")
-local REQUEST_SYNC_EVENT = EVENTS_FOLDER:WaitForChild("RequestSync")
-local RETURN_TO_MENU_EVENT = EVENTS_FOLDER:WaitForChild("ReturnToMenu")
-local STOP_WEAPON_IDLE_EVENT = EVENTS_FOLDER:WaitForChild("StopWeaponIdle")
+local eventsFolder = ReplicatedStorage:WaitForChild("remotes")
+local spawnEvent = eventsFolder:WaitForChild("SpawnPlayer")
+local changeWeaponEvent = eventsFolder:WaitForChild("ChangeWeapon")
+local buyWeaponEvent = eventsFolder:WaitForChild("BuyWeapon")
+local buySpellEvent = eventsFolder:WaitForChild("BuySpell")
+local onDeathEvent = eventsFolder:WaitForChild("OnDeath")
+local buyArmorEvent = eventsFolder:WaitForChild("BuyArmor")
+local moveItemEvent = eventsFolder:WaitForChild("MoveItem")
+local buyItemEvent = eventsFolder:WaitForChild("BuyItem")
+local useHotbarEvent = eventsFolder:WaitForChild("UseHotbar")
+local requestSyncEvent = eventsFolder:WaitForChild("RequestSync")
+local returnToMenuEvent = eventsFolder:WaitForChild("ReturnToMenu")
+local stopWeaponIdleEvent = eventsFolder:WaitForChild("StopWeaponIdle")
 
-local WEAPON_FOLDER = ServerStorage:WaitForChild("Weapons")
-local EQUIPMENT_FOLDER = ServerStorage:WaitForChild("Equipment")
-local MENU_SPAWN_NAME = "MenuSpawn"
-local RACE_SPAWNS_FOLDER_NAME = "raceSpawns"
-local TUTORIAL_SPAWN_LOC = workspace:WaitForChild("tutorialSpawn"):WaitForChild("Spawn")
+local weaponFolder = ServerStorage:WaitForChild("Weapons")
+local equipmentFolder = ServerStorage:WaitForChild("Equipment")
+local menuSpawnName = "MenuSpawn"
+local raceSpawnsFolderName = "raceSpawns"
+local tutorialSpawnLoc = workspace:WaitForChild("tutorialSpawn"):WaitForChild("Spawn")
 
-local SPELLS_LIST = {
+local spellsList = {
 	"Whirlwind",
 	"Abyssal Scream",
 	"Berserker Armor",
@@ -175,7 +175,7 @@ local function applyStats(character)
 		end
 		local vitBonus = StatScaling.GetHPBonus(vitPoints)
 
-		local newMax = (BASE_HP + raceBoost + vitBonus) * armorMult
+		local newMax = (baseHp + raceBoost + vitBonus) * armorMult
 
 		if math.abs(humanoid.MaxHealth - newMax) > 0.1 then
 			local oldMax = humanoid.MaxHealth
@@ -237,7 +237,7 @@ local function applyStats(character)
 		local jumpMult = statsFolder:FindFirstChild("JumpBoost") and statsFolder.JumpBoost.Value
 			or 1
 		humanoid.UseJumpPower = false
-		humanoid.JumpHeight = BASE_JUMP_HEIGHT * jumpMult
+		humanoid.JumpHeight = baseJumpHeight * jumpMult
 	end
 	if statsFolder:FindFirstChild("JumpBoost") then
 		statsFolder.JumpBoost.Changed:Connect(updateJump)
@@ -278,8 +278,8 @@ local function WaitForData(player)
 	return true
 end
 
-local GROUND_CHECK_RAYCAST = RaycastParams.new()
-GROUND_CHECK_RAYCAST.FilterType = Enum.RaycastFilterType.Exclude
+local groundCheckRaycast = RaycastParams.new()
+groundCheckRaycast.FilterType = Enum.RaycastFilterType.Exclude
 
 local function StartPositionTracker(player)
 	task.spawn(function()
@@ -360,7 +360,7 @@ local function SendToGameSpawn(character)
 		end
 	end
 
-	local allSpawnsFolder = workspace:FindFirstChild(RACE_SPAWNS_FOLDER_NAME)
+	local allSpawnsFolder = workspace:FindFirstChild(raceSpawnsFolderName)
 
 	if allSpawnsFolder then
 		local validSpawns = {}
@@ -392,7 +392,7 @@ local function SendToGameSpawn(character)
 			-- TODO: Add a fallback spawn for when no spawn part exists.
 		end
 	else
-		warn(`[mainGameHandler] Folder {RACE_SPAWNS_FOLDER_NAME} is missing in Workspace.`)
+		warn(`[mainGameHandler] Folder {raceSpawnsFolderName} is missing in Workspace.`)
 	end
 end
 
@@ -403,8 +403,8 @@ local function SendToTutorialSpawn(character)
 		return
 	end
 
-	if TUTORIAL_SPAWN_LOC then
-		local targetCF = CFrame.new(TUTORIAL_SPAWN_LOC.Position + Vector3.new(0, 4, 0))
+	if tutorialSpawnLoc then
+		local targetCF = CFrame.new(tutorialSpawnLoc.Position + Vector3.new(0, 4, 0))
 		SafeTeleport(rootPart, targetCF, "TutorialSpawn")
 	else
 		SendToGameSpawn(character)
@@ -441,7 +441,7 @@ local function HandleCharacterLoad(player, character)
 	UpdateArmorStats(player, currentArmor)
 
 	if player:GetAttribute("HasPressedPlay") == false then
-		local menuSpawn = workspace.spawnRoom:FindFirstChild(MENU_SPAWN_NAME)
+		local menuSpawn = workspace.spawnRoom:FindFirstChild(menuSpawnName)
 		if menuSpawn then
 			rootPart.CFrame = CFrame.new(menuSpawn.Position + Vector3.new(0, 3, 0))
 			rootPart.Anchored = true
@@ -537,7 +537,7 @@ local function EquipWeapon(player, weaponName, deleteOld)
 	if not char or not char:FindFirstChild("Humanoid") then
 		return
 	end
-	local weaponTemplate = WEAPON_FOLDER:FindFirstChild(weaponName)
+	local weaponTemplate = weaponFolder:FindFirstChild(weaponName)
 	if not weaponTemplate then
 		return
 	end
@@ -551,8 +551,8 @@ local function EquipWeapon(player, weaponName, deleteOld)
 
 	local function clean(parent)
 		for _, item in pairs(parent:GetChildren()) do
-			if WEAPON_FOLDER:FindFirstChild(item.Name) then
-				if deleteOld or not table.find(SPELLS_LIST, item.Name) then
+			if weaponFolder:FindFirstChild(item.Name) then
+				if deleteOld or not table.find(spellsList, item.Name) then
 					item:Destroy()
 				end
 			end
@@ -660,21 +660,21 @@ Players.PlayerRemoving:Connect(function(player)
 	DataManager.PlayerRemoving(player)
 end)
 
-local MENU_AREA_CENTER = Vector3.new(-3232.061, 6, -1263.206)
+local menuAreaCenter = Vector3.new(-3232.061, 6, -1263.206)
 -- Half the menu area size (164 x 158), with a generous Y.
-local MENU_AREA_HALF_SIZE = Vector3.new(82, 20, 79)
+local menuAreaHalfSize = Vector3.new(82, 20, 79)
 
 local function IsInMenuArea(position)
-	local diff = position - MENU_AREA_CENTER
-	return math.abs(diff.X) <= MENU_AREA_HALF_SIZE.X
-		and math.abs(diff.Y) <= MENU_AREA_HALF_SIZE.Y
-		and math.abs(diff.Z) <= MENU_AREA_HALF_SIZE.Z
+	local diff = position - menuAreaCenter
+	return math.abs(diff.X) <= menuAreaHalfSize.X
+		and math.abs(diff.Y) <= menuAreaHalfSize.Y
+		and math.abs(diff.Z) <= menuAreaHalfSize.Z
 end
 
 -- The players between pressing Play and HasPressedPlay turning true.
 local spawning = {}
 
-SPAWN_EVENT.OnServerEvent:Connect(function(player)
+spawnEvent.OnServerEvent:Connect(function(player)
 	-- Play works only from the menu. In the game it would teleport the player to their
 	-- saved position, out of any fight.
 	if player:GetAttribute("HasPressedPlay") or spawning[player] then
@@ -706,11 +706,11 @@ SPAWN_EVENT.OnServerEvent:Connect(function(player)
 		if savedPos then
 			local rootPart = char:FindFirstChild("HumanoidRootPart")
 			if rootPart then
-				GROUND_CHECK_RAYCAST.FilterDescendantsInstances = { char }
+				groundCheckRaycast.FilterDescendantsInstances = { char }
 				local rayResult = workspace:Raycast(
 					savedPos + Vector3.new(0, 5, 0),
 					Vector3.new(0, -20, 0),
-					GROUND_CHECK_RAYCAST
+					groundCheckRaycast
 				)
 
 				local targetPos
@@ -729,14 +729,14 @@ SPAWN_EVENT.OnServerEvent:Connect(function(player)
 	end
 end)
 
-REQUEST_SYNC_EVENT.OnServerEvent:Connect(function(player)
+requestSyncEvent.OnServerEvent:Connect(function(player)
 	local inv = InventoryManager.GetInventory(player)
 	if inv then
 		inv:Sync()
 	end
 end)
 
-BUY_ARMOR_EVENT.OnServerEvent:Connect(function(player, armorName)
+buyArmorEvent.OnServerEvent:Connect(function(player, armorName)
 	local armorData = ArmorConfig.Armors[armorName]
 	if not armorData then
 		return
@@ -789,7 +789,7 @@ local function cleanupWeaponVisuals(player)
 			lGrip.Part1 = nil
 		end
 	end
-	STOP_WEAPON_IDLE_EVENT:FireClient(player)
+	stopWeaponIdleEvent:FireClient(player)
 end
 
 -- UnequipTools is deferred: the tool returns to the Backpack on a later frame. Wait
@@ -807,7 +807,7 @@ end
 -- The server owns every price, and the client's price argument is ignored. Seed
 -- weapons are free from the tutorial NPCs. A shop reaches only players who skipped
 -- the tutorial, because HasItem blocks a second purchase.
-local WEAPON_PRICES = {
+local weaponPrices = {
 	-- Seed weapons.
 	["Fists"] = 0,
 	["Sword"] = 0,
@@ -832,19 +832,19 @@ local WEAPON_PRICES = {
 -- The family level that unlocks the branch weapons of a family.
 local branchUnlockLevel = 10
 
-BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
+buyWeaponEvent.OnServerEvent:Connect(function(player, weaponName, price)
 	-- A table here would throw inside FindFirstChild.
 	if type(weaponName) ~= "string" then
 		return
 	end
 
-	local weaponTemplate = WEAPON_FOLDER:FindFirstChild(weaponName)
+	local weaponTemplate = weaponFolder:FindFirstChild(weaponName)
 	if not weaponTemplate then
 		return
 	end
 
 	-- A weapon that is not in the table is not for sale.
-	price = WEAPON_PRICES[weaponName]
+	price = weaponPrices[weaponName]
 	if not price then
 		warn(`[mainGameHandler] {player.Name} tried to buy {weaponName}, which has no price.`)
 		return
@@ -945,7 +945,7 @@ end)
 
 -- The server owns every price, and the client's price argument is ignored. An item
 -- that is not in the table is not for sale.
-local ITEM_PRICES = {
+local itemPrices = {
 	-- Free with the Hoss armor, which BuyArmor charges for.
 	["Prayer Beads"] = 0,
 	["Abyssal Helmet"] = 500,
@@ -953,12 +953,12 @@ local ITEM_PRICES = {
 	-- elsewhere.
 }
 
-BUY_ITEM_EVENT.OnServerEvent:Connect(function(player, itemName, price)
+buyItemEvent.OnServerEvent:Connect(function(player, itemName, price)
 	if type(itemName) ~= "string" then
 		return
 	end
 
-	local template = EQUIPMENT_FOLDER:FindFirstChild(itemName)
+	local template = equipmentFolder:FindFirstChild(itemName)
 	if not template then
 		return
 	end
@@ -967,7 +967,7 @@ BUY_ITEM_EVENT.OnServerEvent:Connect(function(player, itemName, price)
 		return
 	end
 
-	price = ITEM_PRICES[itemName]
+	price = itemPrices[itemName]
 	if not price then
 		warn(`[mainGameHandler] {player.Name} tried to buy {itemName}, which has no price.`)
 		return
@@ -991,12 +991,12 @@ end)
 
 -- Skills are priced by slot, the same as the trainer dialogues. The slot is the
 -- skill's index in SkillConfig.WeaponSkills, so a new skill gets a price on its own.
-local SKILL_SLOT_PRICES = { [1] = 1000, [2] = 1500, [3] = 2500 }
+local skillSlotPrices = { [1] = 1000, [2] = 1500, [3] = 2500 }
 
 -- The family mastery level needed for each slot, the same as the trainer.
-local SKILL_SLOT_LEVELS = { [1] = 15, [2] = 20, [3] = 25 }
+local skillSlotLevels = { [1] = 15, [2] = 20, [3] = 25 }
 
-BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
+buySpellEvent.OnServerEvent:Connect(function(player, spellName, price)
 	if type(spellName) ~= "string" then
 		return
 	end
@@ -1028,14 +1028,14 @@ BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
 		return
 	end
 
-	price = SKILL_SLOT_PRICES[slot]
+	price = skillSlotPrices[slot]
 	if not price then
 		return
 	end
 
 	-- The trainer checks the level only on the client, so check it here too.
 	local level = DataManager.GetWeaponLevel(player, family)
-	local required = SKILL_SLOT_LEVELS[slot]
+	local required = skillSlotLevels[slot]
 	if required and level < required then
 		warn(`[mainGameHandler] {player.Name} needs {family} level {required} for {spellName}.`)
 		return
@@ -1054,7 +1054,7 @@ BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
 	end
 end)
 
-CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
+changeWeaponEvent.OnServerEvent:Connect(function(player, weaponName)
 	if type(weaponName) ~= "string" then
 		return
 	end
@@ -1070,7 +1070,7 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 		return
 	end
 
-	local weaponTemplate = WEAPON_FOLDER:FindFirstChild(weaponName)
+	local weaponTemplate = weaponFolder:FindFirstChild(weaponName)
 	if not weaponTemplate then
 		return
 	end
@@ -1107,7 +1107,7 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 	end
 end)
 
-MOVE_ITEM_EVENT.OnServerEvent:Connect(
+moveItemEvent.OnServerEvent:Connect(
 	function(player, itemId, sourceType, sourceIndex, targetType, targetIndex)
 		if
 			typeof(itemId) ~= "string"
@@ -1124,7 +1124,7 @@ MOVE_ITEM_EVENT.OnServerEvent:Connect(
 	end
 )
 
-USE_HOTBAR_EVENT.OnServerEvent:Connect(function(player, slotNumber)
+useHotbarEvent.OnServerEvent:Connect(function(player, slotNumber)
 	if type(slotNumber) ~= "number" or slotNumber < 1 or slotNumber > 9 then
 		return
 	end
@@ -1166,7 +1166,7 @@ USE_HOTBAR_EVENT.OnServerEvent:Connect(function(player, slotNumber)
 	end
 end)
 
-ON_DEATH_EVENT.OnServerEvent:Connect(function(player, char)
+onDeathEvent.OnServerEvent:Connect(function(player, char)
 	if typeof(char) ~= "Instance" or char ~= player.Character then
 		return
 	end
@@ -1190,7 +1190,7 @@ workspace.plrManager.alive.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
-RETURN_TO_MENU_EVENT.OnServerEvent:Connect(function(player)
+returnToMenuEvent.OnServerEvent:Connect(function(player)
 	local combatExpiry = player:GetAttribute("CombatLogExpiry")
 	if combatExpiry and os.clock() < combatExpiry then
 		return
@@ -1216,7 +1216,7 @@ RETURN_TO_MENU_EVENT.OnServerEvent:Connect(function(player)
 	end
 
 	char.Parent = workspace.plrManager.noPVP
-	local menuSpawn = workspace.spawnRoom:FindFirstChild(MENU_SPAWN_NAME)
+	local menuSpawn = workspace.spawnRoom:FindFirstChild(menuSpawnName)
 	if menuSpawn and rootPart then
 		SafeTeleport(
 			rootPart,

@@ -18,24 +18,24 @@ local ParryService = require(ServerScriptService.modules.parryService)
 
 local MobAI = {}
 
-local AGGRO_LEASH_TIME = 8
-local WANDER_WAIT_MIN = 3
-local WANDER_WAIT_MAX = 6
-local UPDATE_RATE = 0.1
-local MOVE_UPDATE_RATE = 0.3
-local LOS_UPDATE_RATE = 0.5
-local SEARCH_DURATION = 10
-local SEARCH_WALK_SPEED_MULT = 0.65
-local DETECTION_FREEZE_TIME = 0.25
+local aggroLeashTime = 8
+local wanderWaitMin = 3
+local wanderWaitMax = 6
+local updateRate = 0.1
+local moveUpdateRate = 0.3
+local losUpdateRate = 0.5
+local searchDuration = 10
+local searchWalkSpeedMult = 0.65
+local detectionFreezeTime = 0.25
 
-local ORBIT_SPEED_MULT = 0.75
-local ORBIT_RANGE_MULT = 1.6
-local FLANK_ANGLE_DEG = 120
-local REPULSION_RADIUS = 5
-local REPULSION_BLEND = 0.35
+local orbitSpeedMult = 0.75
+local orbitRangeMult = 1.6
+local flankAngleDeg = 120
+local repulsionRadius = 5
+local repulsionBlend = 0.35
 
-local MAX_ATTACK_TOKENS = 2
-local TOKEN_OVERLAP_WINDOW = 0.05
+local maxAttackTokens = 2
+local tokenOverlapWindow = 0.05
 
 MobAI.Registry = {}
 
@@ -45,8 +45,8 @@ MobAI.AttackTokens = {}
 local plrManager = workspace:FindFirstChild("plrManager")
 local aliveFolder = plrManager and plrManager:FindFirstChild("alive")
 
-local DETECTION_FX_TEMPLATE = ReplicatedStorage.assets:FindFirstChild("MobDetection")
-local DETECTION_SOUND_TEMPLATE = ReplicatedStorage.assets.sounds:FindFirstChild("MobDetectionSound")
+local detectionFxTemplate = ReplicatedStorage.assets:FindFirstChild("MobDetection")
+local detectionSoundTemplate = ReplicatedStorage.assets.sounds:FindFirstChild("MobDetectionSound")
 
 local CombatCore = require(game.ServerScriptService.root.serverFramework.Combat._Shared.CombatCore)
 
@@ -70,10 +70,10 @@ end
 
 local function claimAttackToken(char)
 	local pool = getTokenPool(char)
-	if pool.count >= MAX_ATTACK_TOKENS then
+	if pool.count >= maxAttackTokens then
 		return false
 	end
-	if pool.count >= 1 and (os.clock() - pool.lastFireTime) < TOKEN_OVERLAP_WINDOW then
+	if pool.count >= 1 and (os.clock() - pool.lastFireTime) < tokenOverlapWindow then
 		return false
 	end
 	pool.count += 1
@@ -115,8 +115,8 @@ local function playDetectionFX(mob)
 
 	local cfg = MobConfig.Mobs[mob.Name]
 
-	if DETECTION_FX_TEMPLATE then
-		local attachTemplate = DETECTION_FX_TEMPLATE:FindFirstChildOfClass("Attachment")
+	if detectionFxTemplate then
+		local attachTemplate = detectionFxTemplate:FindFirstChildOfClass("Attachment")
 		if attachTemplate then
 			local attachClone = attachTemplate:Clone()
 			attachClone.Parent = root
@@ -129,8 +129,8 @@ local function playDetectionFX(mob)
 		end
 	end
 
-	if DETECTION_SOUND_TEMPLATE then
-		local sound = DETECTION_SOUND_TEMPLATE:Clone()
+	if detectionSoundTemplate then
+		local sound = detectionSoundTemplate:Clone()
 		sound.Parent = root
 		local senseRadius = (cfg and cfg.PackSenseRadius or 100)
 		sound.RollOffMaxDistance = senseRadius + 50
@@ -141,7 +141,7 @@ local function playDetectionFX(mob)
 	mob.Model.Humanoid.WalkSpeed = 0
 	mob.Model.Humanoid:MoveTo(root.Position)
 
-	task.delay(DETECTION_FREEZE_TIME, function()
+	task.delay(detectionFreezeTime, function()
 		mob.IsDetecting = false
 		if isAlive(mob.Model) and not mob.Dead then
 			local mobCfg = MobConfig.Mobs[mob.Name]
@@ -282,8 +282,8 @@ local function computeRepulsionVector(mob)
 		end
 		local diff = myPos - otherRoot.Position
 		local dist = diff.Magnitude
-		if dist > 0 and dist < REPULSION_RADIUS then
-			repulsion += diff.Unit * ((REPULSION_RADIUS - dist) / REPULSION_RADIUS)
+		if dist > 0 and dist < repulsionRadius then
+			repulsion += diff.Unit * ((repulsionRadius - dist) / repulsionRadius)
 		end
 	end
 	return repulsion
@@ -295,7 +295,7 @@ local function startLOSCache(mob)
 
 	task.spawn(function()
 		while isAlive(mob.Model) and not mob.Dead do
-			task.wait(LOS_UPDATE_RATE)
+			task.wait(losUpdateRate)
 			if not isAlive(mob.Model) or mob.Dead then
 				break
 			end
@@ -458,7 +458,7 @@ function MobAI.ReceiveAlert(mob, lastKnownPos)
 
 	task.spawn(function()
 		playDetectionFX(mob)
-		task.wait(DETECTION_FREEZE_TIME)
+		task.wait(detectionFreezeTime)
 		if mob.Dead or mob.State == "CHASE" then
 			return
 		end
@@ -468,7 +468,7 @@ function MobAI.ReceiveAlert(mob, lastKnownPos)
 		mob.IsWandering = false
 		local cfg = MobConfig.Mobs[mob.Name]
 		if cfg then
-			mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * SEARCH_WALK_SPEED_MULT
+			mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * searchWalkSpeedMult
 		end
 	end)
 end
@@ -906,7 +906,7 @@ local function handleWander(mob, cfg)
 			if not mob.Animations.Idle.IsPlaying then
 				mob.Animations.Idle:Play()
 			end
-			task.wait(math.random(WANDER_WAIT_MIN, WANDER_WAIT_MAX))
+			task.wait(math.random(wanderWaitMin, wanderWaitMax))
 		end
 		mob.IsWandering = false
 	end)
@@ -1000,7 +1000,7 @@ local function handleSearch(mob, cfg)
 					end
 				end
 			end
-			if lookElapsed >= SEARCH_DURATION then
+			if lookElapsed >= searchDuration then
 				break
 			end
 		end
@@ -1069,7 +1069,7 @@ function MobAI.Update(mob)
 	if mob.IsDetecting then
 		return
 	end
-	if os.clock() - (mob.LastUpdate or 0) < UPDATE_RATE then
+	if os.clock() - (mob.LastUpdate or 0) < updateRate then
 		return
 	end
 	mob.LastUpdate = os.clock()
@@ -1113,7 +1113,7 @@ function MobAI.Update(mob)
 				mob.OrbitDir = (math.random() < 0.5) and 1 or -1
 				task.spawn(function()
 					playDetectionFX(mob)
-					task.wait(DETECTION_FREEZE_TIME)
+					task.wait(detectionFreezeTime)
 					if mob.Dead then
 						return
 					end
@@ -1139,7 +1139,7 @@ function MobAI.Update(mob)
 				mob.OrbitDir = (math.random() < 0.5) and 1 or -1
 				task.spawn(function()
 					playDetectionFX(mob)
-					task.wait(DETECTION_FREEZE_TIME)
+					task.wait(detectionFreezeTime)
 					if mob.Dead then
 						return
 					end
@@ -1187,7 +1187,7 @@ function MobAI.Update(mob)
 		if not target then
 			if not mob.AggroLostTime then
 				mob.AggroLostTime = os.clock()
-			elseif os.clock() - mob.AggroLostTime > AGGRO_LEASH_TIME then
+			elseif os.clock() - mob.AggroLostTime > aggroLeashTime then
 				mob.Target = nil
 				mob.Aggroed = false
 				mob.AggroLostTime = nil
@@ -1195,7 +1195,7 @@ function MobAI.Update(mob)
 					mob.SearchTarget = mob.LastKnownPosition
 					mob.SearchTimer = os.clock()
 					mob.State = "SEARCH"
-					mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * SEARCH_WALK_SPEED_MULT
+					mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * searchWalkSpeedMult
 				else
 					mob.State = cfg.PatrolMode == "WANDER" and "WANDER" or "IDLE"
 					mob.Model.Humanoid:MoveTo(mob.SpawnCFrame.Position)
@@ -1226,7 +1226,7 @@ function MobAI.Update(mob)
 					end)
 				end
 			else
-				if os.clock() - (mob.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+				if os.clock() - (mob.LastMoveUpdate or 0) >= moveUpdateRate then
 					mob.LastMoveUpdate = os.clock()
 					mob.Model.Humanoid:MoveTo(target.PrimaryPart.Position)
 					handleObstacleJumping(mob, target)
@@ -1241,7 +1241,7 @@ function MobAI.Update(mob)
 			end
 			return
 		else
-			if os.clock() - (mob.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+			if os.clock() - (mob.LastMoveUpdate or 0) >= moveUpdateRate then
 				mob.LastMoveUpdate = os.clock()
 				mob.Model.Humanoid:MoveTo(target.PrimaryPart.Position)
 				handleObstacleJumping(mob, target)
@@ -1259,19 +1259,19 @@ function MobAI.Update(mob)
 		end
 
 		local targetRoot = target.PrimaryPart
-		local orbitRadius = cfg.AttackRange * ORBIT_RANGE_MULT
+		local orbitRadius = cfg.AttackRange * orbitRangeMult
 		local attackCooldown = cfg.AttackSpeed + math.random() * (cfg.AttackSpeedVariance or 0)
 		local cooldownReady = (os.clock() - (mob.LastAttack or 0)) >= attackCooldown
 
 		local isFlanking = false
 		if targetRoot then
-			isFlanking = angleFromPlayerFacing(targetRoot, root) > FLANK_ANGLE_DEG
+			isFlanking = angleFromPlayerFacing(targetRoot, root) > flankAngleDeg
 		end
 
 		local repulsion = computeRepulsionVector(mob)
 
 		if dist <= cfg.AttackRange and cooldownReady then
-			mob.Model.Humanoid:MoveTo(root.Position + repulsion * REPULSION_BLEND)
+			mob.Model.Humanoid:MoveTo(root.Position + repulsion * repulsionBlend)
 			if mob.Animations.Walk.IsPlaying then
 				mob.Animations.Walk:Stop()
 			end
@@ -1286,7 +1286,7 @@ function MobAI.Update(mob)
 				task.spawn(handleAttack, mob, target, cfg)
 			end
 		elseif dist <= cfg.AttackRange and not cooldownReady then
-			local holdPos = root.Position + repulsion * REPULSION_BLEND
+			local holdPos = root.Position + repulsion * repulsionBlend
 			mob.Model.Humanoid:MoveTo(holdPos)
 			faceTarget(mob, targetRoot.Position)
 			if mob.Animations.Walk.IsPlaying then
@@ -1300,7 +1300,7 @@ function MobAI.Update(mob)
 			end
 		elseif isFlanking and dist <= orbitRadius * 1.2 and cooldownReady then
 			mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed
-			if os.clock() - (mob.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+			if os.clock() - (mob.LastMoveUpdate or 0) >= moveUpdateRate then
 				mob.LastMoveUpdate = os.clock()
 				mob.Model.Humanoid:MoveTo(targetRoot.Position)
 				handleObstacleJumping(mob, target)
@@ -1317,15 +1317,15 @@ function MobAI.Update(mob)
 			end
 		else
 			local pool = getTokenPool(target)
-			local tokensFull = pool.count >= MAX_ATTACK_TOKENS
+			local tokensFull = pool.count >= maxAttackTokens
 
 			if tokensFull then
-				mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * ORBIT_SPEED_MULT
-				if os.clock() - (mob.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+				mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed * orbitSpeedMult
+				if os.clock() - (mob.LastMoveUpdate or 0) >= moveUpdateRate then
 					mob.LastMoveUpdate = os.clock()
 					local orbitTarget =
 						computeOrbitTarget(targetRoot, root, orbitRadius, mob.OrbitDir or 1)
-					local finalTarget = orbitTarget + repulsion * REPULSION_BLEND
+					local finalTarget = orbitTarget + repulsion * repulsionBlend
 					mob.Model.Humanoid:MoveTo(finalTarget)
 					faceTarget(mob, targetRoot.Position)
 				end
@@ -1338,9 +1338,9 @@ function MobAI.Update(mob)
 				end
 			else
 				mob.Model.Humanoid.WalkSpeed = cfg.WalkSpeed
-				if os.clock() - (mob.LastMoveUpdate or 0) >= MOVE_UPDATE_RATE then
+				if os.clock() - (mob.LastMoveUpdate or 0) >= moveUpdateRate then
 					mob.LastMoveUpdate = os.clock()
-					local advanceTarget = targetRoot.Position + repulsion * REPULSION_BLEND
+					local advanceTarget = targetRoot.Position + repulsion * repulsionBlend
 					mob.Model.Humanoid:MoveTo(advanceTarget)
 					handleObstacleJumping(mob, target)
 				end

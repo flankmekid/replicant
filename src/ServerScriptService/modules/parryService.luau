@@ -8,8 +8,8 @@ local Players = game:GetService("Players")
 local ParryService = {}
 
 -- Every parry press starts the full cooldown. A landed parry shortens it.
-local BASE_COOLDOWN = 5
-local RESET_COOLDOWN = 1
+local baseCooldown = 5
+local resetCooldown = 1
 
 -- The os.clock() time when each player may parry again.
 local nextParryTime = {}
@@ -37,7 +37,7 @@ function ParryService.StartCooldown(plr)
 	if not plr then
 		return
 	end
-	nextParryTime[plr] = os.clock() + BASE_COOLDOWN
+	nextParryTime[plr] = os.clock() + baseCooldown
 end
 
 -- ParryService.ResetParry() - shorten the cooldown after a landed parry
@@ -50,7 +50,7 @@ function ParryService.ResetParry(plr)
 	if not plr then
 		return
 	end
-	local target = os.clock() + RESET_COOLDOWN
+	local target = os.clock() + resetCooldown
 	local current = nextParryTime[plr]
 	if not current or target < current then
 		nextParryTime[plr] = target

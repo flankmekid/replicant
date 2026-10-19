@@ -84,13 +84,13 @@ reconciler is safe to run any number of times.
 
 ## Downed state
 
-A player whose HP would drop to `DOWNED_THRESHOLD_PCT` of max HP or lower goes down
+A player whose HP would drop to `downedThresholdPct` of max HP or lower goes down
 instead of dying. NPCs never go down. `DownedManager` owns the whole life cycle:
 
 - A downed body never gets up on its own. Its ragdoll has no duration and no stun
   timer. Only a revive, an execution, or a carry changes it.
-- The revive timer (`REVIVE_TIMER`, 30 s) stands the player up with
-  `REVIVE_HP_PCT` of max HP. It pauses while the body is carried or being executed.
+- The revive timer (`reviveTimer`, 30 s) stands the player up with
+  `reviveHpPct` of max HP. It pauses while the body is carried or being executed.
 - Hitting a downed body deals no damage but restarts the revive timer, so beating
   on a downed player keeps them down.
 - The body is pinned with SpeedService `PIN` priority, the top of the stack, so no
@@ -149,7 +149,7 @@ Letting go of a ledge is not a climb, so it is checked before the armed check: w
 hanging, the player is Seated, not airborne.
 
 The jump input is buffered like the dash: a press that cannot act (during the climb
-cooldown or a short state block) is retried for `BUFFER_WINDOW` seconds. The climb
+cooldown or a short state block) is retried for `bufferWindow` seconds. The climb
 yields, so `actionRunning` keeps a retry from starting a second climb during the
 first.
 
@@ -159,4 +159,4 @@ a ledge the player tries to fall past, because a ground hold never arms. It neve
 runs while hanging, because a grab check while hanging lets go.
 
 A ledge must be a solid, mostly opaque part with no side thinner than
-`MIN_LEDGE_THICKNESS`. Characters, NPCs, and their gear are never ledges.
+`minLedgeThickness`. Characters, NPCs, and their gear are never ledges.

@@ -23,11 +23,11 @@ local ActiveCarryTracks = {}
 local ActiveCarriedTracks = {}
 local ActiveExecuteTracks = {}
 
-local DOWNED_THRESHOLD_PCT = 0.01
-local REVIVE_TIMER = 30
-local REVIVE_HP_PCT = 0.30
-local EXECUTE_RANGE = 5
-local CARRY_OFFSET = Vector3.new(2, 2, 0)
+local downedThresholdPct = 0.01
+local reviveTimer = 30
+local reviveHpPct = 0.30
+local executeRange = 5
+local carryOffset = Vector3.new(2, 2, 0)
 
 local function StopCarrying(carrierChar, victimChar)
 	if ActiveCarryTracks[carrierChar] then
@@ -170,7 +170,7 @@ function DownedManager.ResetReviveTimer(char)
 	if not data then
 		return
 	end
-	data.Timer = REVIVE_TIMER
+	data.Timer = reviveTimer
 end
 
 -- DownedManager.CheckDownedCondition() - knock a player down instead of killing them
@@ -179,7 +179,7 @@ end
 -- @isInstantKill: true to skip the downed state
 --
 -- Only players go down. A hit that would leave them at or below
--- DOWNED_THRESHOLD_PCT of max HP knocks them down instead.
+-- downedThresholdPct of max HP knocks them down instead.
 --
 -- Return: true if this hit knocked the character down.
 function DownedManager.CheckDownedCondition(char, damage, isInstantKill)
@@ -198,7 +198,7 @@ function DownedManager.CheckDownedCondition(char, damage, isInstantKill)
 
 	local potentialHealth = hum.Health - damage
 	local maxHealth = hum.MaxHealth
-	local threshold = maxHealth * DOWNED_THRESHOLD_PCT
+	local threshold = maxHealth * downedThresholdPct
 
 	if isInstantKill then
 		return false
@@ -242,7 +242,7 @@ function DownedManager.KnockDown(char)
 	pinDown(char)
 
 	DownedData[char] = {
-		Timer = REVIVE_TIMER,
+		Timer = reviveTimer,
 		Carrier = nil,
 		BeingExecuted = false,
 	}
@@ -277,7 +277,7 @@ end
 -- DownedManager.Revive() - stand a downed character back up
 -- @char: the character
 --
--- Restores REVIVE_HP_PCT of max HP. Does nothing to a dead body.
+-- Restores reviveHpPct of max HP. Does nothing to a dead body.
 --
 -- Return: nothing. Yields for one frame.
 function DownedManager.Revive(char)
@@ -307,7 +307,7 @@ function DownedManager.Revive(char)
 		hum.PlatformStand = false
 		hum.AutoRotate = true
 
-		hum.Health = hum.MaxHealth * REVIVE_HP_PCT
+		hum.Health = hum.MaxHealth * reviveHpPct
 
 		-- Roblox ignores GettingUp while PlatformStand is true, so request it again here,
 		-- after PlatformStand is off.
@@ -411,7 +411,7 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 		return
 	end
 	local dist = (executorRoot.Position - victimRoot.Position).Magnitude
-	if dist > EXECUTE_RANGE then
+	if dist > executeRange then
 		return
 	end
 
@@ -516,7 +516,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 			return
 		end
 		local dist = (carrierRoot.Position - victimRoot.Position).Magnitude
-		if dist > EXECUTE_RANGE then
+		if dist > executeRange then
 			return
 		end
 
@@ -581,7 +581,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 			vHum:ChangeState(Enum.HumanoidStateType.Physics)
 		end
 
-		victimRoot.CFrame = carrierRoot.CFrame * CFrame.new(CARRY_OFFSET) * CFrame.Angles(0, 0, 0)
+		victimRoot.CFrame = carrierRoot.CFrame * CFrame.new(carryOffset) * CFrame.Angles(0, 0, 0)
 
 		-- The carrier owns the victim's physics, so the carry does not lag.
 		local carrierPlayer = Players:GetPlayerFromCharacter(carrierChar)
@@ -591,7 +591,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 
 		local carrierAtt = Instance.new("Attachment")
 		carrierAtt.Name = "CarryAtt"
-		carrierAtt.CFrame = CFrame.new(CARRY_OFFSET)
+		carrierAtt.CFrame = CFrame.new(carryOffset)
 		carrierAtt.Parent = carrierRoot
 
 		local victimAtt = Instance.new("Attachment")

@@ -29,9 +29,9 @@ if not ReplicatedStorage:FindFirstChild("BarberEvent") then
 end
 local BarberEvent = ReplicatedStorage.BarberEvent
 
-local PITY_THRESHOLD = 30
-local DYE_COST = 1000
-local FEMALE_TORSO_ID = 48112070
+local pityThreshold = 30
+local dyeCost = 1000
+local femaleTorsoId = 48112070
 local playerPity = {}
 
 local function WaitForData(player)
@@ -51,7 +51,7 @@ local function GetRandomRace(player)
 	local currentPity = DataManager.GetPity(player)
 	local forceLegendary = false
 
-	if currentPity >= PITY_THRESHOLD then
+	if currentPity >= pityThreshold then
 		forceLegendary = true
 	end
 
@@ -268,7 +268,7 @@ local function UpdateCharacterVisuals(player)
 	if appData and appData.Gender == "Female" then
 		local mesh = Instance.new("CharacterMesh")
 		mesh.BodyPart = Enum.BodyPart.Torso
-		mesh.MeshId = FEMALE_TORSO_ID
+		mesh.MeshId = femaleTorsoId
 		mesh.Parent = char
 	end
 
@@ -454,7 +454,7 @@ end
 
 -- RaceConfig Stats key to character attribute name. Any other key is a numeric stat in
 -- PlayerStats, not an attribute.
-local RACE_PASSIVE_ATTRS = {
+local racePassiveAttrs = {
 	Hyperarmor = "Hyperarmor",
 	Lifesteal = "Lifesteal",
 	ESP = "SeerESP",
@@ -468,7 +468,7 @@ local function ApplyRacePassives(char, raceName)
 	local raceInfo = RaceConfig.Races[raceName]
 	local stats = raceInfo and raceInfo.Stats
 
-	for statKey, attrName in pairs(RACE_PASSIVE_ATTRS) do
+	for statKey, attrName in pairs(racePassiveAttrs) do
 		if stats and stats[statKey] then
 			char:SetAttribute(attrName, true)
 		else
@@ -587,8 +587,8 @@ BarberEvent.OnServerEvent:Connect(function(player, action, payload)
 		if typeof(payload) ~= "Color3" then
 			return
 		end
-		if DataManager.GetLiturgy(player) >= DYE_COST then
-			DataManager.RemoveLiturgy(player, DYE_COST)
+		if DataManager.GetLiturgy(player) >= dyeCost then
+			DataManager.RemoveLiturgy(player, dyeCost)
 			DataManager.SetArmorColor(player, payload)
 			UpdateCharacterVisuals(player)
 		end

@@ -19,7 +19,7 @@ local yesButton = prompt:WaitForChild("Buttons"):WaitForChild("Yes")
 local noButton = prompt:WaitForChild("Buttons"):WaitForChild("No")
 local closeButton = panel:WaitForChild("Close")
 
-local BG_TRANSPARENCY = 0.35
+local bgTransparency = 0.35
 
 local function wireHover(button)
 	button.MouseEnter:Connect(function()
@@ -27,7 +27,7 @@ local function wireHover(button)
 	end)
 	button.MouseLeave:Connect(function()
 		TweenService
-			:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = BG_TRANSPARENCY })
+			:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = bgTransparency })
 			:Play()
 	end)
 end

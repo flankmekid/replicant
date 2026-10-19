@@ -123,7 +123,7 @@ function module.GetStateAttr(char, stateKey: string)
 end
 
 -- The states in which another system owns the HumanoidRootPart.
-local ROOT_OWNED_STATES = {
+local rootOwnedStates = {
 	"Downed",
 	"Ragdolled",
 	"Carried",
@@ -147,7 +147,7 @@ function module.IsRootOwned(char, ignoreRagdoll)
 	if not char then
 		return false
 	end
-	for _, key in ipairs(ROOT_OWNED_STATES) do
+	for _, key in ipairs(rootOwnedStates) do
 		if ignoreRagdoll and key == "Ragdolled" then
 			continue
 		end

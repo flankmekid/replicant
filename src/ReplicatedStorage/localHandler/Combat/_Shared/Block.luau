@@ -17,7 +17,7 @@ local ParryCooldownClient = require(RP.modules.ParryCooldownClient)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 
 -- The delay before the next block, in seconds, so block is not spammable.
-local BLOCK_COOLDOWN = 0.35
+local blockCooldown = 0.35
 
 local isBlocking = false
 local nextBlockTime = 0
@@ -167,7 +167,7 @@ function module.Release()
 	local cfg = weapon and WeaponConfig[weapon]
 
 	if isBlocking then
-		nextBlockTime = os.clock() + BLOCK_COOLDOWN
+		nextBlockTime = os.clock() + blockCooldown
 		local anim = cfg and cfg.client.block.blockAnim
 		animationHndlr.StopAnim(char, "Blocking", anim)
 		ServerRemote:FireServer({

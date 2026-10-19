@@ -2,7 +2,7 @@
 --
 -- Shows the sheath of the equipped weapon on the character. Only tools in
 -- ServerStorage.Weapons count, so equipping a spell or a quest item keeps the current
--- sheath. To give a weapon a sheath, add it to SHEATH_MAP.
+-- sheath. To give a weapon a sheath, add it to sheathMap.
 
 local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
@@ -10,27 +10,27 @@ local assets = game:GetService("ReplicatedStorage"):WaitForChild("assets")
 
 -- Tool name to sheath model name in ReplicatedStorage.assets. Equipping a weapon
 -- without an entry removes the sheath and adds nothing.
-local SHEATH_MAP = {
+local sheathMap = {
 	["Katana"] = "Sheath",
 	["Vermillion"] = "SheathKensei",
 }
 
 -- Every weapon name in ServerStorage.Weapons.
-local WEAPON_NAMES = {}
+local weaponNames = {}
 local weaponsFolder = ServerStorage:WaitForChild("Weapons")
 for _, tool in ipairs(weaponsFolder:GetChildren()) do
-	WEAPON_NAMES[tool.Name] = true
+	weaponNames[tool.Name] = true
 end
 
 -- Every sheath model name, for cleanup.
-local ALL_SHEATH_NAMES = {}
-for _, assetName in pairs(SHEATH_MAP) do
-	ALL_SHEATH_NAMES[assetName] = true
+local allSheathNames = {}
+for _, assetName in pairs(sheathMap) do
+	allSheathNames[assetName] = true
 end
 
 local function removeSheath(char)
 	for _, child in ipairs(char:GetChildren()) do
-		if ALL_SHEATH_NAMES[child.Name] then
+		if allSheathNames[child.Name] then
 			child:Destroy()
 		end
 	end
@@ -61,7 +61,7 @@ end
 
 local function onWeaponEquipped(char, tool)
 	removeSheath(char)
-	local assetName = SHEATH_MAP[tool.Name]
+	local assetName = sheathMap[tool.Name]
 	if assetName then
 		attachSheath(char, assetName)
 	end
@@ -74,7 +74,7 @@ local function watchCharacter(char)
 		if not child:IsA("Tool") then
 			return
 		end
-		if not WEAPON_NAMES[child.Name] then
+		if not weaponNames[child.Name] then
 			return
 		end
 		onWeaponEquipped(char, child)

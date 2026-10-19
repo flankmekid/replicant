@@ -31,58 +31,58 @@ local DashConfig = require(RP.modules.DashConfig)
 -- A landed M2 has a short recovery, so the player can cancel into M1, E, a skill, or a
 -- dash. A whiff has a long recovery, so M2 is not free to spam. The M2 cooldown
 -- (cfg.postCooldown) is separate, so M2 still cannot chain into another M2.
-local M2_ENDLAG_HIT = 0.1
-local M2_ENDLAG_WHIFF = 0.65
+local m2EndlagHit = 0.1
+local m2EndlagWhiff = 0.65
 
 -- An extra lock after an M1 or E that hit nothing, so a missed swing can be punished.
 -- A landed swing skips it, so combos keep their timing.
-local M1E_WHIFF_RECOVERY = 0.2
+local m1eWhiffRecovery = 0.2
 
 -- Hitstun decides what combos into what. A combo is true when the victim's hitstun
 -- outlasts the attacker's recovery. It is a read (parryable) when the victim recovers
 -- around the time the next hitbox is live. All values are in seconds.
 --
--- M1 hitstun is the weapon's M1 cooldown plus M1_ADVANTAGE, so light and medium weapons
+-- M1 hitstun is the weapon's M1 cooldown plus m1Advantage, so light and medium weapons
 -- all link the same way at different speeds. At 0.20, a landed M1 string can only be
 -- escaped with a parry, which is allowed during stun. M2 and E use flat values, so
 -- landing one reliably leads into M1.
-local M1_ADVANTAGE = 0.20
+local m1Advantage = 0.20
 -- A floor so fast weapons still stun.
-local M1_MIN_HITSTUN = 0.45
+local m1MinHitstun = 0.45
 -- Greatsword-family M1s stun for less than their recovery, so a second M1 is a read.
-local GREATSWORD_M1_HITSTUN = 1.0
-local M2_HITSTUN = 1.10
-local E_HITSTUN = 1.00
+local greatswordM1Hitstun = 1.0
+local m2Hitstun = 1.10
+local eHitstun = 1.00
 -- WalkSpeed during weapon hitstun. It is low so that walking backward cannot escape.
-local HITSTUN_STUNSPEED = 1
+local hitstunStunspeed = 1
 
 -- Returns the hitstun in seconds for a landed hit of the given action.
 local function computeHitstun(action, weaponName)
 	if action == "M2" then
-		return M2_HITSTUN
+		return m2Hitstun
 	elseif action == "E" then
-		return E_HITSTUN
+		return eHitstun
 	end
 	local wc = weaponName and WeaponConfig[weaponName]
 	if wc and wc.family == "Greatsword" then
-		return GREATSWORD_M1_HITSTUN
+		return greatswordM1Hitstun
 	end
 	local recovery = (wc and wc.client and wc.client.m1 and wc.client.m1.cooldown) or 0.5
-	return math.max(recovery + M1_ADVANTAGE, M1_MIN_HITSTUN)
+	return math.max(recovery + m1Advantage, m1MinHitstun)
 end
 
 -- An M2 that lands while an M1 combo is open is a combo ender. It launches the victim
 -- up and away and stuns longer. Combo is 1-indexed, so 2 means at least two M1s.
-local M2_FINISHER_MIN_COMBO = 2
-local M2_FINISHER_LAUNCH_UP = 40
-local M2_FINISHER_LAUNCH_BACK = 20
-local M2_FINISHER_STUN = 1.2
+local m2FinisherMinCombo = 2
+local m2FinisherLaunchUp = 40
+local m2FinisherLaunchBack = 20
+local m2FinisherStun = 1.2
 
 -- The uppercut (slide + M1) lifts the attacker and the victim into a short hang, so the
 -- attacker can follow up in the air. Both get the Launched attribute for the hang, and
 -- RunM1 then uses the ground combo instead of the aerial attack. The victim is stunned
 -- and not ragdolled, because a ragdoll falls out of hitboxes.
-local LAUNCH_WINDOW = WeaponConfig.Uppercut.HangWindow
+local launchWindow = WeaponConfig.Uppercut.HangWindow
 
 local comboResetTime = 5
 local comboResetTasks = {}
@@ -166,12 +166,12 @@ end
 
 -- Hitstop freezes the animations of both fighters on every client and locks the
 -- victim's movement on the server for the freeze. The animation freeze is cosmetic.
-local HITSTOP_DEFAULT = 0.12
+local hitstopDefault = 0.12
 -- The jump and rotation values of each victim in hitstop, restored when it ends.
 local hitstopLocks = setmetatable({}, { __mode = "k" })
 
 local function applyHitstop(plr, attackerChar, targetChar, action, duration)
-	duration = duration or HITSTOP_DEFAULT
+	duration = duration or hitstopDefault
 
 	ReplicateRemote:FireAllClients({
 		Type = "Combat",
@@ -305,23 +305,23 @@ local function makeM2Knockback(isFinisher)
 			local lookVec = attackerHRP.CFrame.LookVector
 			floatUp(
 				targetChar,
-				M2_FINISHER_LAUNCH_UP,
-				M2_FINISHER_LAUNCH_UP * 0.4,
-				M2_FINISHER_LAUNCH_BACK,
+				m2FinisherLaunchUp,
+				m2FinisherLaunchUp * 0.4,
+				m2FinisherLaunchBack,
 				lookVec,
 				0.6
 			)
-			StateHandler.SetStun(targetChar, true, M2_FINISHER_STUN, HITSTUN_STUNSPEED)
+			StateHandler.SetStun(targetChar, true, m2FinisherStun, hitstunStunspeed)
 		else
 			Helper.ApplyKnockback(targetChar, direction, knockbackDistance, 0.2)
-			StateHandler.SetStun(targetChar, true, M2_HITSTUN, HITSTUN_STUNSPEED)
+			StateHandler.SetStun(targetChar, true, m2Hitstun, hitstunStunspeed)
 		end
 	end
 end
 
 local function eKnockback(char, targetChar, targetHRP, attackerHRP, direction, knockbackDistance)
 	Helper.ApplyKnockback(targetChar, direction, knockbackDistance * 2, 0.2)
-	StateHandler.SetStun(targetChar, true, E_HITSTUN, HITSTUN_STUNSPEED)
+	StateHandler.SetStun(targetChar, true, eHitstun, hitstunStunspeed)
 end
 
 -- The action argument is the replication tag: "M1", "M2", or "E". The ctx table holds
@@ -601,9 +601,9 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 						-- doAttack, because a block must not land the full weapon hitstun or give
 						-- the attacker mana and XP. A nil damage type is true damage, because
 						-- chipDamage is already final.
-						local BLOCK_STUN = 0.18
+						local blockStun = 0.18
 						-- The blocker can still move a little, unlike in a real hitstun.
-						local BLOCK_STUN_SPEED = 8
+						local blockStunSpeed = 8
 						BlockResolver.OnAttackerLandedHit(char)
 						local direction = (targetHRP.Position - attackerHRP.Position).Unit
 						Helper.ApplyKnockback(targetChar, direction, verdict.knockback, 0.2)
@@ -615,11 +615,11 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 								0,
 								false,
 								nil,
-								BLOCK_STUN,
-								BLOCK_STUN_SPEED
+								blockStun,
+								blockStunSpeed
 							)
 						else
-							StateHandler.SetStun(targetChar, true, BLOCK_STUN, BLOCK_STUN_SPEED)
+							StateHandler.SetStun(targetChar, true, blockStun, blockStunSpeed)
 						end
 						ReplicateRemote:FireAllClients({
 							Type = "Combat",
@@ -681,7 +681,7 @@ function module.RunM1(plr, cfg, opts)
 	local dmg = cfg.dmg
 	local guardbreak = cfg.guardbreak
 	local windupDelay = cfg.windup
-	local MAX_COMBO = cfg.maxCombo
+	local maxCombo = cfg.maxCombo
 
 	local Combo = StateHandler.GetState(char, "Combo")
 
@@ -766,7 +766,7 @@ function module.RunM1(plr, cfg, opts)
 	if type(Combo) ~= "number" then
 		nextCombo = 1
 	else
-		nextCombo = (Combo % MAX_COMBO) + 1
+		nextCombo = (Combo % maxCombo) + 1
 	end
 	StateHandler.SetState(char, "Combo", nextCombo)
 
@@ -900,17 +900,17 @@ function module.RunM1(plr, cfg, opts)
 				juggleFloat(thrp, apex, UC.HangWindow, UC.Responsiveness)
 			end
 			ktargetChar:SetAttribute("Launched", true)
-			task.delay(LAUNCH_WINDOW, function()
+			task.delay(launchWindow, function()
 				if ktargetChar then
 					ktargetChar:SetAttribute("Launched", nil)
 				end
 			end)
-			StateHandler.SetStun(ktargetChar, true, LAUNCH_WINDOW, HITSTUN_STUNSPEED)
+			StateHandler.SetStun(ktargetChar, true, launchWindow, hitstunStunspeed)
 
 			-- This runs only on a connect. The attacker gets Launched so the follow-up reads as
 			-- the ground combo, and the attacker's own client performs the rise.
 			kchar:SetAttribute("Launched", true)
-			task.delay(LAUNCH_WINDOW, function()
+			task.delay(launchWindow, function()
 				if kchar then
 					kchar:SetAttribute("Launched", nil)
 				end
@@ -921,12 +921,12 @@ function module.RunM1(plr, cfg, opts)
 				Func = "UppercutRise",
 				FolderName = getEquippedTool(plr),
 			}, kchar)
-		elseif StateHandler.GetState(kchar, "Combo") == MAX_COMBO then
+		elseif StateHandler.GetState(kchar, "Combo") == maxCombo then
 			Helper.ApplyKnockback(ktargetChar, direction, knockbackDistance * 2, 0.2)
-			StateHandler.SetStun(ktargetChar, true, 0.5, HITSTUN_STUNSPEED)
+			StateHandler.SetStun(ktargetChar, true, 0.5, hitstunStunspeed)
 		else
 			Helper.ApplyKnockback(ktargetChar, direction, knockbackDistance, 0.2)
-			StateHandler.SetStun(ktargetChar, true, m1Hitstun, HITSTUN_STUNSPEED)
+			StateHandler.SetStun(ktargetChar, true, m1Hitstun, hitstunStunspeed)
 		end
 	end
 
@@ -947,7 +947,7 @@ function module.RunM1(plr, cfg, opts)
 		StateHandler.RemoveStates(char, "Active")
 		StateHandler.SetState(char, "Recovery", true, 0.25)
 		if not token.didHit then
-			StateHandler.SetState(char, "CantAnything", true, M1E_WHIFF_RECOVERY)
+			StateHandler.SetState(char, "CantAnything", true, m1eWhiffRecovery)
 		end
 		-- Release the slow 0.2 seconds after the 0.25-second recovery. Running attacks never
 		-- took the slow.
@@ -981,8 +981,8 @@ function module.RunM2(plr, cfg, opts)
 	end
 
 	local WINDUP_DELAY = cfg.windup
-	local HITBOX_DURATION = cfg.hitboxDuration or 0.2
-	local POST_COOLDOWN = cfg.postCooldown or 3
+	local hitboxDuration = cfg.hitboxDuration or 0.2
+	local postCooldown = cfg.postCooldown or 3
 
 	local isBusy = false
 	if activeAttacks[char] then
@@ -1014,7 +1014,7 @@ function module.RunM2(plr, cfg, opts)
 
 	-- Decide once, before the swing starts, whether this M2 is a combo ender.
 	local comboNow = StateHandler.GetState(char, "Combo")
-	local isFinisher = (type(comboNow) == "number" and comboNow >= M2_FINISHER_MIN_COMBO)
+	local isFinisher = (type(comboNow) == "number" and comboNow >= m2FinisherMinCombo)
 	local m2Knockback = makeM2Knockback(isFinisher)
 
 	local token = { cancelled = false, hitboxStart = nil, action = "M2" }
@@ -1030,7 +1030,7 @@ function module.RunM2(plr, cfg, opts)
 		char:SetAttribute("HyperArmor", true)
 	end
 
-	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5)
+	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + hitboxDuration + 0.5)
 	StateHandler.SetState(char, "Windup", true, WINDUP_DELAY + 0.2)
 
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
@@ -1130,14 +1130,14 @@ function module.RunM2(plr, cfg, opts)
 		end
 		AnimationHandler.StopAnim(char, "ALL")
 		finish()
-		task.delay(POST_COOLDOWN, function()
+		task.delay(postCooldown, function()
 			playerM2Debounces[plr] = nil
 		end)
 		return
 	end
 
 	StateHandler.RemoveStates(char, "Windup")
-	StateHandler.SetState(char, "Active", true, HITBOX_DURATION + 0.1)
+	StateHandler.SetState(char, "Active", true, hitboxDuration + 0.1)
 	token.hitboxStart = os.clock()
 
 	if opts.swingM2 then
@@ -1160,7 +1160,7 @@ function module.RunM2(plr, cfg, opts)
 	Hitbox:WeldTo(humrp, cfg.hitboxOffset)
 	Hitbox:Start()
 
-	StateHandler.SetState(char, "M2", true, HITBOX_DURATION)
+	StateHandler.SetState(char, "M2", true, hitboxDuration)
 
 	resolveHit(plr, char, Hitbox, "M2", {
 		dmg = cfg.dmg,
@@ -1175,11 +1175,11 @@ function module.RunM2(plr, cfg, opts)
 
 	-- Replace the long lock from the start of the swing with the endlag for a hit or a
 	-- whiff.
-	task.delay(HITBOX_DURATION, function()
+	task.delay(hitboxDuration, function()
 		Hitbox:Destroy()
 		StateHandler.RemoveStates(char, "Active")
 
-		local endlag = token.didHit and M2_ENDLAG_HIT or M2_ENDLAG_WHIFF
+		local endlag = token.didHit and m2EndlagHit or m2EndlagWhiff
 
 		-- RemoveStates cancels the original timer, so the old lock cannot expire on top of
 		-- this one.
@@ -1192,7 +1192,7 @@ function module.RunM2(plr, cfg, opts)
 		finish()
 	end)
 
-	task.delay(POST_COOLDOWN, function()
+	task.delay(postCooldown, function()
 		playerM2Debounces[plr] = nil
 	end)
 end
@@ -1341,15 +1341,15 @@ function module.RunE(plr, cfg, opts)
 
 	-- RunM1 declines input until finish() releases activeAttacks, so this delay must match
 	-- the lock above. Heavy weapons set a longer eRecovery in WeaponConfig.
-	local E_RECOVERY = cfg.eRecovery or 0.1
+	local eRecovery = cfg.eRecovery or 0.1
 
-	task.delay(E_RECOVERY, function()
+	task.delay(eRecovery, function()
 		Hitbox:Destroy()
 		setTrail(char, cfg.trailBlade, false)
 		StateHandler.RemoveStates(char, "Active")
 		StateHandler.SetState(char, "Recovery", true, 0.25)
 		if not token.didHit then
-			StateHandler.SetState(char, "CantAnything", true, M1E_WHIFF_RECOVERY)
+			StateHandler.SetState(char, "CantAnything", true, m1eWhiffRecovery)
 		end
 		finish()
 	end)

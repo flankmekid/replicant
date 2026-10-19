@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: MIT
 --
--- Adds a cooldown between jumps by disabling the Jumping state for JUMP_COOLDOWN
+-- Adds a cooldown between jumps by disabling the Jumping state for jumpCooldown
 -- seconds after each jump.
 
 local RunService = game:GetService("RunService")
@@ -10,7 +10,7 @@ local character = script.Parent
 local humanoid = character:WaitForChild("Humanoid")
 
 -- Seconds between jumps.
-local JUMP_COOLDOWN = 0.65
+local jumpCooldown = 0.65
 
 local lastJumpTime = 0
 
@@ -23,7 +23,7 @@ end)
 RunService.Heartbeat:Connect(function()
 	local timeSinceJump = tick() - lastJumpTime
 
-	if timeSinceJump < JUMP_COOLDOWN then
+	if timeSinceJump < jumpCooldown then
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 	else
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)

@@ -12,36 +12,36 @@ local DashConfig = require(ReplicatedStorage.modules.DashConfig)
 
 local LungeService = {}
 
-local TARGET_FOLDER = Workspace:WaitForChild("plrManager"):WaitForChild("alive")
+local targetFolder = Workspace:WaitForChild("plrManager"):WaitForChild("alive")
 
 -- The lock-on reaches 100 studs, but a lunge across 100 studs is a teleport.
-local MAX_ACQUIRE_DIST = 60
+local maxAcquireDist = 60
 -- How far off the attacker's facing, in degrees, a target can be without a lock-on.
-local ACQUIRE_CONE_DEG = 60
+local acquireConeDeg = 60
 
 -- The boost length comes from the M1Lunge entry in DashConfig. The fallback matters only
 -- if M1Lunge is disabled, and then CombatCore never calls Start.
-local _, BOOST_TIME = DashConfig.Get("M1Lunge")
-BOOST_TIME = BOOST_TIME or 0.3
+local _, boostTime = DashConfig.Get("M1Lunge")
+boostTime = boostTime or 0.3
 
 -- The target's lookVector dotted with the direction to the attacker. Below this, they
 -- are turned away.
-local FLEE_FACING_DOT = -0.15
+local fleeFacingDot = -0.15
 -- Speed away from the attacker, in studs per second, that counts as fleeing. Filters
 -- out strafing and jitter.
-local FLEE_SPEED_MIN = 8
+local fleeSpeedMin = 8
 
--- The same multiplier as Movement.Running: sprint = WalkSpeed * SPRINT_MULT.
-local SPRINT_MULT = 1.75
-local BASE_SPRINT = 16 * SPRINT_MULT
+-- The same multiplier as Movement.Running: sprint = WalkSpeed * sprintMult.
+local sprintMult = 1.75
+local baseSprint = 16 * sprintMult
 -- How much faster than the target's sprint the chase closes.
-local CHASE_SPRINT_MULT = 1.35
+local chaseSprintMult = 1.35
 -- Steering in degrees per second. High makes a homing missile, low is easy to juke.
-local MAX_TURN_RATE_DEG = 280
+local maxTurnRateDeg = 280
 -- Stop driving inside this distance, so the attacker lands next to the target.
-local STOP_DIST = 5
+local stopDist = 5
 -- Below this distance the flat vector is degenerate and .Unit returns NaN.
-local MIN_FLAT_DIST = 1.5
+local minFlatDist = 1.5
 
 -- The same rules as LockOn.isValidTarget.
 local function isValidTarget(enemy, attacker)
@@ -85,7 +85,7 @@ end
 local function flatDir(fromPos, toPos)
 	local d = Vector3.new(toPos.X - fromPos.X, 0, toPos.Z - fromPos.Z)
 	local mag = d.Magnitude
-	if mag < MIN_FLAT_DIST then
+	if mag < minFlatDist then
 		return nil, nil
 	end
 	local u = d.Unit
@@ -105,7 +105,7 @@ local function isFleeing(target, myRoot)
 
 	local toUs =
 		Vector3.new(myRoot.Position.X - tRoot.Position.X, 0, myRoot.Position.Z - tRoot.Position.Z)
-	if toUs.Magnitude < MIN_FLAT_DIST then
+	if toUs.Magnitude < minFlatDist then
 		return false
 	end
 	toUs = toUs.Unit
@@ -118,7 +118,7 @@ local function isFleeing(target, myRoot)
 	if flatLook.Magnitude > 0.01 then
 		flatLook = flatLook.Unit
 		-- Near +1 means looking straight at us. Negative means turned away.
-		if flatLook:Dot(toUs) < FLEE_FACING_DOT then
+		if flatLook:Dot(toUs) < fleeFacingDot then
 			return true
 		end
 	end
@@ -127,7 +127,7 @@ local function isFleeing(target, myRoot)
 	local vel = tRoot.AssemblyLinearVelocity
 	local flatVel = Vector3.new(vel.X, 0, vel.Z)
 	local awaySpeed = flatVel:Dot(-toUs)
-	if awaySpeed >= FLEE_SPEED_MIN then
+	if awaySpeed >= fleeSpeedMin then
 		return true
 	end
 
@@ -140,7 +140,7 @@ local function getLockedTarget(char)
 		return nil
 	end
 
-	local enemy = TARGET_FOLDER:FindFirstChild(name)
+	local enemy = targetFolder:FindFirstChild(name)
 	if not enemy or not enemy:IsA("Model") then
 		return nil
 	end
@@ -154,7 +154,7 @@ local function getLockedTarget(char)
 	end
 
 	-- A forged attribute that names someone across the map gets nothing.
-	if (enemy.HumanoidRootPart.Position - myRoot.Position).Magnitude > MAX_ACQUIRE_DIST then
+	if (enemy.HumanoidRootPart.Position - myRoot.Position).Magnitude > maxAcquireDist then
 		return nil
 	end
 
@@ -175,13 +175,13 @@ local function getConeTarget(char)
 	end
 	flatFacing = flatFacing.Unit
 
-	local cosLimit = math.cos(math.rad(ACQUIRE_CONE_DEG))
+	local cosLimit = math.cos(math.rad(acquireConeDeg))
 	local best, bestDist = nil, math.huge
 
-	for _, enemy in ipairs(TARGET_FOLDER:GetChildren()) do
+	for _, enemy in ipairs(targetFolder:GetChildren()) do
 		if enemy:IsA("Model") and isValidTarget(enemy, char) then
 			local dir, dist = flatDir(myPos, enemy.HumanoidRootPart.Position)
-			if dir and dist and dist <= MAX_ACQUIRE_DIST then
+			if dir and dist and dist <= maxAcquireDist then
 				if flatFacing:Dot(dir) >= cosLimit and dist < bestDist then
 					bestDist = dist
 					best = enemy
@@ -232,7 +232,7 @@ end
 -- @speed: the boost velocity, from DashConfig
 -- @chaseUntil: how long the drive may last if a chase engages. Pass windupDelay plus
 --              lungeWait so the chase covers the whole animation. Without a chase, the
---              drive ends at BOOST_TIME.
+--              drive ends at boostTime.
 -- @token: CombatCore's attack token. A parry or a stun ends the lunge.
 --
 -- Return: nothing.
@@ -305,8 +305,8 @@ function LungeService.Start(char, speed, chaseUntil, token)
 				chasing = isFleeing(target, root)
 			end
 
-			-- The drive ends at BOOST_TIME unless a chase is engaged.
-			local limit = chasing and math.max(BOOST_TIME, chaseUntil) or BOOST_TIME
+			-- The drive ends at boostTime unless a chase is engaged.
+			local limit = chasing and math.max(boostTime, chaseUntil) or boostTime
 			if elapsed >= limit then
 				stop()
 				return
@@ -320,23 +320,23 @@ function LungeService.Start(char, speed, chaseUntil, token)
 					local desired, dist = flatDir(root.Position, tRoot.Position)
 					if desired and dist then
 						-- Stop when close, so the lunge lands on the target, not through them.
-						if dist <= STOP_DIST then
+						if dist <= stopDist then
 							stop()
 							return
 						end
 
-						currentDir = steer(currentDir, desired, math.rad(MAX_TURN_RATE_DEG) * dt)
+						currentDir = steer(currentDir, desired, math.rad(maxTurnRateDeg) * dt)
 					end
 
 					-- After the burst, follow at a speed based on the target's sprint, so it works
 					-- the same for every weapon and adapts to a fast target.
-					if elapsed > BOOST_TIME then
+					if elapsed > boostTime then
 						local tHum = target:FindFirstChild("Humanoid")
-						local theirSprint = BASE_SPRINT
+						local theirSprint = baseSprint
 						if tHum and tHum.WalkSpeed > 0 then
-							theirSprint = tHum.WalkSpeed * SPRINT_MULT
+							theirSprint = tHum.WalkSpeed * sprintMult
 						end
-						spd = math.min(speed, theirSprint * CHASE_SPRINT_MULT)
+						spd = math.min(speed, theirSprint * chaseSprintMult)
 					end
 				end
 			end

@@ -31,8 +31,8 @@ local inCombat = false
 -- The running volume tween, so a new one can cancel it. Two tweens on Volume fight.
 local activeVolumeTween = nil
 
-local FADE_DURATION = 1.5
-local RAYCAST_INTERVAL = 0.5
+local fadeDuration = 1.5
+local raycastInterval = 0.5
 local timeSinceLastCast = 0
 
 -- Set by BindGui, so the script works whether or not MusicUI resets on spawn.
@@ -94,7 +94,7 @@ local function PlayTrack(newAudioObject)
 
 		if isPlaying then
 			currentAudio:Play()
-			tweenVolume(currentAudio, FADE_DURATION, baseVolume)
+			tweenVolume(currentAudio, fadeDuration, baseVolume)
 		else
 			currentAudio:Play()
 			currentAudio:Pause()
@@ -113,7 +113,7 @@ local function PlayTrack(newAudioObject)
 
 	if oldAudio then
 		-- The old track fades out on its own tween and stops when silent.
-		local fadeOut = TweenService:Create(oldAudio, TweenInfo.new(FADE_DURATION), { Volume = 0 })
+		local fadeOut = TweenService:Create(oldAudio, TweenInfo.new(fadeDuration), { Volume = 0 })
 		fadeOut:Play()
 		fadeOut.Completed:Once(function()
 			if oldAudio ~= currentAudio then
@@ -291,7 +291,7 @@ end)
 
 RunService.Heartbeat:Connect(function(dt)
 	timeSinceLastCast += dt
-	if timeSinceLastCast >= RAYCAST_INTERVAL then
+	if timeSinceLastCast >= raycastInterval then
 		timeSinceLastCast = 0
 		CheckZone()
 	end

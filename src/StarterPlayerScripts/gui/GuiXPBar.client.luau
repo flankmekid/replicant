@@ -11,7 +11,7 @@ local player = Players.LocalPlayer
 local PlayerGui = player.PlayerGui
 local character = player.Character or player.CharacterAdded:Wait()
 
-local WEAPON_REGISTRY = {
+local weaponRegistry = {
 	Sword = "Sword",
 	Excalibur = "Sword",
 	Guandao = "Sword",
@@ -44,7 +44,7 @@ local BarGlow = BarTrack:WaitForChild("Glow")
 local InfoLeft = Container:WaitForChild("InfoLeft")
 local InfoRight = Container:WaitForChild("InfoRight")
 
-local XP_TWEEN = TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local xpTween = TweenInfo.new(0.45, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 local activeConnections = {}
 
@@ -83,8 +83,8 @@ local function updateDisplay(category, weaponFolder, animate)
 
 	local targetSize = UDim2.new(ratio, 0, 1, 0)
 	if animate then
-		TweenService:Create(BarFill, XP_TWEEN, { Size = targetSize }):Play()
-		TweenService:Create(BarGlow, XP_TWEEN, { Size = targetSize }):Play()
+		TweenService:Create(BarFill, xpTween, { Size = targetSize }):Play()
+		TweenService:Create(BarGlow, xpTween, { Size = targetSize }):Play()
 	else
 		BarFill.Size = targetSize
 		BarGlow.Size = targetSize
@@ -124,14 +124,14 @@ end
 
 local function resolveWeapon()
 	local equipped = character:FindFirstChildWhichIsA("Tool")
-	if equipped and WEAPON_REGISTRY[equipped.Name] then
-		return WEAPON_REGISTRY[equipped.Name]
+	if equipped and weaponRegistry[equipped.Name] then
+		return weaponRegistry[equipped.Name]
 	end
 	local backpack = player:FindFirstChild("Backpack")
 	if backpack then
 		for _, tool in ipairs(backpack:GetChildren()) do
-			if tool:IsA("Tool") and WEAPON_REGISTRY[tool.Name] then
-				return WEAPON_REGISTRY[tool.Name]
+			if tool:IsA("Tool") and weaponRegistry[tool.Name] then
+				return weaponRegistry[tool.Name]
 			end
 		end
 	end
@@ -201,7 +201,7 @@ local function init()
 	local backpack = player:WaitForChild("Backpack", 10)
 	if backpack then
 		backpack.ChildAdded:Connect(function(child)
-			if child:IsA("Tool") and WEAPON_REGISTRY[child.Name] then
+			if child:IsA("Tool") and weaponRegistry[child.Name] then
 				refresh()
 			end
 		end)

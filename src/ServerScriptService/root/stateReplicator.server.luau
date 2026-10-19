@@ -11,7 +11,7 @@ local stateRemote = RP.remotes.stateRepl
 local stateHandler = require(RP.modules.stateHandler)
 local StatScaling = require(RP.modules.StatScaling)
 
--- Must match DASH_CONFIG in the Dash client: seconds per charge with one charge and
+-- Must match dashConfig in the Dash client: seconds per charge with one charge and
 -- with two.
 local dashCooldown = 2.5
 local dashMultiCooldown = 3.5

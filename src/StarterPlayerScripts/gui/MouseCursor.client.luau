@@ -8,11 +8,11 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 
-local DEFAULT_ICON = "rbxassetid://4127959394"
-local HOVER_ICON = "rbxassetid://4127964114"
+local defaultIcon = "rbxassetid://4127959394"
+local hoverIcon = "rbxassetid://4127964114"
 -- The Shift Lock icon, the same as the PlayerModule MouseLockController default.
-local LOCK_ICON = "rbxassetid://4586653091"
-local CURSOR_SIZE = UDim2.new(0, 64, 0, 64)
+local lockIcon = "rbxassetid://4586653091"
+local cursorSize = UDim2.new(0, 64, 0, 64)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CustomCursor"
@@ -25,8 +25,8 @@ local cursor = Instance.new("ImageLabel")
 cursor.Name = "Icon"
 cursor.BackgroundTransparency = 1
 cursor.AnchorPoint = Vector2.new(0.5, 0.5)
-cursor.Size = CURSOR_SIZE
-cursor.Image = DEFAULT_ICON
+cursor.Size = cursorSize
+cursor.Image = defaultIcon
 cursor.Active = false
 cursor.ZIndex = 999
 cursor.Parent = screenGui
@@ -65,11 +65,11 @@ end
 
 local function refresh()
 	if isLocked() then
-		cursor.Image = LOCK_ICON
+		cursor.Image = lockIcon
 	elseif next(hovered) then
-		cursor.Image = HOVER_ICON
+		cursor.Image = hoverIcon
 	else
-		cursor.Image = DEFAULT_ICON
+		cursor.Image = defaultIcon
 	end
 end
 

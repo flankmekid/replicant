@@ -11,14 +11,14 @@ local PlayerMovement = {}
 -- Return: nothing.
 function PlayerMovement:Movement(Player, move)
 	local ContextActionService = game:GetService("ContextActionService")
-	local FREEZE_ACTION = "freezeMovement"
+	local freezeAction = "freezeMovement"
 
 	if move == false then
-		ContextActionService:BindAction(FREEZE_ACTION, function()
+		ContextActionService:BindAction(freezeAction, function()
 			return Enum.ContextActionResult.Sink
 		end, false, unpack(Enum.PlayerActions:GetEnumItems()))
 	elseif move == true then
-		ContextActionService:UnbindAction(FREEZE_ACTION)
+		ContextActionService:UnbindAction(freezeAction)
 	end
 end
 

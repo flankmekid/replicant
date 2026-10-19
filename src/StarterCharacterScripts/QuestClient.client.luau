@@ -49,18 +49,18 @@ local ClassQuestBanner = GUI:WaitForChild("ClassQuestBanner")
 local BannerTitle = ClassQuestBanner:WaitForChild("BannerTitle")
 local BannerSub = ClassQuestBanner:WaitForChild("BannerSub")
 
-local COLOR_MAIN = Color3.fromRGB(212, 175, 55)
-local COLOR_SIDE = Color3.fromRGB(180, 180, 180)
-local COLOR_TRACKED_BG = Color3.fromRGB(50, 45, 35)
-local COLOR_DEFAULT_BG = Color3.fromRGB(109, 90, 84)
+local colorMain = Color3.fromRGB(212, 175, 55)
+local colorSide = Color3.fromRGB(180, 180, 180)
+local colorTrackedBg = Color3.fromRGB(50, 45, 35)
+local colorDefaultBg = Color3.fromRGB(109, 90, 84)
 
-local TWEEN_FADE = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local TWEEN_SLIDE = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local tweenFade = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local tweenSlide = TweenInfo.new(0.5, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
-local COMPLETE_SLIDE = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local COMPLETE_FADE = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local OFFSCREEN_POS = UDim2.new(0.5, 0, 1.3, 0)
-local ONSCREEN_POS = UDim2.new(0.5, 0, 0.82, 0)
+local completeSlide = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local completeFade = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local offscreenPos = UDim2.new(0.5, 0, 1.3, 0)
+local onscreenPos = UDim2.new(0.5, 0, 0.82, 0)
 
 local activeQuests = {}
 local trackedId = nil
@@ -99,7 +99,7 @@ local function createMarker(partName, questType)
 	icon.Size = UDim2.new(1, 0, 1, 0)
 	icon.BackgroundTransparency = 1
 	icon.Image = "rbxassetid://17426600101"
-	icon.ImageColor3 = questType == "Main" and COLOR_MAIN or COLOR_SIDE
+	icon.ImageColor3 = questType == "Main" and colorMain or colorSide
 	icon.Parent = bbGui
 
 	activeMarker = bbGui
@@ -158,7 +158,7 @@ local function selectQuestInJournal(questId)
 
 	DetailTitle.Text = def.Title
 	DetailType.Text = def.Type == "Main" and "MAIN QUEST" or "SIDE QUEST"
-	DetailType.TextColor3 = def.Type == "Main" and COLOR_MAIN or COLOR_SIDE
+	DetailType.TextColor3 = def.Type == "Main" and colorMain or colorSide
 	DetailDesc.Text = def.Description
 
 	if def.MaxProgress > 1 then
@@ -172,7 +172,7 @@ local function selectQuestInJournal(questId)
 	AbandonBtn.Visible = not (def.ClassQuest == true)
 
 	for id, btn in pairs(questButtons) do
-		btn.BackgroundColor3 = (id == questId) and COLOR_TRACKED_BG or COLOR_DEFAULT_BG
+		btn.BackgroundColor3 = (id == questId) and colorTrackedBg or colorDefaultBg
 	end
 
 	QuestDetailFrame.Visible = true
@@ -209,16 +209,16 @@ local function rebuildQuestList()
 
 		local btn = ReplicatedStorage.assets.UI.QuestButton:Clone()
 		btn.Name = questId
-		btn.BackgroundColor3 = (questId == selectedId) and COLOR_TRACKED_BG or COLOR_DEFAULT_BG
+		btn.BackgroundColor3 = (questId == selectedId) and colorTrackedBg or colorDefaultBg
 		btn.Text = def.Title
-		btn.TextColor3 = def.Type == "Main" and COLOR_MAIN or COLOR_SIDE
+		btn.TextColor3 = def.Type == "Main" and colorMain or colorSide
 		btn.Parent = QuestListFrame
 
 		if questId == trackedId then
 			local dot = btn:FindFirstChild("ActiveDot")
 			if dot then
 				dot.Transparency = 0.5
-				dot.BackgroundColor3 = COLOR_MAIN
+				dot.BackgroundColor3 = colorMain
 			end
 		end
 
@@ -246,10 +246,10 @@ local function setJournalOpen(open)
 		local hasQuests = next(activeQuests) ~= nil
 		if not hasQuests then
 			EmptyLabel.Font = Enum.Font.Fondamento
-			EmptyLabel.TextColor3 = COLOR_MAIN
+			EmptyLabel.TextColor3 = colorMain
 			EmptyLabel.TextTransparency = 1
 			EmptyLabel.Visible = true
-			TweenService:Create(EmptyLabel, TWEEN_FADE, { TextTransparency = 0 }):Play()
+			TweenService:Create(EmptyLabel, tweenFade, { TextTransparency = 0 }):Play()
 		else
 			EmptyLabel.Visible = false
 			EmptyLabel.TextTransparency = 1
@@ -267,13 +267,13 @@ local function playBanner(questId, def)
 	ClassQuestBanner.Position = UDim2.new(0.144, 0, -0.1, 0)
 	ClassQuestBanner.Visible = true
 
-	TweenService:Create(ClassQuestBanner, TWEEN_SLIDE, {
+	TweenService:Create(ClassQuestBanner, tweenSlide, {
 		Position = UDim2.new(0.144, 0, 0.196, 0),
 	}):Play()
 
 	task.wait(3.5)
 
-	local out = TweenService:Create(ClassQuestBanner, TWEEN_SLIDE, {
+	local out = TweenService:Create(ClassQuestBanner, tweenSlide, {
 		Position = UDim2.new(0.144, 0, -0.1, 0),
 	})
 	out:Play()
@@ -301,13 +301,13 @@ local function playCompleteUI(questName, liturgyReward)
 	CompleteName.Text = questName
 	CompleteReward.Text = "+" .. liturgyReward .. " Liturgy"
 
-	CompleteFrame.Position = OFFSCREEN_POS
+	CompleteFrame.Position = offscreenPos
 	CompleteFrame.Visible = true
 	CompleteFrame.GroupTransparency = 0
 
 	CompleteSound:Play()
 
-	TweenService:Create(CompleteFrame, COMPLETE_SLIDE, { Position = ONSCREEN_POS }):Play()
+	TweenService:Create(CompleteFrame, completeSlide, { Position = onscreenPos }):Play()
 
 	task.wait(0.4 + 5.5)
 
@@ -315,7 +315,7 @@ local function playCompleteUI(questName, liturgyReward)
 		return
 	end
 
-	local fade = TweenService:Create(CompleteFrame, COMPLETE_FADE, { GroupTransparency = 1 })
+	local fade = TweenService:Create(CompleteFrame, completeFade, { GroupTransparency = 1 })
 	fade:Play()
 	fade.Completed:Wait()
 	CompleteFrame.Visible = false
@@ -337,8 +337,8 @@ local function queueCompleteUI(questName, liturgyReward)
 	end)
 end
 
-local SHOW_DIST = 100
-local HIDE_DIST = 110
+local showDist = 100
+local hideDist = 110
 
 local QuestBillboardTemplate = ReplicatedStorage:WaitForChild("assets")
 	:WaitForChild("QuestBillboard")
@@ -405,9 +405,9 @@ RunService.Heartbeat:Connect(function()
 		end
 
 		local dist = (entry.part.Position - playerPos).Magnitude
-		if dist <= SHOW_DIST then
+		if dist <= showDist then
 			setShown(key, hasLOS(playerPos, entry.part))
-		elseif dist >= HIDE_DIST then
+		elseif dist >= hideDist then
 			setShown(key, false)
 		end
 		-- Between 100 and 110 studs, keep the current state (hysteresis).
@@ -448,7 +448,7 @@ local function trainerHasSomething(weaponKey, skillWeaponKey)
 	return false
 end
 
-local NPC_DEFS = {
+local npcDefs = {
 	{
 		key = "arc",
 		hrpPath = function()
@@ -578,7 +578,7 @@ local NPC_DEFS = {
 -- Re-evaluates availability for all registered icons and hides any that are
 -- no longer available. Heartbeat handles showing when back in range.
 local function reEvalAll()
-	for _, def in ipairs(NPC_DEFS) do
+	for _, def in ipairs(npcDefs) do
 		local entry = npcIcons[def.key]
 		if not entry then
 			continue
@@ -797,7 +797,7 @@ QuestReadyRemote:FireServer()
 -- Register the NPC icons after a short wait, so the world and the data can load.
 task.spawn(function()
 	task.wait(1.5)
-	for _, def in ipairs(NPC_DEFS) do
+	for _, def in ipairs(npcDefs) do
 		local part = def.hrpPath()
 		if part then
 			registerIcon(def.key, part)

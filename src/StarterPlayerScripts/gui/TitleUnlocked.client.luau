@@ -11,8 +11,8 @@ local PlayerGui = player:WaitForChild("PlayerGui")
 
 local TitleEarned = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("TitleEarned")
 
-local SLIDE_UP = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local FADE_OUT = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local slideUp = TweenInfo.new(0.4, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local fadeOut = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 local queue = {}
 local playing = false
@@ -48,7 +48,7 @@ local function playNotification(titleName, liturgyReward)
 		sound:Play()
 	end
 
-	TweenService:Create(frame, SLIDE_UP, {
+	TweenService:Create(frame, slideUp, {
 		Position = UDim2.new(0.5, 0, 0.88, 0),
 	}):Play()
 
@@ -58,7 +58,7 @@ local function playNotification(titleName, liturgyReward)
 		return
 	end
 
-	local out = TweenService:Create(frame, FADE_OUT, {
+	local out = TweenService:Create(frame, fadeOut, {
 		GroupTransparency = 1,
 	})
 	out:Play()

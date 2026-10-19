@@ -31,10 +31,10 @@ local hitboxParams = {
 local DataManager = require(game.ServerScriptService.modules.dataManager)
 
 local dmg = 5
-local GUARD_BREAK = false
-local WINDUP_DELAY = 0.5
-local HITBOX_DURATION = 1.1
-local POST_ATTACK_COOLDOWN = 3
+local guardBreak = false
+local windupDelay = 0.5
+local hitboxDuration = 1.1
+local postAttackCooldown = 3
 
 local v = {}
 local InfoTween = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut)
@@ -177,7 +177,7 @@ function module.ServerCheck(plr)
 		}, char)
 	end)
 
-	task.wait(WINDUP_DELAY)
+	task.wait(windupDelay)
 
 	-- A stun or a down during the windup cancels the attack before the hitbox.
 	if StateHandler.IsInterrupted(char) then
@@ -344,7 +344,7 @@ function module.ServerCheck(plr)
 						target = targetChar,
 						attackerHRP = attackerHRP,
 						targetHRP = targetHRP,
-						guardbreak = GUARD_BREAK,
+						guardbreak = guardBreak,
 						attackClass = "E",
 						dmg = dmg,
 					})

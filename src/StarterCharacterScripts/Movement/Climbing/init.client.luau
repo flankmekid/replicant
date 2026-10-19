@@ -51,12 +51,12 @@ local function isAirborne()
 end
 
 -- The climb cooldown in seconds, for the HUD. It matches the task.wait in the climb.
-local CLIMB_COOLDOWN = 1.25
+local climbCooldown = 1.25
 
 -- The thinnest part side that can be a ledge, in studs. Rejects railings and blades.
-local MIN_LEDGE_THICKNESS = 0.5
+local minLedgeThickness = 0.5
 -- A more transparent part cannot be a ledge.
-local MAX_LEDGE_TRANSPARENCY = 0.5
+local maxLedgeTransparency = 0.5
 
 local grabAnim = humanoid:LoadAnimation(script:WaitForChild("Grab"))
 grabAnim.Priority = Enum.AnimationPriority.Action4
@@ -93,7 +93,7 @@ local function isValidLedgeSurface(part)
 		return false
 	end
 
-	if part.Transparency > MAX_LEDGE_TRANSPARENCY then
+	if part.Transparency > maxLedgeTransparency then
 		return false
 	end
 	if not part.CanCollide then
@@ -102,7 +102,7 @@ local function isValidLedgeSurface(part)
 
 	-- Check the smallest side. A thin wall is still tall and wide, so it passes.
 	local sz = part.Size
-	if math.min(sz.X, sz.Y, sz.Z) < MIN_LEDGE_THICKNESS then
+	if math.min(sz.X, sz.Y, sz.Z) < minLedgeThickness then
 		return false
 	end
 
@@ -162,9 +162,9 @@ local function detectLedge(bypassChecks)
 
 		-- Cast at head height and 1 stud above and below, so a ledge near the head still
 		-- counts. The first valid surface wins, and an invalid hit tries the next height.
-		local LEDGE_VERTICAL_LEEWAY = 1
+		local ledgeVerticalLeeway = 1
 		local vaultCheck = nil
-		for _, yOff in ipairs({ 0, LEDGE_VERTICAL_LEEWAY, -LEDGE_VERTICAL_LEEWAY }) do
+		for _, yOff in ipairs({ 0, ledgeVerticalLeeway, -ledgeVerticalLeeway }) do
 			local origin = head.CFrame.Position + Vector3.new(0, yOff, 0)
 			local result = workspace:Raycast(origin, head.CFrame.LookVector * 5, raycastParams)
 			if result and result.Instance and isValidLedgeSurface(result.Instance) then
@@ -233,10 +233,10 @@ local function checkWall()
 	return workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 end
 
--- A press that cannot act now is buffered and retried for BUFFER_WINDOW seconds, like
+-- A press that cannot act now is buffered and retried for bufferWindow seconds, like
 -- the dash. handleJumpAction yields through the climb, so actionRunning keeps a second
 -- attempt from starting during the first.
-local BUFFER_WINDOW = 0.5
+local bufferWindow = 0.5
 local bufferedAt = nil
 local actionRunning = false
 
@@ -308,7 +308,7 @@ local function handleJumpAction()
 				climbDebounce = true
 				fired = true
 				-- The HUD only shows the cooldown. climbDebounce is the real gate.
-				CooldownTracker.Register("Climb", "Wall Jump", CLIMB_COOLDOWN)
+				CooldownTracker.Register("Climb", "Wall Jump", climbCooldown)
 
 				script.RemoteEvent:FireServer(wallCheck1.Position, wallCheck1.Normal, "Step1", x)
 
@@ -426,7 +426,7 @@ RunService.Heartbeat:Connect(function()
 	if not bufferedAt then
 		return
 	end
-	if os.clock() - bufferedAt > BUFFER_WINDOW then
+	if os.clock() - bufferedAt > bufferWindow then
 		bufferedAt = nil
 		return
 	end
@@ -441,10 +441,10 @@ end)
 -- Hold-to-catch: while the jump key is held and the player is armed, try to grab a
 -- ledge every frame, so the timing is forgiving. It never runs while hanging, because
 -- detectLedge would let go, and it stays out of the wall climb.
-local HOLD_KEYS = { [Enum.KeyCode.Space] = true, [Enum.KeyCode.ButtonA] = true }
+local holdKeys = { [Enum.KeyCode.Space] = true, [Enum.KeyCode.ButtonA] = true }
 
 local function isHoldingCatch()
-	for key in pairs(HOLD_KEYS) do
+	for key in pairs(holdKeys) do
 		if UserInputService:IsKeyDown(key) then
 			return true
 		end

@@ -8,9 +8,9 @@
 local StatScaling = {}
 
 StatScaling.MAX_STAT = 50
--- Full value per point up to SOFT_CAP. After it, a point gives POST_CAP_RATIO of that.
+-- Full value per point up to SOFT_CAP. After it, a point gives postCapRatio of that.
 StatScaling.SOFT_CAP = 40
-local POST_CAP_RATIO = 0.30
+local postCapRatio = 0.30
 
 -- Returns the progress (0 to 1) of points on the soft-capped curve. MAX_STAT returns
 -- exactly 1.
@@ -18,12 +18,12 @@ local function softCapProgress(points)
 	points = math.clamp(points, 0, StatScaling.MAX_STAT)
 	local knee = StatScaling.SOFT_CAP
 	local maxStat = StatScaling.MAX_STAT
-	-- One unit per point before the soft cap, POST_CAP_RATIO per point after.
+	-- One unit per point before the soft cap, postCapRatio per point after.
 	local function rawUnits(p)
 		if p <= knee then
 			return p
 		end
-		return knee + (p - knee) * POST_CAP_RATIO
+		return knee + (p - knee) * postCapRatio
 	end
 	local maxUnits = rawUnits(maxStat)
 	if maxUnits <= 0 then
@@ -39,7 +39,7 @@ local function scaledBonus(points, maxBonus)
 end
 
 -- Vitality: flat max HP by level, back-heavy, +100 at level 50. Tuned by hand.
-local VITALITY_HP = {
+local vitalityHp = {
 	[0] = 0,
 	[1] = 0,
 	[2] = 1,
@@ -92,7 +92,7 @@ local VITALITY_HP = {
 	[49] = 97,
 	[50] = 100,
 }
-StatScaling.VITALITY_HP = VITALITY_HP
+StatScaling.VITALITY_HP = vitalityHp
 
 -- StatScaling.GetHPBonus() - get the max HP bonus of Vitality
 -- @vitPoints: the Vitality points
@@ -100,7 +100,7 @@ StatScaling.VITALITY_HP = VITALITY_HP
 -- Return: the flat HP bonus.
 function StatScaling.GetHPBonus(vitPoints)
 	vitPoints = math.clamp(math.floor(vitPoints or 0), 0, StatScaling.MAX_STAT)
-	return VITALITY_HP[vitPoints] or 0
+	return vitalityHp[vitPoints] or 0
 end
 
 -- StatScaling.GetStrengthBonus() - get the weapon damage bonus of Strength
@@ -223,7 +223,7 @@ function StatScaling.GetVelocityProgress(stamPoints)
 		if p <= knee then
 			return p
 		end
-		return knee + (p - knee) * POST_CAP_RATIO
+		return knee + (p - knee) * postCapRatio
 	end
 	local maxUnits = rawUnits(StatScaling.MAX_STAT)
 	return rawUnits(stamPoints) / maxUnits

@@ -1,17 +1,17 @@
 -- SPDX-License-Identifier: MIT
 --
--- Regenerates the character's HP when it has taken no damage for WAIT_TIME seconds,
+-- Regenerates the character's HP when it has taken no damage for waitTime seconds,
 -- scaled by the race RegenMultiplier. A downed character does not regenerate.
 
 local character = script.Parent
 local humanoid = character:WaitForChild("Humanoid")
 
 -- HP per tick.
-local REGEN_RATE = 1
+local regenRate = 1
 -- Seconds between ticks.
-local REGEN_FREQUENCY = 0.25
+local regenFrequency = 0.25
 -- Seconds without damage before regeneration starts.
-local WAIT_TIME = 30
+local waitTime = 30
 
 -- The os.time() of the last hit.
 local lastDamageTime = 0
@@ -27,7 +27,7 @@ humanoid.HealthChanged:Connect(function(newHealth)
 end)
 
 while true do
-	task.wait(REGEN_FREQUENCY)
+	task.wait(regenFrequency)
 
 	if humanoid.Health <= 0 then
 		continue
@@ -37,10 +37,10 @@ while true do
 		continue
 	end
 
-	if (os.time() - lastDamageTime) >= WAIT_TIME and not character:GetAttribute("Downed") then
+	if (os.time() - lastDamageTime) >= waitTime and not character:GetAttribute("Downed") then
 		local mult = character:GetAttribute("RegenMultiplier") or 1
 
-		local finalHeal = REGEN_RATE * mult
+		local finalHeal = regenRate * mult
 
 		humanoid.Health = math.min(humanoid.Health + finalHeal, humanoid.MaxHealth)
 

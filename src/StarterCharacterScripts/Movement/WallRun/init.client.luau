@@ -22,16 +22,16 @@ local AnimsFolder = script:WaitForChild("Anims")
 local WallRunL = animator:LoadAnimation(AnimsFolder:WaitForChild("WallRunL"))
 local WallRunR = animator:LoadAnimation(AnimsFolder:WaitForChild("WallRunR"))
 
-local WALL_RUN_DISTANCE = 3
-local WALL_RUN_SPEED = 30
-local WALL_RUN_Y_VELOCITY = 2
+local wallRunDistance = 3
+local wallRunSpeed = 30
+local wallRunYVelocity = 2
 -- The wall must be nearly parallel to the facing direction.
-local ANGLE_TOLERANCE = 0.45
-local WALL_RUN_DURATION = 3
+local angleTolerance = 0.45
+local wallRunDuration = 3
 local COOLDOWN = 0.5
-local LEDGE_THRESHOLD = 2
+local ledgeThreshold = 2
 -- A space press this many seconds before freefall still counts as a press in the air.
-local BUFFER_WINDOW = 0.5
+local bufferWindow = 0.5
 -- The wall runs allowed before the player touches the ground.
 local function getMaxWallRuns()
 	local stam = 0
@@ -53,7 +53,7 @@ local wallRunCount = 0
 
 -- True when space was pressed while in freefall.
 local spacePressedInAir = false
--- The time of a space press before freefall. If freefall starts within BUFFER_WINDOW
+-- The time of a space press before freefall. If freefall starts within bufferWindow
 -- and space is still held, it becomes a press in the air.
 local spaceBufferedAt = nil
 
@@ -89,7 +89,7 @@ local function isNearLedge(hitPart, hitPos)
 	local ledgePos = hitPart.CFrame:PointToWorldSpace(localLedgePos)
 	local verticalDist = math.abs(ledgePos.Y - Head.Position.Y)
 
-	if verticalDist < LEDGE_THRESHOLD then
+	if verticalDist < ledgeThreshold then
 		return true
 	end
 	return false
@@ -154,21 +154,20 @@ function startWallRun(WallHit, WallSide)
 	local forward = Root.CFrame.LookVector
 	local runDir = getWallRunDirection(forward, WallHit.Normal)
 
-	-- Already running: update the direction, and fall off after WALL_RUN_DURATION.
+	-- Already running: update the direction, and fall off after wallRunDuration.
 	if isWallRunning and wallRunBV then
 		local elapsedTime = tick() - startTime
 
-		local currentY = WALL_RUN_Y_VELOCITY
-		if elapsedTime > WALL_RUN_DURATION then
+		local currentY = wallRunYVelocity
+		if elapsedTime > wallRunDuration then
 			currentY = -20
-			if elapsedTime > (WALL_RUN_DURATION + 0.5) then
+			if elapsedTime > (wallRunDuration + 0.5) then
 				stopWallRun()
 				return
 			end
 		end
 
-		wallRunBV.Velocity =
-			Vector3.new(runDir.X * WALL_RUN_SPEED, currentY, runDir.Z * WALL_RUN_SPEED)
+		wallRunBV.Velocity = Vector3.new(runDir.X * wallRunSpeed, currentY, runDir.Z * wallRunSpeed)
 		return
 	end
 
@@ -192,7 +191,7 @@ function startWallRun(WallHit, WallSide)
 	end
 
 	wallRunBV.Velocity =
-		Vector3.new(runDir.X * WALL_RUN_SPEED, WALL_RUN_Y_VELOCITY, runDir.Z * WALL_RUN_SPEED)
+		Vector3.new(runDir.X * wallRunSpeed, wallRunYVelocity, runDir.Z * wallRunSpeed)
 
 	if WallSide == "RightWall" then
 		if not WallRunR.IsPlaying then
@@ -262,7 +261,7 @@ end)
 RunService.Heartbeat:Connect(function(dt)
 	-- A buffered press counts once the player is in freefall, if space is still held.
 	if spaceBufferedAt then
-		if os.clock() - spaceBufferedAt > BUFFER_WINDOW then
+		if os.clock() - spaceBufferedAt > bufferWindow then
 			spaceBufferedAt = nil
 		elseif hum:GetState() == Enum.HumanoidStateType.Freefall then
 			if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
@@ -279,8 +278,8 @@ RunService.Heartbeat:Connect(function(dt)
 		spaceBufferedAt = nil
 	end
 
-	local rightRay = Root.CFrame.RightVector * WALL_RUN_DISTANCE
-	local leftRay = -Root.CFrame.RightVector * WALL_RUN_DISTANCE
+	local rightRay = Root.CFrame.RightVector * wallRunDistance
+	local leftRay = -Root.CFrame.RightVector * wallRunDistance
 
 	local leftWall = workspace:Raycast(Root.Position, leftRay, params)
 	local rightWall = workspace:Raycast(Root.Position, rightRay, params)
@@ -294,7 +293,7 @@ RunService.Heartbeat:Connect(function(dt)
 	local angleCheck = false
 	if WallHit then
 		local dot = Root.CFrame.LookVector:Dot(WallHit.Normal)
-		if math.abs(dot) < ANGLE_TOLERANCE then
+		if math.abs(dot) < angleTolerance then
 			angleCheck = true
 		end
 	end

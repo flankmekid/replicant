@@ -12,14 +12,14 @@ local AlertRemote = ReplicatedStorage:WaitForChild("HealthAlertEvent")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local TEXT_FONT = Enum.Font.Merriweather
-local TEXT_COLOR = Color3.fromRGB(255, 40, 40)
-local TYPE_SPEED = 0.05
-local LINGER_TIME = 3.0
-local FADE_TIME = 1.5
-local LOOP_DELAY_MIN = 1.0
-local LOOP_DELAY_MAX = 3.0
-local BLUR_SIZE = 8
+local textFont = Enum.Font.Merriweather
+local textColor = Color3.fromRGB(255, 40, 40)
+local typeSpeed = 0.05
+local lingerTime = 3.0
+local fadeTime = 1.5
+local loopDelayMin = 1.0
+local loopDelayMax = 3.0
+local blurSize = 8
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "PanicOverlay"
@@ -66,7 +66,7 @@ local function PlayTypewriter(label, text)
 		end
 		label.Text = string.sub(text, 1, i)
 		label.Rotation = label.Rotation + math.random(-1, 1)
-		task.wait(TYPE_SPEED)
+		task.wait(typeSpeed)
 	end
 end
 
@@ -78,8 +78,8 @@ local function SpawnSingleMessage(message)
 	local label = Instance.new("TextLabel")
 	label.Text = ""
 	label.BackgroundTransparency = 1
-	label.TextColor3 = TEXT_COLOR
-	label.Font = TEXT_FONT
+	label.TextColor3 = textColor
+	label.Font = textFont
 	label.TextSize = 35
 	label.Size = UDim2.new(0, 400, 0, 50)
 	label.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -96,11 +96,11 @@ local function SpawnSingleMessage(message)
 	PlayTypewriter(label, message)
 
 	if isPanicMode then
-		task.wait(LINGER_TIME)
+		task.wait(lingerTime)
 	end
 
 	if label.Parent then
-		local info = TweenInfo.new(FADE_TIME, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+		local info = TweenInfo.new(fadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 		local t1 = TweenService:Create(label, info, { TextTransparency = 1 })
 		local t2 = TweenService:Create(stroke, info, { Transparency = 1 })
 		t1:Play()
@@ -117,7 +117,7 @@ local function StartPanicLoop(messages)
 	isPanicMode = true
 
 	local blurInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	TweenService:Create(blurEffect, blurInfo, { Size = BLUR_SIZE }):Play()
+	TweenService:Create(blurEffect, blurInfo, { Size = blurSize }):Play()
 
 	task.spawn(function()
 		while isPanicMode do
@@ -128,9 +128,7 @@ local function StartPanicLoop(messages)
 				end)
 			end
 
-			local waitTime = (TYPE_SPEED * 20)
-				+ LINGER_TIME
-				+ math.random(LOOP_DELAY_MIN, LOOP_DELAY_MAX)
+			local waitTime = (typeSpeed * 20) + lingerTime + math.random(loopDelayMin, loopDelayMax)
 			local elapsed = 0
 			while elapsed < waitTime do
 				if not isPanicMode then

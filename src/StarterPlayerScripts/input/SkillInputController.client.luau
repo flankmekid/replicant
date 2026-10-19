@@ -31,7 +31,7 @@ local KEYS = {
 -- skill is free again.
 local cooldowns = {}
 -- The longest time a rejected cast stays locked, in seconds.
-local PENDING_WINDOW = 1
+local pendingWindow = 1
 
 local function GetCurrentWeapon()
 	local char = player.Character
@@ -200,5 +200,5 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 
 	CastSkillRemote:FireServer(skillName, mouse.Hit)
-	cooldowns[skillName] = os.time() + PENDING_WINDOW
+	cooldowns[skillName] = os.time() + pendingWindow
 end)

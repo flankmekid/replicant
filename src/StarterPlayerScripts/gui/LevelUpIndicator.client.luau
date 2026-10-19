@@ -42,7 +42,7 @@ local CFG = {
 	SOUND_PITCH = 1.0,
 }
 
-local WEAPON_TYPES = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
+local weaponTypes = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
 
 local function waitForStats()
 	local stats = player:FindFirstChild("PlayerStats")
@@ -226,7 +226,7 @@ local function watchWeaponLevels(stats)
 		return
 	end
 
-	for _, weaponName in ipairs(WEAPON_TYPES) do
+	for _, weaponName in ipairs(weaponTypes) do
 		local weaponFolder = weaponDataFolder:WaitForChild(weaponName, 10)
 		if weaponFolder then
 			local levelValue = weaponFolder:WaitForChild("Level", 10)

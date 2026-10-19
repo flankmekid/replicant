@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: MIT
 --
--- Execute (B) and carry or drop (N) for a downed player within SEARCH_RADIUS, with the
+-- Execute (B) and carry or drop (N) for a downed player within searchRadius, with the
 -- prompt on the DownedInteractionHUD.
 
 local Players = game:GetService("Players")
@@ -17,9 +17,9 @@ local InteractionRemote = Remotes:WaitForChild("DownedInteraction")
 local interactionGui = playerGui:WaitForChild("DownedInteractionHUD", 10)
 local promptLabel = interactionGui and interactionGui.Container.PromptText
 
-local SEARCH_RADIUS = 5
+local searchRadius = 5
 
--- Returns the nearest downed player within SEARCH_RADIUS, or nil.
+-- Returns the nearest downed player within searchRadius, or nil.
 local function GetNearestDownedPlayer()
 	local char = player.Character
 	if not char then
@@ -31,7 +31,7 @@ local function GetNearestDownedPlayer()
 	end
 
 	local nearestChar = nil
-	local minDist = SEARCH_RADIUS
+	local minDist = searchRadius
 
 	for _, otherPlayer in ipairs(Players:GetPlayers()) do
 		if otherPlayer ~= player and otherPlayer.Character then

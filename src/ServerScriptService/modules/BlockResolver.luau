@@ -13,10 +13,10 @@ local GuardBarService = require(SSS.modules.GuardBarService)
 local BlockResolver = {}
 
 -- A dot product of forward and toAttacker above this counts as facing.
-local BLOCK_ANGLE_THRESHOLD = 0.5
+local blockAngleThreshold = 0.5
 
 -- Chip fractions of the attack's damage that leak through a successful block.
-local CHIP_FRACTION = {
+local chipFraction = {
 	M1 = 0.10,
 	E = 0.10,
 	M2 = 0, -- Guard breaks deal full damage instead.
@@ -26,16 +26,16 @@ local CHIP_FRACTION = {
 
 -- The attacker's recovery stun on a normal block, in seconds. A blocked E leaves the
 -- defender plus. A blocked M1 is neutral.
-local ATTACKER_RECOVERY = {
+local attackerRecovery = {
 	E = 0.45,
 	M1 = 0,
 	Skill = 0,
 	Default = 0,
 }
-local ATTACKER_RECOVERY_STUNSPEED = 6
+local attackerRecoveryStunspeed = 6
 
 -- A small shove on a normal blocked hit.
-local BLOCK_KNOCKBACK = 5
+local blockKnockback = 5
 -- The attackerPos argument is a projectile or skill origin, or the attacker's HRP position.
 local function isFacing(attackerPos, targetHRP)
 	if not attackerPos or not targetHRP then
@@ -43,7 +43,7 @@ local function isFacing(attackerPos, targetHRP)
 	end
 	local toAttacker = (attackerPos - targetHRP.Position).Unit
 	local forward = targetHRP.CFrame.LookVector
-	return forward:Dot(toAttacker) > BLOCK_ANGLE_THRESHOLD
+	return forward:Dot(toAttacker) > blockAngleThreshold
 end
 
 -- BlockResolver.Resolve() - resolve a hit on a blocking target
@@ -70,7 +70,7 @@ function BlockResolver.Resolve(params)
 			outcome = "Bypass",
 			broke = false,
 			chipDamage = dmg,
-			knockback = BLOCK_KNOCKBACK,
+			knockback = blockKnockback,
 		}
 	end
 
@@ -82,7 +82,7 @@ function BlockResolver.Resolve(params)
 			outcome = "GuardBreak",
 			broke = true,
 			chipDamage = dmg,
-			knockback = BLOCK_KNOCKBACK,
+			knockback = blockKnockback,
 		}
 	end
 
@@ -93,22 +93,22 @@ function BlockResolver.Resolve(params)
 		return {
 			outcome = "GuardBreak",
 			broke = true,
-			chipDamage = (CHIP_FRACTION[class] or CHIP_FRACTION.Default) * dmg,
-			knockback = BLOCK_KNOCKBACK,
+			chipDamage = (chipFraction[class] or chipFraction.Default) * dmg,
+			knockback = blockKnockback,
 		}
 	end
 
 	-- A normal block. Stun the attacker on moves where the defender comes out plus.
-	local atkRecovery = ATTACKER_RECOVERY[class] or ATTACKER_RECOVERY.Default
+	local atkRecovery = attackerRecovery[class] or attackerRecovery.Default
 	if atkRecovery > 0 and attacker then
-		StateHandler.SetStun(attacker, true, atkRecovery, ATTACKER_RECOVERY_STUNSPEED)
+		StateHandler.SetStun(attacker, true, atkRecovery, attackerRecoveryStunspeed)
 	end
 
 	return {
 		outcome = "Blocked",
 		broke = false,
-		chipDamage = (CHIP_FRACTION[class] or CHIP_FRACTION.Default) * dmg,
-		knockback = BLOCK_KNOCKBACK,
+		chipDamage = (chipFraction[class] or chipFraction.Default) * dmg,
+		knockback = blockKnockback,
 	}
 end
 

@@ -12,7 +12,7 @@ local WeaponConfig = require(RP.modules.WeaponConfig)
 local WINDUP = WeaponConfig.Shackles.server.m1.windup
 -- The limb that glows for each move pattern: combo hits 1 to 5, then the running
 -- attack (6), the air attack (7), and the uppercut (8).
-local FX_PARTS = {
+local fxParts = {
 	"Right Arm",
 	"Left Arm",
 	"Right Leg",
@@ -41,7 +41,7 @@ local function FX(char, bodypart)
 end
 
 local function onWindupStart(char, movePattern)
-	local bp = FX_PARTS[movePattern]
+	local bp = fxParts[movePattern]
 	if bp then
 		FX(char, bp)
 	end

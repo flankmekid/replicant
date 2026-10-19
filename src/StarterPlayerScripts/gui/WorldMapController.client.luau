@@ -1,7 +1,7 @@
 --!strict
 -- SPDX-License-Identifier: MIT
 --
--- The full-screen world map, toggled with TOGGLE_KEY, with drag to pan and the wheel to
+-- The full-screen world map, toggled with toggleKey, with drag to pan and the wheel to
 -- zoom. The camera zoom is locked while the map is open, so the world does not zoom
 -- underneath. Panning is clamped to the image. A marker with a facing arrow follows the
 -- local character through MapTransform, inside MarkerLayer, so it pans and zooms with
@@ -20,14 +20,14 @@ local MapTransform = require(ReplicatedStorage.modules.MapTransform)
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local TOGGLE_KEY = Enum.KeyCode.Tab
-local OPEN_TIME = 0.28
-local CLOSE_TIME = 0.20
-local MIN_ZOOM = 1.0
-local MAX_ZOOM = 4.0
-local ZOOM_STEP = 0.15
-local ZOOM_LERP = 0.18
-local MARKER_SIZE_PX = 18
+local toggleKey = Enum.KeyCode.Tab
+local openTime = 0.28
+local closeTime = 0.20
+local minZoom = 1.0
+local maxZoom = 4.0
+local zoomStep = 0.15
+local zoomLerp = 0.18
+local markerSizePx = 18
 
 local isOpen = false
 local currentZoom = 1.0
@@ -97,7 +97,7 @@ markerLayer.Parent = mapImage
 local playerMarker = Instance.new("Frame")
 playerMarker.Name = "PlayerMarker"
 playerMarker.AnchorPoint = Vector2.new(0.5, 0.5)
-playerMarker.Size = UDim2.fromOffset(MARKER_SIZE_PX, MARKER_SIZE_PX)
+playerMarker.Size = UDim2.fromOffset(markerSizePx, markerSizePx)
 playerMarker.BackgroundColor3 = Color3.fromRGB(90, 170, 255)
 playerMarker.BorderSizePixel = 0
 playerMarker.ZIndex = 5
@@ -118,7 +118,7 @@ pmStroke.Parent = playerMarker
 local facingArrow = Instance.new("Frame")
 facingArrow.Name = "FacingArrow"
 facingArrow.AnchorPoint = Vector2.new(0.5, 0.5)
-facingArrow.Size = UDim2.fromOffset(MARKER_SIZE_PX, MARKER_SIZE_PX)
+facingArrow.Size = UDim2.fromOffset(markerSizePx, markerSizePx)
 facingArrow.Position = UDim2.fromScale(0.5, 0.5)
 facingArrow.BackgroundTransparency = 1
 facingArrow.ZIndex = 4
@@ -178,7 +178,7 @@ local function applyTransform()
 	panOffset = clampPan(panOffset, scaled)
 	mapImage.Position = UDim2.new(0.5, panOffset.X, 0.5, panOffset.Y)
 	-- Counter-scale the marker, so it keeps its screen size at any zoom.
-	local s = MARKER_SIZE_PX / currentZoom
+	local s = markerSizePx / currentZoom
 	playerMarker.Size = UDim2.fromOffset(s, s)
 	facingArrow.Size = UDim2.fromOffset(s, s)
 end
@@ -250,8 +250,8 @@ local function openMap()
 	screenGui.Enabled = true
 	lockCameraZoom()
 
-	currentZoom = MIN_ZOOM
-	targetZoom = MIN_ZOOM
+	currentZoom = minZoom
+	targetZoom = minZoom
 	panOffset = Vector2.new(0, 0)
 	applyTransform()
 	updatePlayerMarker()
@@ -262,7 +262,7 @@ local function openMap()
 	hint.TextTransparency = 1
 	viewport.Size = UDim2.fromScale(0.62, 0.74)
 
-	local ti = TweenInfo.new(OPEN_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
+	local ti = TweenInfo.new(openTime, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 	TweenService:Create(dimmer, ti, { BackgroundTransparency = 0.45 }):Play()
 	TweenService:Create(viewport, ti, {
 		BackgroundTransparency = 0,
@@ -281,7 +281,7 @@ local function closeMap()
 	lastDragPos = nil
 	restoreCameraZoom()
 
-	local ti = TweenInfo.new(CLOSE_TIME, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
+	local ti = TweenInfo.new(closeTime, Enum.EasingStyle.Quint, Enum.EasingDirection.In)
 	TweenService:Create(dimmer, ti, { BackgroundTransparency = 1 }):Play()
 	TweenService:Create(viewport, ti, {
 		BackgroundTransparency = 1,
@@ -315,7 +315,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
-	if input.KeyCode == TOGGLE_KEY then
+	if input.KeyCode == toggleKey then
 		toggleMap()
 		return
 	elseif input.KeyCode == Enum.KeyCode.Escape and isOpen then
@@ -362,11 +362,8 @@ UserInputService.InputChanged:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseWheel then
 		local p = Vector2.new(input.Position.X, input.Position.Y)
 		if isInsideViewport(p) then
-			targetZoom = math.clamp(
-				targetZoom + input.Position.Z * ZOOM_STEP * targetZoom,
-				MIN_ZOOM,
-				MAX_ZOOM
-			)
+			targetZoom =
+				math.clamp(targetZoom + input.Position.Z * zoomStep * targetZoom, minZoom, maxZoom)
 		end
 	end
 end)
@@ -386,7 +383,7 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 	if math.abs(currentZoom - targetZoom) > 0.001 then
-		currentZoom = currentZoom + (targetZoom - currentZoom) * ZOOM_LERP
+		currentZoom = currentZoom + (targetZoom - currentZoom) * zoomLerp
 		applyTransform()
 	end
 	updatePlayerMarker()

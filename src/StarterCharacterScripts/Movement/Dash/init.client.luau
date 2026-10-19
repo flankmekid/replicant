@@ -43,7 +43,7 @@ local Anims = {
 	Cancel = loadAnim("CancelAnim"),
 }
 
-local DASH_CONFIG = {
+local dashConfig = {
 	Cooldown = 2.5, -- Seconds per charge with one charge.
 	MultiCooldown = 3.5, -- Seconds per charge with two charges, a bit longer.
 	Duration = 0.3, -- Seconds.
@@ -75,7 +75,7 @@ local function getMaxCharges()
 end
 
 local function perChargeCooldown()
-	return (getMaxCharges() >= 2) and DASH_CONFIG.MultiCooldown or DASH_CONFIG.Cooldown
+	return (getMaxCharges() >= 2) and dashConfig.MultiCooldown or dashConfig.Cooldown
 end
 
 -- Builds the slot table on first use, sized to the current maximum.
@@ -244,9 +244,9 @@ local function SpawnAirEffects(emissionDir)
 	end)
 end
 
--- A Q press that fails a check is buffered and retried every frame for BUFFER_WINDOW
+-- A Q press that fails a check is buffered and retried every frame for bufferWindow
 -- seconds. The retry runs the same tryDash, so a buffer can never skip a check.
-local BUFFER_WINDOW = 0.2
+local bufferWindow = 0.2
 local bufferedAt = nil
 
 -- Checks and runs a dash. Returns true if the dash started, false otherwise.
@@ -312,8 +312,8 @@ local function tryDash()
 	stateRemote:FireServer("Dodge")
 
 	local hpPercentage = Hum.Health / Hum.MaxHealth
-	local speedMultiplier = (hpPercentage <= DASH_CONFIG.HealthThreshold)
-			and DASH_CONFIG.HealthMultiplier
+	local speedMultiplier = (hpPercentage <= dashConfig.HealthThreshold)
+			and dashConfig.HealthMultiplier
 		or 1
 
 	anim:Play()
@@ -331,7 +331,7 @@ local function tryDash()
 	linearVelocity.Attachment0 = attachment
 	-- A high force overrides gravity and friction at once.
 	linearVelocity.MaxForce = 100000
-	linearVelocity.VectorVelocity = moveDir * (DASH_CONFIG.BaseSpeed * speedMultiplier)
+	linearVelocity.VectorVelocity = moveDir * (dashConfig.BaseSpeed * speedMultiplier)
 
 	-- Lock the orientation to the facing at the start, so the character does not stumble.
 	local alignOrientation = Instance.new("AlignOrientation", HumRP)
@@ -340,7 +340,7 @@ local function tryDash()
 	alignOrientation.CFrame = HumRP.CFrame
 	alignOrientation.RigidityEnabled = true
 
-	task.delay(DASH_CONFIG.Duration, function()
+	task.delay(dashConfig.Duration, function()
 		linearVelocity:Destroy()
 		alignOrientation:Destroy()
 		attachment:Destroy()
@@ -370,7 +370,7 @@ RunService.Heartbeat:Connect(function()
 	if not bufferedAt then
 		return
 	end
-	if os.clock() - bufferedAt > BUFFER_WINDOW then
+	if os.clock() - bufferedAt > bufferWindow then
 		bufferedAt = nil
 		return
 	end

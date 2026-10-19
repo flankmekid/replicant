@@ -71,7 +71,7 @@ local KEYFRAMES = {
 
 -- A small brightness boost for a full moon (phase 1), small enough to keep visibility
 -- flat. Set it to 0 to turn it off.
-local FULL_MOON_BRIGHTNESS_BONUS = 0.015
+local fullMoonBrightnessBonus = 0.015
 
 local function lerp(a: number, b: number, t: number): number
 	return a + (b - a) * t
@@ -114,10 +114,10 @@ RunService.RenderStepped:Connect(function()
 		local brightness = lerp(a.ccBrightness, b.ccBrightness, t)
 		-- The full-moon boost grows toward midnight.
 		local phaseIndex = Lighting:GetAttribute("MoonPhaseIndex")
-		if phaseIndex == 1 and FULL_MOON_BRIGHTNESS_BONUS > 0 then
+		if phaseIndex == 1 and fullMoonBrightnessBonus > 0 then
 			local nightness = math.clamp(1 - math.abs(((hour + 12) % 24) - 12) / 12, 0, 1)
 			local darkness = 1 - math.clamp(math.abs((hour % 24) - 12) / 12, 0, 1)
-			brightness = brightness + FULL_MOON_BRIGHTNESS_BONUS * darkness
+			brightness = brightness + fullMoonBrightnessBonus * darkness
 		end
 		cc.Brightness = brightness
 		cc.Contrast = lerp(a.ccContrast, b.ccContrast, t)

@@ -13,7 +13,7 @@ local SkillFunctions = require(ServerScriptService.modules.SkillFunctions)
 local BurstRemote = ReplicatedStorage.remotes:WaitForChild("Burst")
 
 -- The fraction of MaxMana that a burst costs.
-local MANA_FRACTION = 0.5
+local manaFraction = 0.5
 -- The cooldown in seconds.
 local COOLDOWN = 12
 
@@ -62,7 +62,7 @@ BurstRemote.OnServerEvent:Connect(function(player)
 		reply(player, "Declined")
 		return
 	end
-	local cost = maxMana.Value * MANA_FRACTION
+	local cost = maxMana.Value * manaFraction
 	if mana.Value < cost then
 		reply(player, "Declined")
 		return

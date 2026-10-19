@@ -33,19 +33,19 @@ local ErrorLabel = Footer:WaitForChild("ErrorLabel")
 local AttunementToast = SpireGui:WaitForChild("AttunementToast")
 local ToastLabel = AttunementToast:WaitForChild("Inner"):WaitForChild("ToastLabel")
 
-local COLOR_GOLD = Color3.fromRGB(212, 175, 55)
-local COLOR_GOLD_DIM = Color3.fromRGB(140, 110, 35)
-local COLOR_WHITE = Color3.fromRGB(235, 225, 205)
-local COLOR_MUTED = Color3.fromRGB(140, 128, 108)
-local COLOR_UNATTUNED = Color3.fromRGB(60, 55, 48)
-local COLOR_BTN_NORMAL = Color3.fromRGB(38, 30, 18)
-local COLOR_BTN_SELECT = Color3.fromRGB(60, 50, 30)
-local COLOR_BTN_HOVER = Color3.fromRGB(48, 40, 24)
+local colorGold = Color3.fromRGB(212, 175, 55)
+local colorGoldDim = Color3.fromRGB(140, 110, 35)
+local colorWhite = Color3.fromRGB(235, 225, 205)
+local colorMuted = Color3.fromRGB(140, 128, 108)
+local colorUnattuned = Color3.fromRGB(60, 55, 48)
+local colorBtnNormal = Color3.fromRGB(38, 30, 18)
+local colorBtnSelect = Color3.fromRGB(60, 50, 30)
+local colorBtnHover = Color3.fromRGB(48, 40, 24)
 
-local FADE_IN = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local FADE_OUT = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local TOAST_IN = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local TOAST_OUT = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local fadeIn = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local fadeOut = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local toastIn = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local toastOut = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 local attunedSpires = {}
 local selectedSpireId = nil
@@ -61,8 +61,8 @@ local resting = false
 local currentRestSpireId = nil
 
 -- Stat metadata for the level-up panel.
-local STAT_ORDER = { "Vitality", "Stamina", "Strength", "Dexterity", "Magic" }
-local STAT_DESC = {
+local statOrder = { "Vitality", "Stamina", "Strength", "Dexterity", "Magic" }
+local statDesc = {
 	Vitality = "Max HP",
 	Stamina = "Movement & dashes",
 	Strength = "Weapon damage",
@@ -85,7 +85,7 @@ local function reasonText(code)
 end
 
 -- The resting animation, shared with the bonfire system.
-local REST_ANIM_ID = "rbxassetid://133831523774694"
+local restAnimId = "rbxassetid://133831523774694"
 local restTrack = nil
 local function loadRestAnim()
 	local hum = character and character:FindFirstChild("Humanoid")
@@ -94,7 +94,7 @@ local function loadRestAnim()
 		return
 	end
 	local anim = Instance.new("Animation")
-	anim.AnimationId = REST_ANIM_ID
+	anim.AnimationId = restAnimId
 	restTrack = animator:LoadAnimation(anim)
 end
 
@@ -117,11 +117,11 @@ local armoryPanel
 local function makeButton(parent, text, order)
 	local b = Instance.new("TextButton")
 	b.Size = UDim2.new(1, 0, 0, 40)
-	b.BackgroundColor3 = COLOR_BTN_NORMAL
+	b.BackgroundColor3 = colorBtnNormal
 	b.BorderSizePixel = 0
 	b.AutoButtonColor = false
 	b.Text = text
-	b.TextColor3 = COLOR_WHITE
+	b.TextColor3 = colorWhite
 	b.TextSize = 15
 	b.Font = Enum.Font.Merriweather
 	b.LayoutOrder = order or 0
@@ -130,10 +130,10 @@ local function makeButton(parent, text, order)
 	c.CornerRadius = UDim.new(0, 6)
 	c.Parent = b
 	b.MouseEnter:Connect(function()
-		b.BackgroundColor3 = COLOR_BTN_HOVER
+		b.BackgroundColor3 = colorBtnHover
 	end)
 	b.MouseLeave:Connect(function()
-		b.BackgroundColor3 = COLOR_BTN_NORMAL
+		b.BackgroundColor3 = colorBtnNormal
 	end)
 	return b
 end
@@ -174,7 +174,7 @@ local function buildRestGui()
 	rc.CornerRadius = UDim.new(0, 10)
 	rc.Parent = restPanel
 	local rstroke = Instance.new("UIStroke")
-	rstroke.Color = COLOR_GOLD_DIM
+	rstroke.Color = colorGoldDim
 	rstroke.Thickness = 1
 	rstroke.Parent = restPanel
 	local rpad = Instance.new("UIPadding")
@@ -188,7 +188,7 @@ local function buildRestGui()
 	title.Size = UDim2.new(1, 0, 0, 30)
 	title.BackgroundTransparency = 1
 	title.Text = "Rest"
-	title.TextColor3 = COLOR_GOLD
+	title.TextColor3 = colorGold
 	title.TextSize = 20
 	title.Font = Enum.Font.Merriweather
 	title.TextXAlignment = Enum.TextXAlignment.Left
@@ -248,7 +248,7 @@ local function playToast(text)
 	AttunementToast.Visible = true
 	AttunementToast.Position = UDim2.new(0.5, 0, 0.85, 0)
 
-	TweenService:Create(AttunementToast, TOAST_IN, {
+	TweenService:Create(AttunementToast, toastIn, {
 		GroupTransparency = 0,
 		Position = UDim2.new(0.5, 0, 0.82, 0),
 	}):Play()
@@ -258,7 +258,7 @@ local function playToast(text)
 		return
 	end
 
-	local out = TweenService:Create(AttunementToast, TOAST_OUT, {
+	local out = TweenService:Create(AttunementToast, toastOut, {
 		GroupTransparency = 1,
 	})
 	out:Play()
@@ -321,7 +321,7 @@ local function selectEntry(spireId)
 	selectedSpireId = spireId
 
 	for id, btn in pairs(listButtons) do
-		btn.BackgroundColor3 = (id == spireId) and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
+		btn.BackgroundColor3 = (id == spireId) and colorBtnSelect or colorBtnNormal
 	end
 
 	local spireDef = nil
@@ -334,7 +334,7 @@ local function selectEntry(spireId)
 
 	if spireDef then
 		SelectedLabel.Text = spireDef.Name
-		SelectedLabel.TextColor3 = COLOR_GOLD
+		SelectedLabel.TextColor3 = colorGold
 		CostLabel.Text = SpireConfig.TeleportCost .. " L"
 		CostLabel.Visible = true
 		ErrorLabel.Visible = false
@@ -356,8 +356,7 @@ local function buildList()
 		local btn = Instance.new("TextButton")
 		btn.Name = spire.Id
 		btn.Size = UDim2.new(1, 0, 0, 52)
-		btn.BackgroundColor3 = (spire.Id == selectedSpireId) and COLOR_BTN_SELECT
-			or COLOR_BTN_NORMAL
+		btn.BackgroundColor3 = (spire.Id == selectedSpireId) and colorBtnSelect or colorBtnNormal
 		btn.BorderSizePixel = 0
 		btn.Text = ""
 		btn.AutoButtonColor = false
@@ -372,7 +371,7 @@ local function buildList()
 		local pip = Instance.new("Frame")
 		pip.Size = UDim2.new(0, 6, 0, 6)
 		pip.Position = UDim2.new(0, 14, 0.5, -3)
-		pip.BackgroundColor3 = isAttuned and COLOR_GOLD or COLOR_UNATTUNED
+		pip.BackgroundColor3 = isAttuned and colorGold or colorUnattuned
 		pip.BorderSizePixel = 0
 		pip.Parent = btn
 		local pipCorner = Instance.new("UICorner")
@@ -384,7 +383,7 @@ local function buildList()
 		nameLbl.Position = UDim2.new(0, 30, 0, 8)
 		nameLbl.BackgroundTransparency = 1
 		nameLbl.Text = spire.Name
-		nameLbl.TextColor3 = isAttuned and COLOR_WHITE or COLOR_UNATTUNED
+		nameLbl.TextColor3 = isAttuned and colorWhite or colorUnattuned
 		nameLbl.TextSize = 13
 		nameLbl.Font = Enum.Font.Merriweather
 		nameLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -396,7 +395,7 @@ local function buildList()
 		zoneLbl.Position = UDim2.new(0, 30, 0, 30)
 		zoneLbl.BackgroundTransparency = 1
 		zoneLbl.Text = spire.Zone
-		zoneLbl.TextColor3 = isAttuned and COLOR_MUTED or COLOR_UNATTUNED
+		zoneLbl.TextColor3 = isAttuned and colorMuted or colorUnattuned
 		zoneLbl.TextSize = 11
 		zoneLbl.Font = Enum.Font.Merriweather
 		zoneLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -410,7 +409,7 @@ local function buildList()
 			lockLbl.BackgroundTransparency = 1
 			lockLbl.Text = "X"
 			lockLbl.TextSize = 14
-			lockLbl.TextColor3 = COLOR_UNATTUNED
+			lockLbl.TextColor3 = colorUnattuned
 			lockLbl.Font = Enum.Font.Merriweather
 			lockLbl.Parent = btn
 		end
@@ -422,13 +421,13 @@ local function buildList()
 
 			btn.MouseEnter:Connect(function()
 				if spire.Id ~= selectedSpireId then
-					btn.BackgroundColor3 = COLOR_BTN_HOVER
+					btn.BackgroundColor3 = colorBtnHover
 				end
 			end)
 
 			btn.MouseLeave:Connect(function()
 				if spire.Id ~= selectedSpireId then
-					btn.BackgroundColor3 = COLOR_BTN_NORMAL
+					btn.BackgroundColor3 = colorBtnNormal
 				end
 			end)
 		end
@@ -456,7 +455,7 @@ buildStatPanel = function()
 	c.CornerRadius = UDim.new(0, 10)
 	c.Parent = statPanel
 	local st = Instance.new("UIStroke")
-	st.Color = COLOR_GOLD_DIM
+	st.Color = colorGoldDim
 	st.Thickness = 1
 	st.Parent = statPanel
 	local pad = Instance.new("UIPadding")
@@ -470,7 +469,7 @@ buildStatPanel = function()
 	hdr.Size = UDim2.new(1, 0, 0, 24)
 	hdr.BackgroundTransparency = 1
 	hdr.Text = "Level Up"
-	hdr.TextColor3 = COLOR_GOLD
+	hdr.TextColor3 = colorGold
 	hdr.TextSize = 18
 	hdr.Font = Enum.Font.Merriweather
 	hdr.TextXAlignment = Enum.TextXAlignment.Left
@@ -481,7 +480,7 @@ buildStatPanel = function()
 	liturgyLabel.Position = UDim2.new(0, 0, 0, 26)
 	liturgyLabel.BackgroundTransparency = 1
 	liturgyLabel.Text = "Liturgy: --"
-	liturgyLabel.TextColor3 = COLOR_MUTED
+	liturgyLabel.TextColor3 = colorMuted
 	liturgyLabel.TextSize = 12
 	liturgyLabel.Font = Enum.Font.RobotoMono
 	liturgyLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -492,7 +491,7 @@ buildStatPanel = function()
 	nextCostLabel.Position = UDim2.new(0, 0, 0, 44)
 	nextCostLabel.BackgroundTransparency = 1
 	nextCostLabel.Text = ""
-	nextCostLabel.TextColor3 = COLOR_GOLD_DIM
+	nextCostLabel.TextColor3 = colorGoldDim
 	nextCostLabel.TextSize = 12
 	nextCostLabel.Font = Enum.Font.RobotoMono
 	nextCostLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -507,10 +506,10 @@ buildStatPanel = function()
 	rl.Padding = UDim.new(0, 8)
 	rl.Parent = rows
 
-	for i, stat in ipairs(STAT_ORDER) do
+	for i, stat in ipairs(statOrder) do
 		local row = Instance.new("Frame")
 		row.Size = UDim2.new(1, 0, 0, 44)
-		row.BackgroundColor3 = COLOR_BTN_NORMAL
+		row.BackgroundColor3 = colorBtnNormal
 		row.BorderSizePixel = 0
 		row.LayoutOrder = i
 		row.Parent = rows
@@ -523,7 +522,7 @@ buildStatPanel = function()
 		nameLbl.Position = UDim2.new(0, 10, 0, 3)
 		nameLbl.BackgroundTransparency = 1
 		nameLbl.Text = stat
-		nameLbl.TextColor3 = COLOR_WHITE
+		nameLbl.TextColor3 = colorWhite
 		nameLbl.TextSize = 14
 		nameLbl.Font = Enum.Font.Merriweather
 		nameLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -533,8 +532,8 @@ buildStatPanel = function()
 		descLbl.Size = UDim2.new(0.55, 0, 0, 14)
 		descLbl.Position = UDim2.new(0, 10, 0, 25)
 		descLbl.BackgroundTransparency = 1
-		descLbl.Text = STAT_DESC[stat] or ""
-		descLbl.TextColor3 = COLOR_MUTED
+		descLbl.Text = statDesc[stat] or ""
+		descLbl.TextColor3 = colorMuted
 		descLbl.TextSize = 10
 		descLbl.Font = Enum.Font.RobotoMono
 		descLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -545,7 +544,7 @@ buildStatPanel = function()
 		valLbl.Position = UDim2.new(1, -86, 0, 0)
 		valLbl.BackgroundTransparency = 1
 		valLbl.Text = "0"
-		valLbl.TextColor3 = COLOR_GOLD
+		valLbl.TextColor3 = colorGold
 		valLbl.TextSize = 18
 		valLbl.Font = Enum.Font.RobotoMono
 		valLbl.Parent = row
@@ -553,11 +552,11 @@ buildStatPanel = function()
 		local plus = Instance.new("TextButton")
 		plus.Size = UDim2.new(0, 40, 0, 32)
 		plus.Position = UDim2.new(1, -46, 0.5, -16)
-		plus.BackgroundColor3 = COLOR_BTN_SELECT
+		plus.BackgroundColor3 = colorBtnSelect
 		plus.BorderSizePixel = 0
 		plus.AutoButtonColor = true
 		plus.Text = "+"
-		plus.TextColor3 = COLOR_WHITE
+		plus.TextColor3 = colorWhite
 		plus.TextSize = 20
 		plus.Font = Enum.Font.Merriweather
 		plus.Parent = row
@@ -601,7 +600,7 @@ buildStatPanel = function()
 	skillPointLabel.Size = UDim2.new(1, 0, 0, 18)
 	skillPointLabel.BackgroundTransparency = 1
 	skillPointLabel.Text = "Skill Points: 0 / 150"
-	skillPointLabel.TextColor3 = COLOR_GOLD
+	skillPointLabel.TextColor3 = colorGold
 	skillPointLabel.TextSize = 14
 	skillPointLabel.Font = Enum.Font.Merriweather
 	skillPointLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -612,7 +611,7 @@ buildStatPanel = function()
 	availableLabel.Position = UDim2.new(0, 0, 0, 19)
 	availableLabel.BackgroundTransparency = 1
 	availableLabel.Text = "Available to spend: 0"
-	availableLabel.TextColor3 = COLOR_MUTED
+	availableLabel.TextColor3 = colorMuted
 	availableLabel.TextSize = 11
 	availableLabel.Font = Enum.Font.RobotoMono
 	availableLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -623,11 +622,11 @@ buildStatPanel = function()
 	buySkillBtn.Position = UDim2.new(0, 0, 1, -30)
 	buySkillBtn.AnchorPoint = Vector2.new(0, 1)
 	buySkillBtn.Position = UDim2.new(0, 0, 1, 0)
-	buySkillBtn.BackgroundColor3 = COLOR_BTN_SELECT
+	buySkillBtn.BackgroundColor3 = colorBtnSelect
 	buySkillBtn.BorderSizePixel = 0
 	buySkillBtn.AutoButtonColor = true
 	buySkillBtn.Text = "Buy Skill Point"
-	buySkillBtn.TextColor3 = COLOR_WHITE
+	buySkillBtn.TextColor3 = colorWhite
 	buySkillBtn.TextSize = 13
 	buySkillBtn.Font = Enum.Font.Merriweather
 	buySkillBtn.Parent = bottom
@@ -672,7 +671,7 @@ buildSpellbookPanel = function()
 	c.CornerRadius = UDim.new(0, 10)
 	c.Parent = spellPanel
 	local st = Instance.new("UIStroke")
-	st.Color = COLOR_GOLD_DIM
+	st.Color = colorGoldDim
 	st.Thickness = 1
 	st.Parent = spellPanel
 	local pad = Instance.new("UIPadding")
@@ -686,7 +685,7 @@ buildSpellbookPanel = function()
 	spellHeader.Size = UDim2.new(1, 0, 0, 24)
 	spellHeader.BackgroundTransparency = 1
 	spellHeader.Text = "Spellbook"
-	spellHeader.TextColor3 = COLOR_GOLD
+	spellHeader.TextColor3 = colorGold
 	spellHeader.TextSize = 18
 	spellHeader.Font = Enum.Font.Merriweather
 	spellHeader.TextXAlignment = Enum.TextXAlignment.Left
@@ -697,7 +696,7 @@ buildSpellbookPanel = function()
 	spellSubHeader.Position = UDim2.new(0, 0, 0, 26)
 	spellSubHeader.BackgroundTransparency = 1
 	spellSubHeader.Text = ""
-	spellSubHeader.TextColor3 = COLOR_MUTED
+	spellSubHeader.TextColor3 = colorMuted
 	spellSubHeader.TextSize = 12
 	spellSubHeader.Font = Enum.Font.RobotoMono
 	spellSubHeader.TextXAlignment = Enum.TextXAlignment.Left
@@ -709,7 +708,7 @@ buildSpellbookPanel = function()
 	spellEmptyLabel.BackgroundTransparency = 1
 	spellEmptyLabel.Text = "Equip a weapon to view its skills."
 	spellEmptyLabel.TextWrapped = true
-	spellEmptyLabel.TextColor3 = COLOR_MUTED
+	spellEmptyLabel.TextColor3 = colorMuted
 	spellEmptyLabel.TextSize = 13
 	spellEmptyLabel.Font = Enum.Font.Merriweather
 	spellEmptyLabel.Visible = false
@@ -721,7 +720,7 @@ buildSpellbookPanel = function()
 	spellSlotsFrame.BackgroundTransparency = 1
 	spellSlotsFrame.BorderSizePixel = 0
 	spellSlotsFrame.ScrollBarThickness = 4
-	spellSlotsFrame.ScrollBarImageColor3 = COLOR_GOLD_DIM
+	spellSlotsFrame.ScrollBarImageColor3 = colorGoldDim
 	spellSlotsFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 	spellSlotsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	spellSlotsFrame.Parent = spellPanel
@@ -763,9 +762,9 @@ refreshSpellbookPanel = function(snap)
 	spellEmptyLabel.Visible = false
 
 	-- Height of one option, and the gap between options.
-	local OPT_H = 32
-	local OPT_PAD = 4
-	local EXPAND_TW = TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+	local optH = 32
+	local optPad = 4
+	local expandTw = TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 	-- Collapses every open slot except keep.
 	local collapseFns = {}
@@ -791,14 +790,14 @@ refreshSpellbookPanel = function(snap)
 		group.LayoutOrder = slotIdx
 		group.Parent = spellSlotsFrame
 		local gl = Instance.new("UIListLayout")
-		gl.Padding = UDim.new(0, OPT_PAD)
+		gl.Padding = UDim.new(0, optPad)
 		gl.SortOrder = Enum.SortOrder.LayoutOrder
 		gl.Parent = group
 
 		-- The header shows the key, the equipped skill, and a chevron.
 		local header = Instance.new("TextButton")
 		header.Size = UDim2.new(1, 0, 0, 40)
-		header.BackgroundColor3 = COLOR_BTN_NORMAL
+		header.BackgroundColor3 = colorBtnNormal
 		header.BorderSizePixel = 0
 		header.AutoButtonColor = false
 		header.Text = ""
@@ -813,7 +812,7 @@ refreshSpellbookPanel = function(snap)
 		slotTag.Position = UDim2.new(0, 10, 0, 0)
 		slotTag.BackgroundTransparency = 1
 		slotTag.Text = slotKey
-		slotTag.TextColor3 = COLOR_GOLD
+		slotTag.TextColor3 = colorGold
 		slotTag.TextSize = 16
 		slotTag.Font = Enum.Font.Merriweather
 		slotTag.TextXAlignment = Enum.TextXAlignment.Left
@@ -824,7 +823,7 @@ refreshSpellbookPanel = function(snap)
 		eqLbl.Position = UDim2.new(0, 44, 0, 0)
 		eqLbl.BackgroundTransparency = 1
 		eqLbl.Text = equipped or "Empty"
-		eqLbl.TextColor3 = equipped and COLOR_WHITE or COLOR_MUTED
+		eqLbl.TextColor3 = equipped and colorWhite or colorMuted
 		eqLbl.TextSize = 14
 		eqLbl.Font = Enum.Font.Merriweather
 		eqLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -836,7 +835,7 @@ refreshSpellbookPanel = function(snap)
 		chevron.Position = UDim2.new(1, -30, 0, 0)
 		chevron.BackgroundTransparency = 1
 		chevron.Text = "v"
-		chevron.TextColor3 = COLOR_GOLD_DIM
+		chevron.TextColor3 = colorGoldDim
 		chevron.TextSize = 14
 		chevron.Font = Enum.Font.Merriweather
 		chevron.Parent = header
@@ -850,7 +849,7 @@ refreshSpellbookPanel = function(snap)
 		optWrap.LayoutOrder = 1
 		optWrap.Parent = group
 		local owl = Instance.new("UIListLayout")
-		owl.Padding = UDim.new(0, OPT_PAD)
+		owl.Padding = UDim.new(0, optPad)
 		owl.SortOrder = Enum.SortOrder.LayoutOrder
 		owl.Parent = optWrap
 
@@ -858,31 +857,31 @@ refreshSpellbookPanel = function(snap)
 
 		header.MouseEnter:Connect(function()
 			if expandedSlot ~= slotKey then
-				header.BackgroundColor3 = COLOR_BTN_HOVER
+				header.BackgroundColor3 = colorBtnHover
 			end
 		end)
 		header.MouseLeave:Connect(function()
 			if expandedSlot ~= slotKey then
-				header.BackgroundColor3 = COLOR_BTN_NORMAL
+				header.BackgroundColor3 = colorBtnNormal
 			end
 		end)
 
 		if #owned == 0 then
 			-- With no owned skills, the header is inactive and shows a muted note.
 			eqLbl.Text = "No skills unlocked"
-			eqLbl.TextColor3 = COLOR_MUTED
+			eqLbl.TextColor3 = colorMuted
 			chevron.Visible = false
 		else
 			local fullHeight = 0
 			for i, skillName in ipairs(owned) do
 				local isEq = (skillName == equipped)
 				local optBtn = Instance.new("TextButton")
-				optBtn.Size = UDim2.new(1, 0, 0, OPT_H)
-				optBtn.BackgroundColor3 = isEq and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
+				optBtn.Size = UDim2.new(1, 0, 0, optH)
+				optBtn.BackgroundColor3 = isEq and colorBtnSelect or colorBtnNormal
 				optBtn.BorderSizePixel = 0
 				optBtn.AutoButtonColor = false
 				optBtn.Text = "    " .. skillName
-				optBtn.TextColor3 = isEq and COLOR_GOLD or COLOR_WHITE
+				optBtn.TextColor3 = isEq and colorGold or colorWhite
 				optBtn.TextSize = 13
 				optBtn.Font = Enum.Font.Merriweather
 				optBtn.TextXAlignment = Enum.TextXAlignment.Left
@@ -895,7 +894,7 @@ refreshSpellbookPanel = function(snap)
 				local pip = Instance.new("Frame")
 				pip.Size = UDim2.new(0, 6, 0, 6)
 				pip.Position = UDim2.new(1, -16, 0.5, -3)
-				pip.BackgroundColor3 = COLOR_GOLD
+				pip.BackgroundColor3 = colorGold
 				pip.BorderSizePixel = 0
 				pip.Visible = isEq
 				pip.Parent = optBtn
@@ -913,12 +912,12 @@ refreshSpellbookPanel = function(snap)
 				end
 				optBtn.MouseEnter:Connect(function()
 					if not isEquipped() then
-						optBtn.BackgroundColor3 = COLOR_BTN_HOVER
+						optBtn.BackgroundColor3 = colorBtnHover
 					end
 				end)
 				optBtn.MouseLeave:Connect(function()
 					if not isEquipped() then
-						optBtn.BackgroundColor3 = COLOR_BTN_NORMAL
+						optBtn.BackgroundColor3 = colorBtnNormal
 					end
 				end)
 
@@ -936,17 +935,16 @@ refreshSpellbookPanel = function(snap)
 						end
 						for name, refs in pairs(spellRowRefs[slotKey].options) do
 							local on = (name == capturedSkill)
-							refs.button.BackgroundColor3 = on and COLOR_BTN_SELECT
-								or COLOR_BTN_NORMAL
-							refs.button.TextColor3 = on and COLOR_GOLD or COLOR_WHITE
+							refs.button.BackgroundColor3 = on and colorBtnSelect or colorBtnNormal
+							refs.button.TextColor3 = on and colorGold or colorWhite
 							refs.pip.Visible = on
 						end
 						eqLbl.Text = capturedSkill
-						eqLbl.TextColor3 = COLOR_WHITE
+						eqLbl.TextColor3 = colorWhite
 					end
 				end)
 
-				fullHeight = fullHeight + OPT_H + (i > 1 and OPT_PAD or 0)
+				fullHeight = fullHeight + optH + (i > 1 and optPad or 0)
 			end
 
 			local function collapse()
@@ -954,8 +952,8 @@ refreshSpellbookPanel = function(snap)
 					expandedSlot = nil
 				end
 				chevron.Text = "v"
-				header.BackgroundColor3 = COLOR_BTN_NORMAL
-				TweenService:Create(optWrap, EXPAND_TW, { Size = UDim2.new(1, 0, 0, 0) }):Play()
+				header.BackgroundColor3 = colorBtnNormal
+				TweenService:Create(optWrap, expandTw, { Size = UDim2.new(1, 0, 0, 0) }):Play()
 			end
 			collapseFns[slotKey] = collapse
 
@@ -963,8 +961,8 @@ refreshSpellbookPanel = function(snap)
 				collapseAllExcept(slotKey)
 				expandedSlot = slotKey
 				chevron.Text = "^"
-				header.BackgroundColor3 = COLOR_BTN_SELECT
-				TweenService:Create(optWrap, EXPAND_TW, { Size = UDim2.new(1, 0, 0, fullHeight) })
+				header.BackgroundColor3 = colorBtnSelect
+				TweenService:Create(optWrap, expandTw, { Size = UDim2.new(1, 0, 0, fullHeight) })
 					:Play()
 			end
 
@@ -1013,8 +1011,8 @@ local armorySelected = nil
 local armoryListButtons = {}
 
 -- Width of the list.
-local ARM_LIST_W = 150
-local ARM_TW = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local armListW = 150
+local armTw = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 -- Builds the armor stand in the viewport once: a copy of the template rig and a camera
 -- in front of it.
@@ -1101,25 +1099,25 @@ local function refreshArmoryButtons()
 	if equipRedundant then
 		armoryEquipBtn.Text = "Equipped"
 		armoryEquipBtn.AutoButtonColor = false
-		armoryEquipBtn.BackgroundColor3 = COLOR_BTN_NORMAL
-		armoryEquipBtn.TextColor3 = COLOR_MUTED
+		armoryEquipBtn.BackgroundColor3 = colorBtnNormal
+		armoryEquipBtn.TextColor3 = colorMuted
 	else
 		armoryEquipBtn.Text = "Equip"
 		armoryEquipBtn.AutoButtonColor = true
-		armoryEquipBtn.BackgroundColor3 = COLOR_BTN_SELECT
-		armoryEquipBtn.TextColor3 = COLOR_WHITE
+		armoryEquipBtn.BackgroundColor3 = colorBtnSelect
+		armoryEquipBtn.TextColor3 = colorWhite
 	end
 
 	if isVanity then
 		armoryTransmogBtn.Text = "Worn"
 		armoryTransmogBtn.AutoButtonColor = false
-		armoryTransmogBtn.BackgroundColor3 = COLOR_BTN_NORMAL
-		armoryTransmogBtn.TextColor3 = COLOR_MUTED
+		armoryTransmogBtn.BackgroundColor3 = colorBtnNormal
+		armoryTransmogBtn.TextColor3 = colorMuted
 	else
 		armoryTransmogBtn.Text = "Transmog"
 		armoryTransmogBtn.AutoButtonColor = true
-		armoryTransmogBtn.BackgroundColor3 = COLOR_BTN_SELECT
-		armoryTransmogBtn.TextColor3 = COLOR_WHITE
+		armoryTransmogBtn.BackgroundColor3 = colorBtnSelect
+		armoryTransmogBtn.TextColor3 = colorWhite
 	end
 end
 
@@ -1132,7 +1130,7 @@ local function selectArmor(armorName)
 	end
 
 	for name, btn in pairs(armoryListButtons) do
-		btn.BackgroundColor3 = (name == armorName) and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
+		btn.BackgroundColor3 = (name == armorName) and colorBtnSelect or colorBtnNormal
 	end
 
 	armoryDetailTitle.Text = info.DisplayName or armorName
@@ -1146,10 +1144,10 @@ local function selectArmor(armorName)
 	dressStand(armorName)
 	refreshArmoryButtons()
 
-	TweenService:Create(armoryListFrame, ARM_TW, { Position = UDim2.new(0, 0, 0, 40) }):Play()
+	TweenService:Create(armoryListFrame, armTw, { Position = UDim2.new(0, 0, 0, 40) }):Play()
 	armoryDetail.Visible = true
 	armoryDetail.GroupTransparency = 1
-	TweenService:Create(armoryDetail, ARM_TW, { GroupTransparency = 0 }):Play()
+	TweenService:Create(armoryDetail, armTw, { GroupTransparency = 0 }):Play()
 end
 
 buildArmoryPanel = function()
@@ -1170,7 +1168,7 @@ buildArmoryPanel = function()
 	c.CornerRadius = UDim.new(0, 10)
 	c.Parent = armoryPanel
 	local st = Instance.new("UIStroke")
-	st.Color = COLOR_GOLD_DIM
+	st.Color = colorGoldDim
 	st.Thickness = 1
 	st.Parent = armoryPanel
 	local pad = Instance.new("UIPadding")
@@ -1184,7 +1182,7 @@ buildArmoryPanel = function()
 	hdr.Size = UDim2.new(1, 0, 0, 24)
 	hdr.BackgroundTransparency = 1
 	hdr.Text = "Armory"
-	hdr.TextColor3 = COLOR_GOLD
+	hdr.TextColor3 = colorGold
 	hdr.TextSize = 18
 	hdr.Font = Enum.Font.Merriweather
 	hdr.TextXAlignment = Enum.TextXAlignment.Left
@@ -1195,7 +1193,7 @@ buildArmoryPanel = function()
 	armoryCurrentLbl.Position = UDim2.new(0, 0, 0, 24)
 	armoryCurrentLbl.BackgroundTransparency = 1
 	armoryCurrentLbl.Text = ""
-	armoryCurrentLbl.TextColor3 = COLOR_MUTED
+	armoryCurrentLbl.TextColor3 = colorMuted
 	armoryCurrentLbl.TextSize = 12
 	armoryCurrentLbl.Font = Enum.Font.RobotoMono
 	armoryCurrentLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1205,11 +1203,11 @@ buildArmoryPanel = function()
 	armoryListFrame.Name = "ArmorList"
 	-- The list is centered by refreshArmoryPanel and moved to x = 0 by selectArmor.
 	armoryListFrame.Position = UDim2.new(0, 0, 0, 40)
-	armoryListFrame.Size = UDim2.new(0, ARM_LIST_W, 1, -50)
+	armoryListFrame.Size = UDim2.new(0, armListW, 1, -50)
 	armoryListFrame.BackgroundTransparency = 1
 	armoryListFrame.BorderSizePixel = 0
 	armoryListFrame.ScrollBarThickness = 4
-	armoryListFrame.ScrollBarImageColor3 = COLOR_GOLD_DIM
+	armoryListFrame.ScrollBarImageColor3 = colorGoldDim
 	armoryListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
 	armoryListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	armoryListFrame.Parent = armoryPanel
@@ -1221,8 +1219,8 @@ buildArmoryPanel = function()
 	-- The detail view is hidden until an armor is picked.
 	armoryDetail = Instance.new("CanvasGroup")
 	armoryDetail.Name = "ArmorDetail"
-	armoryDetail.Position = UDim2.new(0, ARM_LIST_W + 14, 0, 40)
-	armoryDetail.Size = UDim2.new(1, -(ARM_LIST_W + 14), 1, -50)
+	armoryDetail.Position = UDim2.new(0, armListW + 14, 0, 40)
+	armoryDetail.Size = UDim2.new(1, -(armListW + 14), 1, -50)
 	armoryDetail.BackgroundTransparency = 1
 	armoryDetail.BorderSizePixel = 0
 	armoryDetail.Visible = false
@@ -1232,7 +1230,7 @@ buildArmoryPanel = function()
 	armoryDetailTitle.Size = UDim2.new(1, 0, 0, 24)
 	armoryDetailTitle.BackgroundTransparency = 1
 	armoryDetailTitle.Text = ""
-	armoryDetailTitle.TextColor3 = COLOR_GOLD
+	armoryDetailTitle.TextColor3 = colorGold
 	armoryDetailTitle.TextSize = 16
 	armoryDetailTitle.Font = Enum.Font.Merriweather
 	armoryDetailTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -1254,7 +1252,7 @@ buildArmoryPanel = function()
 	armoryDetailStats.Size = UDim2.new(1, 0, 0, 70)
 	armoryDetailStats.BackgroundTransparency = 1
 	armoryDetailStats.Text = ""
-	armoryDetailStats.TextColor3 = COLOR_WHITE
+	armoryDetailStats.TextColor3 = colorWhite
 	armoryDetailStats.TextSize = 14
 	armoryDetailStats.Font = Enum.Font.RobotoMono
 	armoryDetailStats.TextXAlignment = Enum.TextXAlignment.Left
@@ -1265,10 +1263,10 @@ buildArmoryPanel = function()
 	armoryEquipBtn.AnchorPoint = Vector2.new(0, 1)
 	armoryEquipBtn.Position = UDim2.new(0, 0, 1, 0)
 	armoryEquipBtn.Size = UDim2.new(0.5, -6, 0, 36)
-	armoryEquipBtn.BackgroundColor3 = COLOR_BTN_SELECT
+	armoryEquipBtn.BackgroundColor3 = colorBtnSelect
 	armoryEquipBtn.BorderSizePixel = 0
 	armoryEquipBtn.Text = "Equip"
-	armoryEquipBtn.TextColor3 = COLOR_WHITE
+	armoryEquipBtn.TextColor3 = colorWhite
 	armoryEquipBtn.TextSize = 14
 	armoryEquipBtn.Font = Enum.Font.Merriweather
 	armoryEquipBtn.Parent = armoryDetail
@@ -1280,10 +1278,10 @@ buildArmoryPanel = function()
 	armoryTransmogBtn.AnchorPoint = Vector2.new(1, 1)
 	armoryTransmogBtn.Position = UDim2.new(1, 0, 1, 0)
 	armoryTransmogBtn.Size = UDim2.new(0.5, -6, 0, 36)
-	armoryTransmogBtn.BackgroundColor3 = COLOR_BTN_SELECT
+	armoryTransmogBtn.BackgroundColor3 = colorBtnSelect
 	armoryTransmogBtn.BorderSizePixel = 0
 	armoryTransmogBtn.Text = "Transmog"
-	armoryTransmogBtn.TextColor3 = COLOR_WHITE
+	armoryTransmogBtn.TextColor3 = colorWhite
 	armoryTransmogBtn.TextSize = 14
 	armoryTransmogBtn.Font = Enum.Font.Merriweather
 	armoryTransmogBtn.Parent = armoryDetail
@@ -1332,7 +1330,7 @@ refreshArmoryPanel = function(snap)
 
 	-- With no pick, the list is centered under the header.
 	armoryDetail.Visible = false
-	armoryListFrame.Position = UDim2.new(0.5, -ARM_LIST_W / 2, 0, 40)
+	armoryListFrame.Position = UDim2.new(0.5, -armListW / 2, 0, 40)
 
 	refreshArmoryCurrent()
 
@@ -1342,11 +1340,11 @@ refreshArmoryPanel = function(snap)
 		local btn = Instance.new("TextButton")
 		btn.Name = name
 		btn.Size = UDim2.new(1, -4, 0, 36)
-		btn.BackgroundColor3 = COLOR_BTN_NORMAL
+		btn.BackgroundColor3 = colorBtnNormal
 		btn.BorderSizePixel = 0
 		btn.AutoButtonColor = false
 		btn.Text = "  " .. ((info and info.DisplayName) or name)
-		btn.TextColor3 = COLOR_WHITE
+		btn.TextColor3 = colorWhite
 		btn.TextSize = 13
 		btn.Font = Enum.Font.Merriweather
 		btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -1359,12 +1357,12 @@ refreshArmoryPanel = function(snap)
 
 		btn.MouseEnter:Connect(function()
 			if armorySelected ~= name then
-				btn.BackgroundColor3 = COLOR_BTN_HOVER
+				btn.BackgroundColor3 = colorBtnHover
 			end
 		end)
 		btn.MouseLeave:Connect(function()
 			if armorySelected ~= name then
-				btn.BackgroundColor3 = COLOR_BTN_NORMAL
+				btn.BackgroundColor3 = colorBtnNormal
 			end
 		end)
 		btn.MouseButton1Click:Connect(function()
@@ -1426,11 +1424,11 @@ applySnapshot = function(snap)
 		if localOwned >= localMaxSP then
 			buySkillBtn.Text = "Skill Points Maxed"
 			buySkillBtn.AutoButtonColor = false
-			buySkillBtn.BackgroundColor3 = COLOR_BTN_NORMAL
+			buySkillBtn.BackgroundColor3 = colorBtnNormal
 		else
 			buySkillBtn.Text = string.format("Buy Skill Point  (%d L)", localNextCost)
 			buySkillBtn.AutoButtonColor = true
-			buySkillBtn.BackgroundColor3 = COLOR_BTN_SELECT
+			buySkillBtn.BackgroundColor3 = colorBtnSelect
 		end
 	end
 	-- A good refresh clears any error text.
@@ -1477,7 +1475,7 @@ local function performRespec()
 		statPanel.Visible = true
 		applySnapshot(result)
 		nextCostLabel.Text = "All skill points freed"
-		nextCostLabel.TextColor3 = COLOR_GOLD
+		nextCostLabel.TextColor3 = colorGold
 	elseif result and statPanel then
 		nextCostLabel.Text = "Respec failed: " .. reasonText(result.reason)
 		nextCostLabel.TextColor3 = Color3.fromRGB(200, 80, 70)
@@ -1503,7 +1501,7 @@ doRespec = function()
 	cc.CornerRadius = UDim.new(0, 10)
 	cc.Parent = respecConfirm
 	local cs = Instance.new("UIStroke")
-	cs.Color = COLOR_GOLD_DIM
+	cs.Color = colorGoldDim
 	cs.Thickness = 1
 	cs.Parent = respecConfirm
 
@@ -1514,7 +1512,7 @@ doRespec = function()
 	msg.Text =
 		"Respec all stats? This frees every assigned skill point so you can redistribute them. You keep all the skill points you've bought."
 	msg.TextWrapped = true
-	msg.TextColor3 = COLOR_WHITE
+	msg.TextColor3 = colorWhite
 	msg.TextSize = 14
 	msg.Font = Enum.Font.Merriweather
 	msg.ZIndex = 51
@@ -1526,7 +1524,7 @@ doRespec = function()
 	yes.BackgroundColor3 = Color3.fromRGB(40, 70, 40)
 	yes.BorderSizePixel = 0
 	yes.Text = "Yes"
-	yes.TextColor3 = COLOR_WHITE
+	yes.TextColor3 = colorWhite
 	yes.TextSize = 15
 	yes.Font = Enum.Font.Merriweather
 	yes.ZIndex = 51
@@ -1541,7 +1539,7 @@ doRespec = function()
 	no.BackgroundColor3 = Color3.fromRGB(60, 30, 24)
 	no.BorderSizePixel = 0
 	no.Text = "No"
-	no.TextColor3 = COLOR_WHITE
+	no.TextColor3 = colorWhite
 	no.TextSize = 15
 	no.Font = Enum.Font.Merriweather
 	no.ZIndex = 51
@@ -1613,7 +1611,7 @@ beginRestLocal = function(spireId)
 	restGui.Enabled = true
 
 	restDim.BackgroundTransparency = 1
-	TweenService:Create(restDim, FADE_IN, { BackgroundTransparency = REST_DIM }):Play()
+	TweenService:Create(restDim, fadeIn, { BackgroundTransparency = REST_DIM }):Play()
 
 	restPanel.Position = UDim2.new(-0.3, 0, 0.5, 0)
 	TweenService
@@ -1644,9 +1642,9 @@ endRestLocal = function()
 		closeMap()
 	end
 	if restGui then
-		local out = TweenService:Create(restDim, FADE_OUT, { BackgroundTransparency = 1 })
+		local out = TweenService:Create(restDim, fadeOut, { BackgroundTransparency = 1 })
 		out:Play()
-		TweenService:Create(restPanel, FADE_OUT, { Position = UDim2.new(-0.3, 0, 0.5, 0) }):Play()
+		TweenService:Create(restPanel, fadeOut, { Position = UDim2.new(-0.3, 0, 0.5, 0) }):Play()
 		out.Completed:Connect(function()
 			if not resting then
 				restGui.Enabled = false
@@ -1664,7 +1662,7 @@ openMap = function()
 	selectedSpireId = nil
 	TeleportButton.Visible = false
 	SelectedLabel.Text = "Select a destination."
-	SelectedLabel.TextColor3 = COLOR_MUTED
+	SelectedLabel.TextColor3 = colorMuted
 	CostLabel.Visible = false
 	ErrorLabel.Visible = false
 
@@ -1673,14 +1671,14 @@ openMap = function()
 	MapFrame.GroupTransparency = 1
 	MapFrame.Visible = true
 
-	TweenService:Create(MapFrame, FADE_IN, {
+	TweenService:Create(MapFrame, fadeIn, {
 		GroupTransparency = 0,
 	}):Play()
 end
 
 closeMap = function()
 	mapOpen = false
-	local out = TweenService:Create(MapFrame, FADE_OUT, {
+	local out = TweenService:Create(MapFrame, fadeOut, {
 		GroupTransparency = 1,
 	})
 	out:Play()

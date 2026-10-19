@@ -40,7 +40,7 @@ local accelerationTime = 0.5
 
 -- Stamina lowers the momentum build-up time from 0.5 seconds to about 0.25, mostly by
 -- level 20 and a little more up to 50.
-local FAST_ACCEL = 0.25
+local fastAccel = 0.25
 local function getAccelerationTime()
 	local stam = 0
 	local stats = player:FindFirstChild("PlayerStats")
@@ -51,7 +51,7 @@ local function getAccelerationTime()
 		end
 	end
 	local progress = StatScaling.GetVelocityProgress(stam)
-	return 0.5 - (0.5 - FAST_ACCEL) * progress
+	return 0.5 - (0.5 - fastAccel) * progress
 end
 
 local bobbingSpeed = 12

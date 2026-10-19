@@ -12,9 +12,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage").remotes
 
 local fallEvent = ReplicatedStorage:WaitForChild("FallDmg")
 
-local MIN_FALL_DAMAGE_HEIGHT = 30
-local FATAL_FALL_HEIGHT = 200
-local ROLL_DAMAGE_REDUCTION = 0.75
+local minFallDamageHeight = 30
+local fatalFallHeight = 200
+local rollDamageReduction = 0.75
 
 -- An R6 root part rests about 3 studs above the floor.
 local groundRayLength = 4.5
@@ -30,12 +30,11 @@ local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 local DownedManager = require(game.ServerScriptService.modules.DownedManager)
 
 local function calculateDamage(height)
-	if height < MIN_FALL_DAMAGE_HEIGHT then
+	if height < minFallDamageHeight then
 		return 0
 	end
 
-	local damageRatio = (height - MIN_FALL_DAMAGE_HEIGHT)
-		/ (FATAL_FALL_HEIGHT - MIN_FALL_DAMAGE_HEIGHT)
+	local damageRatio = (height - minFallDamageHeight) / (fatalFallHeight - minFallDamageHeight)
 	local damage = damageRatio * 100
 
 	return math.clamp(damage, 0, 1000)
@@ -72,7 +71,7 @@ local function applyFall(character, fallDistance, isRolling)
 
 	if baseDamage > 5 then
 		if isRolling then
-			local reducedDamage = baseDamage * (1 - ROLL_DAMAGE_REDUCTION)
+			local reducedDamage = baseDamage * (1 - rollDamageReduction)
 
 			if reducedDamage > 10 then
 				humanoid:TakeDamage(reducedDamage)

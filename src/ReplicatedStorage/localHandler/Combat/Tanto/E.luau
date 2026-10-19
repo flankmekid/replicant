@@ -17,10 +17,10 @@ local animationHndlr = require(RP.modules.animationHandler)
 local CooldownTracker = require(RP.modules.CooldownTracker)
 local ParryCooldownClient = require(RP.modules.ParryCooldownClient)
 
-local ANIM_THROW = "rbxassetid://115237120299356"
+local animThrow = "rbxassetid://115237120299356"
 
 -- A client-side debounce. The server has its own checks.
-local ATTACK_COOLDOWN = 3
+local attackCooldown = 3
 local debounce = false
 
 local function getEquippedToolName()
@@ -64,7 +64,7 @@ function module.OnEActivated()
 
 	debounce = true
 
-	CooldownTracker.Register("Dagger_E", "E", ATTACK_COOLDOWN)
+	CooldownTracker.Register("Dagger_E", "E", attackCooldown)
 
 	local s = RP.assets.sounds.dagger.daggerLunge:Clone()
 	s.Parent = char.HumanoidRootPart
@@ -80,9 +80,9 @@ function module.OnEActivated()
 
 	-- Play the throw animation now, for responsiveness.
 	animationHndlr.StopAnim(char, "ALL")
-	animationHndlr.LoadAnim(char, "E", ANIM_THROW, nil, false)
+	animationHndlr.LoadAnim(char, "E", animThrow, nil, false)
 
-	task.delay(ATTACK_COOLDOWN, function()
+	task.delay(attackCooldown, function()
 		debounce = false
 	end)
 end
@@ -96,7 +96,7 @@ function module.ServerResponse(plr, response)
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
 	if response == "Declined" then
-		animationHndlr.StopAnim(char, "E", ANIM_THROW)
+		animationHndlr.StopAnim(char, "E", animThrow)
 	end
 end
 

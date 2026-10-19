@@ -422,18 +422,18 @@ function module.AbyssalScream(player)
 end
 
 -- How long the burst gives i-frames and its hitbox is live.
-local BURST_ACTIVE = 0.15
+local burstActive = 0.15
 -- The CantAnything lock. It outlasts the i-frames, so a whiffed burst can be punished.
-local BURST_WHIFF_RECOVERY = 1.0
+local burstWhiffRecovery = 1.0
 -- How long the user is rooted after a burst that catches a target.
-local BURST_ROOT_HIT = 0.5
+local burstRootHit = 0.5
 -- How long the user is rooted after a whiff.
-local BURST_ROOT_WHIFF = 1.0
+local burstRootWhiff = 1.0
 -- The knockback radius around the user, in studs.
-local BURST_RADIUS = 8
-local BURST_KNOCKBACK = 30
+local burstRadius = 8
+local burstKnockback = 30
 -- How long enemies stay ragdolled, in seconds.
-local BURST_RAGDOLL = 1.0
+local burstRagdoll = 1.0
 
 -- SkillFunctions.Burst() - break out of a combo with i-frames and knockback
 -- @player: the player who pressed T
@@ -456,8 +456,8 @@ function module.Burst(player)
 	-- Clear the stun first, so a player caught in a combo can burst out.
 	StateHandler.SetStun(character, false)
 
-	StateHandler.SetState(character, "Dodging", true, BURST_ACTIVE)
-	StateHandler.SetState(character, "CantAnything", true, BURST_WHIFF_RECOVERY)
+	StateHandler.SetState(character, "Dodging", true, burstActive)
+	StateHandler.SetState(character, "CantAnything", true, burstWhiffRecovery)
 
 	-- Root the user. A whiff keeps the long root. The first target hit reschedules the
 	-- release to the short root, and the token makes the old timer do nothing. The hitbox
@@ -474,7 +474,7 @@ function module.Burst(player)
 			helperModule.ResetSpeed(character)
 		end)
 	end
-	scheduleUnroot(BURST_ROOT_WHIFF)
+	scheduleUnroot(burstRootWhiff)
 
 	animationHandler.LoadAnim(character, "Burst", "rbxassetid://71570879146947", nil, false)
 
@@ -502,7 +502,7 @@ function module.Burst(player)
 
 	-- No damage: each enemy hit gets knockback and a short ragdoll.
 	local Hitbox =
-		hitboxClass.new({ SizeOrPart = BURST_RADIUS, SpatialOption = "InRadius", DebounceTime = 1 })
+		hitboxClass.new({ SizeOrPart = burstRadius, SpatialOption = "InRadius", DebounceTime = 1 })
 	Hitbox:WeldTo(root, CFrame.new(0, 0, 0))
 	Hitbox:Start()
 
@@ -531,18 +531,18 @@ function module.Burst(player)
 			-- The first target shortens the root. Later targets do not reschedule it.
 			if not rootShortened then
 				rootShortened = true
-				scheduleUnroot(BURST_ROOT_HIT)
+				scheduleUnroot(burstRootHit)
 			end
 
 			local direction = (targetHRP.Position - root.Position).Unit
-			helperModule.ApplyKnockback(targetChar, direction, BURST_KNOCKBACK, 0.2)
-			if BURST_RAGDOLL > 0 then
-				ragdollManager.Ragdoll(targetChar, BURST_RAGDOLL)
+			helperModule.ApplyKnockback(targetChar, direction, burstKnockback, 0.2)
+			if burstRagdoll > 0 then
+				ragdollManager.Ragdoll(targetChar, burstRagdoll)
 			end
 		end
 	end)
 
-	task.delay(BURST_ACTIVE, function()
+	task.delay(burstActive, function()
 		Hitbox:Destroy()
 	end)
 end
@@ -2268,18 +2268,18 @@ function module.Kurai(player)
 	Debris:AddItem(BV, 0.3)
 
 	-- How far forward to teleport, and how high when starting on the ground.
-	local TELEPORT_DISTANCE = 20
-	local AIR_HEIGHT = 10
+	local teleportDistance = 20
+	local airHeight = 10
 
 	local forwardDir = root.CFrame.LookVector
 	local targetPosition
 
 	if not isAirborne then
 		targetPosition = root.Position
-			+ (forwardDir * TELEPORT_DISTANCE)
-			+ Vector3.new(0, AIR_HEIGHT, 0)
+			+ (forwardDir * teleportDistance)
+			+ Vector3.new(0, airHeight, 0)
 	else
-		local airForwardPos = root.Position + (forwardDir * TELEPORT_DISTANCE)
+		local airForwardPos = root.Position + (forwardDir * teleportDistance)
 
 		local floorRay = workspace:Raycast(airForwardPos, Vector3.new(0, -100, 0), rayParams)
 
@@ -2411,15 +2411,15 @@ function module.HiddenDaggers(player)
 	local root = char.HumanoidRootPart
 
 	local DAMAGE = 7
-	local THROW_SPEED = 250
-	local WINDUP_TIME = 0.4
+	local throwSpeed = 250
+	local windupTime = 0.4
 
-	StateHandler.SetState(char, "CantAnything", true, WINDUP_TIME + 0.2)
+	StateHandler.SetState(char, "CantAnything", true, windupTime + 0.2)
 	helperModule.SetSpeed(char, 2, 16)
 
 	animationHandler.LoadAnim(char, "DaggerThrow", "rbxassetid://116490680994705", nil, false)
 
-	task.wait(WINDUP_TIME)
+	task.wait(windupTime)
 
 	StateHandler.SetState(char, "M1", true, 0.5)
 	helperModule.ResetSpeed(char)
@@ -2430,15 +2430,15 @@ function module.HiddenDaggers(player)
 	local RunService = game:GetService("RunService")
 
 	-- Spawn distance ahead of the torso. It is small, so point-blank targets still get hit.
-	local SPAWN_FORWARD = 0.5
+	local spawnForward = 0.5
 	-- Degrees between the center dagger and each side dagger.
-	local FAN_ANGLE = 30
+	local fanAngle = 30
 	-- The spherecast radius.
-	local HITBOX_RADIUS = 2.0
+	local hitboxRadius = 2.0
 	-- Seconds before a dagger despawns.
 	local LIFETIME = 1.5
 	-- Seconds a dagger stays stuck in a wall.
-	local WALL_STICK = 1
+	local wallStick = 1
 
 	for i = -1, 1 do
 		local projectile = game.ServerStorage.Extras.ThrowDagger:Clone()
@@ -2452,8 +2452,8 @@ function module.HiddenDaggers(player)
 		projectile.CanTouch = false
 
 		local originCF = root.CFrame
-			* CFrame.new(0, 0, -SPAWN_FORWARD)
-			* CFrame.Angles(0, math.rad(i * FAN_ANGLE), 0)
+			* CFrame.new(0, 0, -spawnForward)
+			* CFrame.Angles(0, math.rad(i * fanAngle), 0)
 		projectile.CFrame = originCF
 		projectile.Parent = workspace.plrManager.projectiles
 
@@ -2484,7 +2484,7 @@ function module.HiddenDaggers(player)
 			if projectile:FindFirstChild("ShadowEmitter") then
 				projectile.ShadowEmitter:Emit(100)
 			end
-			Debris:AddItem(projectile, WALL_STICK)
+			Debris:AddItem(projectile, wallStick)
 		end
 
 		-- Returns true if the hit consumes the dagger.
@@ -2659,9 +2659,8 @@ function module.HiddenDaggers(player)
 				return
 			end
 
-			local step = THROW_SPEED * dt
-			local result =
-				workspace:Spherecast(position, HITBOX_RADIUS, travelDir * step, rayParams)
+			local step = throwSpeed * dt
+			local result = workspace:Spherecast(position, hitboxRadius, travelDir * step, rayParams)
 
 			if result then
 				local hitPart = result.Instance

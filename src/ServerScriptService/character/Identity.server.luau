@@ -10,7 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local DataManager = require(ServerScriptService.modules.dataManager)
 local TitleManager = require(ServerScriptService.modules.TitleManager)
 
-local SOUL_COLORS = {
+local soulColors = {
 	Color3.fromRGB(160, 40, 40),
 	Color3.fromRGB(200, 180, 120),
 	Color3.fromRGB(220, 220, 230),
@@ -18,11 +18,11 @@ local SOUL_COLORS = {
 	Color3.fromRGB(162, 135, 189),
 }
 
-local SOUL_FONTS = {
+local soulFonts = {
 	Enum.Font.Merriweather,
 }
 
-local SPECIAL_TITLES = {
+local specialTitles = {
 	[1526974131] = "THE PRIMAL MAW",
 }
 
@@ -108,8 +108,8 @@ local function refreshOverhead(player, character)
 end
 
 Players.PlayerAdded:Connect(function(player)
-	local randomColor = SOUL_COLORS[math.random(1, #SOUL_COLORS)]
-	local randomFont = SOUL_FONTS[math.random(1, #SOUL_FONTS)]
+	local randomColor = soulColors[math.random(1, #soulColors)]
+	local randomFont = soulFonts[math.random(1, #soulFonts)]
 
 	player:SetAttribute("SoulColor", randomColor)
 	player:SetAttribute("SoulFont", randomFont.Name)

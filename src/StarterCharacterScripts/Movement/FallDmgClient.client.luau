@@ -15,9 +15,9 @@ local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
 -- Seconds before landing in which a Ctrl press counts as a roll.
-local ROLL_WINDOW = 0.2
+local rollWindow = 0.2
 -- TODO: Replace the placeholder roll animation.
-local ANIMATION_ID = "rbxassetid://78977275276675"
+local animationId = "rbxassetid://78977275276675"
 
 local fallEvent = ReplicatedStorage.remotes:WaitForChild("FallDmg")
 
@@ -26,7 +26,7 @@ local isFalling = false
 local fallStartY = 0
 
 local rollAnimation = Instance.new("Animation")
-rollAnimation.AnimationId = ANIMATION_ID
+rollAnimation.AnimationId = animationId
 local rollTrack = humanoid:LoadAnimation(rollAnimation)
 rollTrack.Priority = Enum.AnimationPriority.Action4
 
@@ -56,7 +56,7 @@ humanoid.StateChanged:Connect(function(oldState, newState)
 			local fallDistance = fallStartY - landY
 
 			local timeSincePress = tick() - lastCtrlPress
-			local successfulRoll = timeSincePress <= ROLL_WINDOW
+			local successfulRoll = timeSincePress <= rollWindow
 
 			-- Roll only after a fall of more than 30 studs.
 			if successfulRoll and fallDistance > 30 then

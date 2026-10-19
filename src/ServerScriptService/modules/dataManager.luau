@@ -14,13 +14,13 @@ local StatScaling = require(game.ReplicatedStorage.modules:WaitForChild("StatSca
 
 local module = {}
 
-local DATA_STORE_NAME = "Apocrypha_Data_v6_TESTING"
-local CURRENCY_NAME = "Liturgy"
-local MAX_LEVEL = 25
-local WEAPON_TYPES = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
-local DROP_LIFETIME = 180
-local DEATH_DROP_AMOUNT = 200
-local DEFAULT_WEAPON = "Fists"
+local dataStoreName = "Apocrypha_Data_v6_TESTING"
+local currencyName = "Liturgy"
+local maxLevel = 25
+local weaponTypes = { "Fists", "Katana", "Sword", "Dagger", "Greatsword" }
+local dropLifetime = 180
+local deathDropAmount = 200
+local defaultWeapon = "Fists"
 
 local assets = ReplicatedStorage:WaitForChild("assets")
 local fxFolder = assets:WaitForChild("FX")
@@ -28,7 +28,7 @@ local liturgyTemplate = fxFolder:WaitForChild("Liturgy")
 local facesFolder = ReplicatedStorage:WaitForChild("faces")
 
 -- A new profile gets a random eye color from this list.
-local REALISTIC_EYE_COLORS = {
+local realisticEyeColors = {
 	{ R = 89, G = 59, B = 32 }, -- Dark brown.
 	{ R = 139, G = 69, B = 19 }, -- Brown.
 	{ R = 99, G = 78, B = 52 }, -- Hazel.
@@ -126,11 +126,11 @@ local ProfileTemplate = {
 	LastPosition = nil,
 }
 
-for _, weapon in ipairs(WEAPON_TYPES) do
+for _, weapon in ipairs(weaponTypes) do
 	ProfileTemplate.WeaponProgression[weapon] = { XP = 0, Level = 1 }
 end
 
-local GameProfileStore = ProfileStore.New(DATA_STORE_NAME, ProfileTemplate)
+local GameProfileStore = ProfileStore.New(dataStoreName, ProfileTemplate)
 local Profiles = {}
 
 local function GetRandomFaceForRace(raceName)
@@ -174,7 +174,7 @@ function module.CreateSessionStats(player, profile)
 	playerStats.Name = "PlayerStats"
 
 	local liturgyVal = Instance.new("IntValue")
-	liturgyVal.Name = CURRENCY_NAME
+	liturgyVal.Name = currencyName
 	liturgyVal.Value = data.Liturgy
 	liturgyVal.Parent = playerStats
 	liturgyVal.Changed:Connect(function(val)
@@ -350,7 +350,7 @@ function module.CreateSessionStats(player, profile)
 		end
 	end
 
-	for _, weaponName in ipairs(WEAPON_TYPES) do
+	for _, weaponName in ipairs(weaponTypes) do
 		local savedStats = data.WeaponProgression[weaponName]
 		if not savedStats then
 			savedStats = { XP = 0, Level = 1 }
@@ -491,21 +491,21 @@ function module.PlayerAdded(player)
 		end
 
 		if isInventoryEmpty and isHotbarEmpty then
-			print(`[dataManager] New player {player.Name}: {DEFAULT_WEAPON} goes to hotbar slot 1.`)
+			print(`[dataManager] New player {player.Name}: {defaultWeapon} goes to hotbar slot 1.`)
 			local defaultItem = {
 				Id = game:GetService("HttpService"):GenerateGUID(false),
-				Name = DEFAULT_WEAPON,
+				Name = defaultWeapon,
 				Amount = 1,
 			}
 			invData.Hotbar["1"] = defaultItem
 		end
 
 		if profile.Data.CurrentWeapon == nil or profile.Data.CurrentWeapon == "" then
-			profile.Data.CurrentWeapon = DEFAULT_WEAPON
+			profile.Data.CurrentWeapon = defaultWeapon
 		end
 
 		if profile.Data.EyeColor == nil then
-			local rand = REALISTIC_EYE_COLORS[math.random(1, #REALISTIC_EYE_COLORS)]
+			local rand = realisticEyeColors[math.random(1, #realisticEyeColors)]
 			profile.Data.EyeColor = { R = rand.R, G = rand.G, B = rand.B }
 		end
 
@@ -533,24 +533,24 @@ function module.PlayerAdded(player)
 end
 
 -- The Liturgy a player drops for leaving during combat.
-local LOG_PENALTY_AMOUNT = 500
+local logPenaltyAmount = 500
 
 -- dataManager.PlayerRemoving() - save and release the profile of a leaving player
 -- @player: the player
 --
--- A player who leaves during combat drops LOG_PENALTY_AMOUNT Liturgy.
+-- A player who leaves during combat drops logPenaltyAmount Liturgy.
 --
 -- Return: nothing.
 function module.PlayerRemoving(player)
 	local combatExpiry = player:GetAttribute("CombatLogExpiry")
 
 	if combatExpiry and os.clock() < combatExpiry then
-		local success = module.RemoveLiturgy(player, LOG_PENALTY_AMOUNT)
+		local success = module.RemoveLiturgy(player, logPenaltyAmount)
 
 		if success then
 			local char = player.Character
 			if char and char:FindFirstChild("HumanoidRootPart") then
-				module.CreateDrop(char.HumanoidRootPart.Position, LOG_PENALTY_AMOUNT)
+				module.CreateDrop(char.HumanoidRootPart.Position, logPenaltyAmount)
 			end
 		end
 	end
@@ -578,7 +578,7 @@ function module.GetProfile(player)
 	return Profiles[player]
 end
 
-local VALID_STATS =
+local validStats =
 	{ Vitality = true, Stamina = true, Strength = true, Dexterity = true, Magic = true }
 
 -- dataManager.GetStat() - get a player's invested points in a stat
@@ -598,7 +598,7 @@ end
 local function sumStats(p)
 	local total = 0
 	if p.Data.Stats then
-		for stat in pairs(VALID_STATS) do
+		for stat in pairs(validStats) do
 			total = total + (p.Data.Stats[stat] or 0)
 		end
 	end
@@ -683,8 +683,8 @@ function module.BuySkillPoint(player)
 	p.Data.SkillPointsOwned = owned + 1
 
 	local s2 = player:FindFirstChild("PlayerStats")
-	if s2 and s2:FindFirstChild(CURRENCY_NAME) then
-		s2[CURRENCY_NAME].Value = p.Data.Liturgy
+	if s2 and s2:FindFirstChild(currencyName) then
+		s2[currencyName].Value = p.Data.Liturgy
 	end
 	pushStat(player, nil)
 	return true, cost
@@ -703,7 +703,7 @@ function module.AssignStatPoint(player, statName)
 	if not p then
 		return false, "NoProfile"
 	end
-	if not VALID_STATS[statName] then
+	if not validStats[statName] then
 		return false, "BadStat"
 	end
 	if not p.Data.Stats then
@@ -745,11 +745,11 @@ function module.RespecStats(player)
 		return false, "NothingToRespec"
 	end
 
-	for stat in pairs(VALID_STATS) do
+	for stat in pairs(validStats) do
 		p.Data.Stats[stat] = 0
 	end
 
-	for stat in pairs(VALID_STATS) do
+	for stat in pairs(validStats) do
 		pushStat(player, stat)
 	end
 	pushStat(player, nil)
@@ -904,8 +904,8 @@ function module.AddLiturgy(player, amount)
 		p.Data.Liturgy += math.floor(amount * mult)
 
 		local s = player:FindFirstChild("PlayerStats")
-		if s and s:FindFirstChild(CURRENCY_NAME) then
-			s[CURRENCY_NAME].Value = p.Data.Liturgy
+		if s and s:FindFirstChild(currencyName) then
+			s[currencyName].Value = p.Data.Liturgy
 		end
 	end
 end
@@ -920,8 +920,8 @@ function module.RemoveLiturgy(player, amount)
 	if p and p.Data.Liturgy >= amount then
 		p.Data.Liturgy -= amount
 		local s = player:FindFirstChild("PlayerStats")
-		if s and s:FindFirstChild(CURRENCY_NAME) then
-			s[CURRENCY_NAME].Value = p.Data.Liturgy
+		if s and s:FindFirstChild(currencyName) then
+			s[currencyName].Value = p.Data.Liturgy
 		end
 		return true
 	end
@@ -1162,12 +1162,12 @@ end
 -- @player: the player who died
 -- @position: where to drop it
 --
--- Drops at most DEATH_DROP_AMOUNT.
+-- Drops at most deathDropAmount.
 --
 -- Return: nothing.
 function module.HandlePlayerDeath(player, position)
 	local current = module.GetLiturgy(player)
-	local dropAmount = math.min(current, DEATH_DROP_AMOUNT)
+	local dropAmount = math.min(current, deathDropAmount)
 
 	if dropAmount > 0 then
 		if module.RemoveLiturgy(player, dropAmount) then
@@ -1180,7 +1180,7 @@ end
 -- @position: where to create it
 -- @amount: the Liturgy in the pickup
 --
--- The pickup disappears after DROP_LIFETIME seconds.
+-- The pickup disappears after dropLifetime seconds.
 --
 -- Return: nothing.
 function module.CreateDrop(position, amount)
@@ -1218,7 +1218,7 @@ function module.CreateDrop(position, amount)
 		end
 	end)
 
-	Debris:AddItem(dropPart, DROP_LIFETIME)
+	Debris:AddItem(dropPart, dropLifetime)
 end
 
 -- dataManager.GetWeaponLevel() - get a player's mastery level in a weapon family
@@ -1251,7 +1251,7 @@ local function grantFamilyXP(player, family, amount)
 
 	weaponData.XP += (amount * 10)
 
-	while weaponData.Level < MAX_LEVEL do
+	while weaponData.Level < maxLevel do
 		local xpNeeded = GetXPThreshold(weaponData.Level + 1)
 		if weaponData.XP >= xpNeeded then
 			weaponData.XP -= xpNeeded
@@ -1262,7 +1262,7 @@ local function grantFamilyXP(player, family, amount)
 	end
 
 	-- At the max level, keep XP at 0 so the bar does not fill past 25.
-	if weaponData.Level >= MAX_LEVEL then
+	if weaponData.Level >= maxLevel then
 		weaponData.XP = 0
 	end
 
@@ -1273,7 +1273,7 @@ local function grantFamilyXP(player, family, amount)
 		if wFolder then
 			wFolder.CurrentXP.Value = weaponData.XP
 			wFolder.Level.Value = weaponData.Level
-			if weaponData.Level < MAX_LEVEL then
+			if weaponData.Level < maxLevel then
 				wFolder.MaxXP.Value = GetXPThreshold(weaponData.Level + 1)
 			else
 				wFolder.MaxXP.Value = 0
@@ -1338,7 +1338,7 @@ function module.AddWeaponXP(player, weaponName, amount)
 			if QuestManager then
 				QuestManager.ReconcileClassQuests(player, family)
 			end
-			if module.GetWeaponLevel(player, family) >= MAX_LEVEL and TitleManager then
+			if module.GetWeaponLevel(player, family) >= maxLevel and TitleManager then
 				TitleManager.CheckWeaponMastery(player, family)
 			end
 		end
@@ -1365,10 +1365,10 @@ end
 -- dataManager.GetCurrentWeapon() - get the saved weapon of a player
 -- @player: the player
 --
--- Return: the weapon name, DEFAULT_WEAPON when there is no profile.
+-- Return: the weapon name, defaultWeapon when there is no profile.
 function module.GetCurrentWeapon(player)
 	local profile = Profiles[player]
-	return profile and profile.Data.CurrentWeapon or DEFAULT_WEAPON
+	return profile and profile.Data.CurrentWeapon or defaultWeapon
 end
 
 -- dataManager.GetSpellbookSnapshot() - get the spellbook view of a player

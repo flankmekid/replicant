@@ -21,7 +21,7 @@ local DashConfig = require(RP.modules.DashConfig)
 
 -- The same for every weapon.
 local comboResetTime = 5
-local UPPERCUT_VELOCITY = 15
+local uppercutVelocity = 15
 
 -- Raises the HRP to targetPos and holds it for window seconds, then lets it fall.
 -- AlignPosition works through physics, so it does not fight the character's own
