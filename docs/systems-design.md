@@ -130,3 +130,33 @@ loadout. A hybrid weapon is its own family for its skill list, but it has no XP 
 swinging it gives half the XP to each of its two parent families. The hybrid weapon
 unlocks when both parents reach level 10, and its skills at 15, 20, and 25 (see Hybrid
 skills).
+
+## Climbing
+
+A climb (a ledge grab or the wall climb) needs the player to be airborne and armed.
+Arming stops a single ground press from launching the player up a wall:
+
+- A space press on the ground is only a jump. It does not arm.
+- A separate press in the air arms, and that same press tries the climb. So a climb
+  from the ground takes two taps. `InputBegan` fires only on a fresh press, so holding
+  jump cannot count as the second tap.
+- A wall run arms (it sets the `WallRanRecently` attribute), so after a wall run a
+  single press in the air climbs.
+- Touching the ground disarms. While armed in the air, the player can climb again
+  without arming again.
+
+Letting go of a ledge is not a climb, so it is checked before the armed check: while
+hanging, the player is Seated, not airborne.
+
+The jump input is buffered like the dash: a press that cannot act (during the climb
+cooldown or a short state block) is retried for `BUFFER_WINDOW` seconds. The climb
+yields, so `actionRunning` keeps a retry from starting a second climb during the
+first.
+
+Hold-to-catch makes the grab timing forgiving: while the jump key is held and the
+player is armed, the client tries to grab a ledge every frame. It does not snap onto
+a ledge the player tries to fall past, because a ground hold never arms. It never
+runs while hanging, because a grab check while hanging lets go.
+
+A ledge must be a solid, mostly opaque part with no side thinner than
+`MIN_LEDGE_THICKNESS`. Characters, NPCs, and their gear are never ledges.
