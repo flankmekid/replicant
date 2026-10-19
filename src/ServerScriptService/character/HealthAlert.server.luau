@@ -1,7 +1,11 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Tells a player's client to show race-specific low-health messages while their HP is
+-- below the race threshold, and to stop when it rises above it.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Ensure the Remote exists
+-- Create the remote if the place does not have it.
 local AlertRemote = ReplicatedStorage:FindFirstChild("HealthAlertEvent")
 if not AlertRemote then
 	AlertRemote = Instance.new("RemoteEvent")
@@ -9,9 +13,9 @@ if not AlertRemote then
 	AlertRemote.Parent = ReplicatedStorage
 end
 
--- [[ RACE CONFIGURATION ]] --
+-- The HP fraction that starts the messages, and the messages, for each race.
 local RaceAlertConfig = {
-	-- [[ COMMON ]] --
+	-- Common races.
 	["Human"] = {
 		Threshold = 0.2,
 		Messages = {
@@ -40,7 +44,7 @@ local RaceAlertConfig = {
 		},
 	},
 
-	-- [[ UNCOMMON ]] --
+	-- Uncommon races.
 	["Verdis"] = {
 		Threshold = 0.25,
 		Messages = {
@@ -60,7 +64,7 @@ local RaceAlertConfig = {
 		},
 	},
 
-	-- [[ RARE ]] --
+	-- Rare races.
 	["Cruor"] = {
 		Threshold = 0.15,
 		Messages = {
@@ -71,7 +75,7 @@ local RaceAlertConfig = {
 		},
 	},
 	["Karu"] = {
-		Threshold = 0.15, -- Very sturdy, so warning feels significant
+		Threshold = 0.15, -- Sturdy, so a lower threshold.
 		Messages = {
 			"Even the mountain crumbles...",
 			"Cracks in the foundation...",
@@ -80,7 +84,7 @@ local RaceAlertConfig = {
 		},
 	},
 	["Meskar"] = {
-		Threshold = 0.3, -- Very fragile
+		Threshold = 0.3, -- Fragile.
 		Messages = {
 			"Bones shatter so easily...",
 			"This form is too weak...",
@@ -89,7 +93,7 @@ local RaceAlertConfig = {
 		},
 	},
 
-	-- [[ EPIC ]] --
+	-- Epic races.
 	["Marasi"] = {
 		Threshold = 0.2,
 		Messages = {
@@ -109,9 +113,9 @@ local RaceAlertConfig = {
 		},
 	},
 
-	-- [[ LEGENDARY ]] --
+	-- Legendary races.
 	["Maw"] = {
-		Threshold = 0.2, -- Berserker
+		Threshold = 0.2,
 		Messages = {
 			"THE VOID LEAKS OUT.",
 			"CONSUME... OR FADE AWAY.",
@@ -138,7 +142,7 @@ local RaceAlertConfig = {
 		},
 	},
 
-	-- [[ FALLBACK ]] --
+	-- Used for a race with no entry.
 	["Default"] = {
 		Threshold = 0.2,
 		Messages = {
@@ -149,8 +153,8 @@ local RaceAlertConfig = {
 	},
 }
 
--- Track state so we don't spam the remote
-local panicState = {} -- [Player] = boolean
+-- Whether each player's messages are on, so the remote fires only on a change.
+local panicState = {}
 
 local function MonitorCharacter(player, character)
 	local humanoid = character:WaitForChild("Humanoid", 10)
@@ -160,10 +164,7 @@ local function MonitorCharacter(player, character)
 
 	local stats = player:WaitForChild("PlayerStats", 10)
 
-	-- Resolve the panic config LIVE, every evaluation. Capturing it once at spawn
-	-- meant a mid-game race switch (no death/respawn, so no CharacterAdded, so no
-	-- re-init) kept firing the PREVIOUS race's messages and threshold. Reading
-	-- Race.Value here makes a race change take effect immediately with no re-init.
+	-- Read the race on every check, so a race change applies at once without a respawn.
 	local function currentConfig()
 		local raceName = "Human"
 		if stats and stats:FindFirstChild("Race") then
@@ -174,12 +175,9 @@ local function MonitorCharacter(player, character)
 
 	panicState[player] = false
 
-	-- Single debounced evaluator. Both MaxHealth and Health changes schedule one
-	-- deferred re-check against SETTLED values and cancel any pending one. This
-	-- removes the old dependency on signal-fire ordering: the transient mid-write
-	-- frame (a Vitality point raises MaxHealth first, Health a line later in
-	-- mainGameHandler) is never evaluated on its own, only the final state is.
-	-- Kills the phantom low-HP text on level-up.
+	-- Health and MaxHealth changes schedule one deferred check of the settled values. A
+	-- Vitality point raises MaxHealth before Health, and checking between the two would
+	-- show a false low-HP message.
 	local pending = false
 
 	local function evaluate()
@@ -192,16 +190,12 @@ local function MonitorCharacter(player, character)
 		local percentage = health / maxHealth
 		local config = currentConfig()
 
-		-- [[ STATE LOGIC ]] --
 		if percentage <= config.Threshold and percentage > 0 then
-			-- Enter Panic Mode
 			if not panicState[player] then
 				panicState[player] = true
-				-- Send "Start" and the list of messages for the client to use
 				AlertRemote:FireClient(player, "Start", config.Messages)
 			end
 		elseif percentage > config.Threshold then
-			-- Exit Panic Mode
 			if panicState[player] then
 				panicState[player] = false
 				AlertRemote:FireClient(player, "Stop")
@@ -229,7 +223,7 @@ end
 
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(char)
-		panicState[player] = false -- Reset on death/respawn
+		panicState[player] = false
 		MonitorCharacter(player, char)
 	end)
 end)

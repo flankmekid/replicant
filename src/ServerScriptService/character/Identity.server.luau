@@ -1,5 +1,7 @@
--- [[ IDENTITY SERVER ]]
--- Location: ServerScriptService (Script)
+-- SPDX-License-Identifier: MIT
+--
+-- Gives each player a random soul color and font, builds the overhead name tag with
+-- their title, and handles the title remotes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,16 +19,12 @@ local SOUL_COLORS = {
 }
 
 local SOUL_FONTS = {
-	--Enum.Font.Fondamento,
-	--Enum.Font.Antique,
 	Enum.Font.Merriweather,
 }
 
 local SPECIAL_TITLES = {
 	[1526974131] = "THE PRIMAL MAW",
 }
-
--- ── REMOTES ───────────────────────────────────────────────────────────────────
 
 local remotes = ReplicatedStorage:WaitForChild("remotes")
 
@@ -51,16 +49,9 @@ if not TitleUpdated then
 	TitleUpdated.Parent = remotes
 end
 
--- ── OVERHEAD TAG ──────────────────────────────────────────────────────────────
-
 local function buildNameText(player)
 	local displayName = player.DisplayName
 	local title = player:GetAttribute("Title") or ""
-
-	--local specialTitle = SPECIAL_TITLES[player.UserId]
-	--if specialTitle then
-	--	return displayName .. ", " .. specialTitle
-	--end
 
 	if title ~= "" then
 		return displayName .. ", " .. title
@@ -78,7 +69,7 @@ local function refreshOverhead(player, character)
 	if not head then
 		head = character:WaitForChild("Head", 10)
 	end
-	-- Character may have been removed/respawned while we waited.
+	-- The character may have been removed or respawned during the wait.
 	if not head or not head.Parent or character.Parent == nil then
 		return
 	end
@@ -116,8 +107,6 @@ local function refreshOverhead(player, character)
 	nameLabel.Parent = billboard
 end
 
--- ── PLAYER JOIN ───────────────────────────────────────────────────────────────
-
 Players.PlayerAdded:Connect(function(player)
 	local randomColor = SOUL_COLORS[math.random(1, #SOUL_COLORS)]
 	local randomFont = SOUL_FONTS[math.random(1, #SOUL_FONTS)]
@@ -125,8 +114,8 @@ Players.PlayerAdded:Connect(function(player)
 	player:SetAttribute("SoulColor", randomColor)
 	player:SetAttribute("SoulFont", randomFont.Name)
 
-	-- Tracks the profile-load state so character handling can gate on it
-	-- without racing the CharacterAdded connection.
+	-- Whether the profile has loaded. Character handling checks it, so it does not race
+	-- the CharacterAdded connection.
 	local profileReady = false
 
 	local function handleCharacter(character)
@@ -134,8 +123,8 @@ Players.PlayerAdded:Connect(function(player)
 		if humanoid then
 			humanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
 		end
-		-- Only build the tag once the saved title is loaded, so it appears
-		-- complete the first time instead of popping in name-only.
+		-- Build the tag only after the saved title loads, so it does not appear without
+		-- the title first.
 		if not profileReady then
 			return
 		end
@@ -143,41 +132,34 @@ Players.PlayerAdded:Connect(function(player)
 		TitleManager.UpdateAura(player, player:GetAttribute("Title"))
 	end
 
-	-- Register BEFORE any yielding so a fast spawn can't slip past us.
+	-- Connect before anything yields, so a fast spawn is not missed.
 	player.CharacterAdded:Connect(handleCharacter)
 
-	-- Refresh tag when title attribute changes
 	player:GetAttributeChangedSignal("Title"):Connect(function()
 		TitleManager.UpdateAura(player, player:GetAttribute("Title"))
 		local char = player.Character
 		if char then
 			refreshOverhead(player, char)
 		end
-		-- Tell all clients to update the leaderboard entry for this player
+		-- Update this player's leaderboard entry on every client.
 		TitleUpdated:FireAllClients(player.UserId, player:GetAttribute("Title"))
 	end)
 
-	-- Load saved title once profile is ready
 	DataManager.YieldUntilLoaded(player)
 	local savedTitle = DataManager.GetCurrentTitle(player)
 	profileReady = true
 	player:SetAttribute("Title", savedTitle or "")
 	TitleManager.UpdateAura(player, player:GetAttribute("Title"))
 
-	-- If the character spawned during the yield, its handleCharacter ran with
-	-- profileReady == false and bailed. Build the tag now that data is in.
-	-- If the title was actually non-empty, setting the attribute above already
-	-- fired refreshOverhead via the changed signal, and the destroy-then-rebuild
-	-- in refreshOverhead makes a second call harmless.
+	-- A character that spawned during the wait skipped its tag, so build it now. A second
+	-- build is harmless, because refreshOverhead replaces the old tag.
 	if player.Character then
 		refreshOverhead(player, player.Character)
 	end
 end)
 
--- ── REMOTES ───────────────────────────────────────────────────────────────────
-
 SetTitleRemote.OnServerEvent:Connect(function(player, title)
-	-- Allow clearing title with empty string
+	-- An empty string clears the title.
 	if title ~= "" and not DataManager.HasTitle(player, title) then
 		return
 	end

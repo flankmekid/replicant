@@ -1,16 +1,17 @@
--- Script in ServerScriptService
+-- SPDX-License-Identifier: MIT
+--
+-- Applies fall damage that the client reports. A roll reduces it, and a fall that
+-- would kill knocks the player down instead.
 local ReplicatedStorage = game:GetService("ReplicatedStorage").remotes
 
 local fallEvent = ReplicatedStorage:WaitForChild("FallDmg")
 
--- Configuration
 local MIN_FALL_DAMAGE_HEIGHT = 30
 local FATAL_FALL_HEIGHT = 200
 local ROLL_DAMAGE_REDUCTION = 0.75
 
 local ragdoll = require(game.ServerScriptService.modules.ragdollManager)
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
--- [[ NEW REQUIRE ]] --
 local DownedManager = require(game.ServerScriptService.modules.DownedManager)
 
 local function calculateDamage(height)
@@ -40,7 +41,7 @@ fallEvent.OnServerEvent:Connect(function(player, clientCalculatedDistance, isRol
 		return
 	end
 
-	-- Check if already downed to avoid duplicate triggers
+	-- A downed player is not hit again.
 	if stateHandler.GetState(character, "Downed") then
 		return
 	end
@@ -61,8 +62,6 @@ fallEvent.OnServerEvent:Connect(function(player, clientCalculatedDistance, isRol
 			local eff2 = game.ReplicatedStorage.assets.FX.DUST:Clone()
 			eff2.Parent = character["Left Leg"]
 			eff2:Emit(10)
-
-			print(player.Name .. " Rolled! Damage reduced.")
 		else
 			local willDown = (baseDamage > (0.9 * humanoid.MaxHealth))
 				or (humanoid.Health - baseDamage <= 0)
