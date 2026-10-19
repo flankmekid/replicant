@@ -260,3 +260,34 @@ escapes a block-break stun.
 i-frames, so a burst on nothing leaves the user exposed for about a second and open to
 a punish. The user is also rooted: `BURST_ROOT_WHIFF` on a whiff, and the shorter
 `BURST_ROOT_HIT` when the burst catches a target.
+
+Burst has its own handler (`BurstHandler`) instead of a SkillConfig entry in
+`SkillHandler`, for three reasons:
+
+- Everyone owns Burst, so it would fail the ownership check of SkillHandler.
+- Its cost is a percentage of MaxMana (50%), which the flat `Mana` field of SkillConfig
+  cannot express.
+- It must work while stunned. That is the whole point of a combo breaker, and
+  SkillHandler rejects casts while stunned.
+
+BurstHandler rejects a burst while Downed, and while the user has `CantAnything`
+without `Stunned`. That combination means the user is in the recovery of their own
+attack, and Burst must not cancel it. Being hit (`Stunned`, with or without
+`CantAnything`) and being idle are both allowed.
+
+## Skill casts
+
+`SkillHandler` checks every cast on the server: state, ownership (the racial skill or
+an unlocked spell), the server cooldown, and the mana and HP cost.
+
+The client arms its cooldown and the HUD swipe only when the server replies
+"Accepted". A cast that the server rejects (a state check, an ownership or resource
+desync, or the server cooldown) never puts the skill on cooldown on the client, so
+pressing the button at the wrong time costs nothing. "Declined" lets the client drop
+its prediction at once.
+
+Offensive skills get hyper armor for their cast window (`HyperArmorDuration`, 1 s by
+default), so an incoming hit deals damage but does not stop the animation or stun the
+caster out of the skill. Buffs are instant and get no armor. A skill can opt out with
+`HyperArmor = false`. A parry still beats the armor: every parry branch clears the
+`HyperArmor` attribute before it stuns the caster.

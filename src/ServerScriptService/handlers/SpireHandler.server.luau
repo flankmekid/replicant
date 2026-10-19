@@ -1,6 +1,8 @@
--- [[ SPIRE SERVER ]]
--- Location: ServerScriptService
--- Handles attunement saving and teleportation.
+-- SPDX-License-Identifier: MIT
+--
+-- Owns the spires: attunement, resting (a safe heal that opens the rest menu),
+-- teleport between attuned spires, and the rest-menu remotes for stats, the
+-- spellbook, and the armory. Every menu action works only while resting.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -12,14 +14,14 @@ local SpireRemote = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
 local SpireUpdate = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
 local StateHandler = require(ReplicatedStorage.modules:WaitForChild("stateHandler"))
 
--- Forward-declared so the rest helpers below can reference it.
+-- Declared here because the rest helpers below use it.
 local getSpireDef
 
--- Tracks who is currently resting, and where they were resting (the spire part)
--- so we can verify proximity and clean up on death/leave.
+-- The spire part each player rests at, for the proximity check and cleanup on death
+-- or leave.
 local restingPlayers = {}
 
--- Restore HP + Mana to full (matches the spawn-time full-restore pattern).
+-- Restores HP and mana to full, the same as on spawn.
 local function fullRestore(player)
 	local character = player.Character
 	if not character then
@@ -39,8 +41,8 @@ local function fullRestore(player)
 	end
 end
 
--- Begin resting: lock the character in place, disable PvP/aggro by moving to
--- noPVP, heal to full. Server-authoritative; refuses if in combat.
+-- Starts a rest: locks the character in place, removes it from PvP and aggro, and heals
+-- it to full. Refused in combat.
 local function beginRest(player, spireId)
 	local spireDef = getSpireDef(spireId)
 	if not spireDef then
@@ -64,8 +66,8 @@ local function beginRest(player, spireId)
 		return false, "Character not ready."
 	end
 
-	-- Must be on the ground to rest. Airborne states (jumping, mid-fall, ragdolled)
-	-- are refused so you cannot rest off a ledge / mid-jump / while knocked around.
+	-- Resting needs the ground, so a player cannot rest off a ledge, during a jump, or
+	-- while ragdolled.
 	local restHumState = hum:GetState()
 	if
 		restHumState == Enum.HumanoidStateType.Jumping
@@ -77,12 +79,12 @@ local function beginRest(player, spireId)
 		return false, "You must be on the ground to rest."
 	end
 
-	-- Move out of the PvP/aggro folder (mobs, bosses, lock-on, ESP all scan .alive)
+	-- Leave plrManager.alive, which mobs, bosses, lock-on, and ESP scan.
 	if workspace:FindFirstChild("plrManager") and workspace.plrManager:FindFirstChild("noPVP") then
 		character.Parent = workspace.plrManager.noPVP
 	end
 
-	-- Lock: no actions, no movement. (CantAnything + Anchored, NOT Stunned.)
+	-- Lock actions and movement with CantAnything and Anchored, not with Stunned.
 	StateHandler.SetState(character, "CantAnything", true)
 	StateHandler.SetState(character, "Resting", true)
 	hum:UnequipTools()
@@ -93,7 +95,8 @@ local function beginRest(player, spireId)
 	return true, nil
 end
 
--- End resting: unlock, restore to the alive folder (which re-runs applyStats).
+-- Ends a rest: unlocks the character and moves it back to plrManager.alive, which runs
+-- applyStats again.
 local function endRest(player)
 	if not restingPlayers[player] then
 		return
@@ -106,7 +109,7 @@ local function endRest(player)
 	end
 	local root = character:FindFirstChild("HumanoidRootPart")
 
-	-- Clear the rest lock BEFORE moving back to alive, so applyStats runs clean.
+	-- Clear the rest lock before the move, so applyStats runs clean.
 	StateHandler.RemoveStates(character, "CantAnything")
 	StateHandler.RemoveStates(character, "Resting")
 	if root then
@@ -118,12 +121,11 @@ local function endRest(player)
 	end
 end
 
--- Safety: if a resting player dies somehow, clear their rest entry.
+-- A resting player who dies loses their rest entry.
 Players.PlayerRemoving:Connect(function(player)
 	restingPlayers[player] = nil
 end)
 
--- [[ VALIDATE SPIRE ID ]]
 getSpireDef = function(spireId)
 	for _, s in ipairs(SpireConfig.Spires) do
 		if s.Id == spireId then
@@ -133,7 +135,6 @@ getSpireDef = function(spireId)
 	return nil
 end
 
--- [[ TELEPORT ]]
 local function teleportToSpire(player, spireId)
 	local spireDef = getSpireDef(spireId)
 	if not spireDef then
@@ -177,7 +178,6 @@ local function teleportToSpire(player, spireId)
 	return true, nil
 end
 
--- [[ RESTORE SESSION ]]
 local function restoreSession(player)
 	DataManager.YieldUntilLoaded(player)
 	local attuned = DataManager.GetAttuned(player)
@@ -193,24 +193,18 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 end)
 
--- [[ REMOTE HANDLER ]]
 SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 	if action == "Attune" then
 		if not getSpireDef(spireId) then
 			return
 		end
 		local wasNew = DataManager.AddAttuned(player, spireId)
-		if wasNew then
-			print(player.Name .. " attuned to: " .. spireId)
-		end
-		-- Auto-rest on attune (whether newly attuned or re-interacting):
-		-- begin the rest so the menu opens in a single press.
+		-- Attuning also starts a rest, so the menu opens with one press.
 		local ok, err = beginRest(player, spireId)
 		if ok then
 			SpireUpdate:FireClient(player, "RestStarted", { spireId = spireId, wasNew = wasNew })
 		else
-			-- Still tell the client about a brand-new attunement for the toast/effect,
-			-- even if resting was refused (e.g. in combat).
+			-- Tell the client about a new attunement even when the rest was refused.
 			if wasNew then
 				SpireUpdate:FireClient(player, "Attuned", spireId)
 			end
@@ -227,25 +221,22 @@ SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 		endRest(player)
 		SpireUpdate:FireClient(player, "RestEnded")
 	elseif action == "Teleport" then
-		-- Teleport between spires from within the rest menu. Set the destination
-		-- position first (works while anchored), then end the rest so the player
-		-- arrives un-anchored, free to move, and back in the alive (PvP) folder.
-		-- Travelling leaves the spire you were resting at.
+		-- Set the destination first, which works while anchored, then end the rest, so the
+		-- player arrives free to move and back in plrManager.alive.
 		local success, err = teleportToSpire(player, spireId)
 		if not success then
 			SpireUpdate:FireClient(player, "TeleportFailed", err)
 		else
-			endRest(player) -- auto-leave the old spire's rest
+			endRest(player)
 			SpireUpdate:FireClient(player, "TeleportSuccess", spireId)
 		end
 	end
 end)
--- [[ STAT SPREAD REMOTE ]]
--- RemoteFunction so the rest-menu UI gets an immediate buy/respec result.
+-- A RemoteFunction, so the rest menu gets the result of a buy or respec at once.
 local StatAction = ReplicatedStorage.SpireSystem:WaitForChild("StatAction")
 
--- Builds the full menu snapshot every reply carries, so the UI can refresh
--- liturgy, owned/available skill points, per-stat values, and the next buy cost.
+-- Builds the snapshot that every reply carries: Liturgy, owned and available skill
+-- points, each stat, and the next skill point cost.
 local function statSnapshot(player, ok, reason, extra)
 	local prof = DataManager.GetProfile(player)
 	local snap = {
@@ -267,21 +258,17 @@ local function statSnapshot(player, ok, reason, extra)
 end
 
 StatAction.OnServerInvoke = function(player, action, statName)
-	-- Players may only manage their build while actually resting at a spire.
 	if not restingPlayers[player] then
 		return { ok = false, reason = "MustRest" }
 	end
 
 	if action == "BuySkill" then
-		-- Buy one skill point with Liturgy (rising curve, capped at 150).
 		local ok, costOrReason = DataManager.BuySkillPoint(player)
 		return statSnapshot(player, ok, costOrReason, { cost = ok and costOrReason or nil })
 	elseif action == "Assign" then
-		-- Assign one available skill point to a stat (free, 1:1).
 		local ok, reason = DataManager.AssignStatPoint(player, statName)
 		return statSnapshot(player, ok, reason)
 	elseif action == "Respec" then
-		-- Free all assigned points back to the pool (no Liturgy involved).
 		local ok, reason = DataManager.RespecStats(player)
 		return statSnapshot(player, ok, reason)
 	elseif action == "Query" then
@@ -291,20 +278,17 @@ StatAction.OnServerInvoke = function(player, action, statName)
 	return { ok = false, reason = "BadAction" }
 end
 
--- [[ SPELLBOOK EQUIP REMOTE ]]
--- Binds an owned skill to a slot of its family. Gated on resting, like stats.
+-- Equips an owned skill into a slot of its family.
 local EquipSkillAction = ReplicatedStorage.SpireSystem:WaitForChild("EquipSkillAction")
 EquipSkillAction.OnServerInvoke = function(player, action, family, slotKey, skillName)
 	if not restingPlayers[player] then
 		return { ok = false, reason = "MustRest" }
 	end
 
-	-- Query: return the full spellbook snapshot for the player's current weapon family.
 	if action == "Query" then
 		return DataManager.GetSpellbookSnapshot(player)
 	end
 
-	-- Equip: bind an owned skill to a slot of its family, then return a fresh snapshot.
 	if action == "Equip" then
 		if type(family) ~= "string" or type(slotKey) ~= "string" or type(skillName) ~= "string" then
 			return { ok = false, reason = "BadAction" }
@@ -322,14 +306,13 @@ EquipSkillAction.OnServerInvoke = function(player, action, family, slotKey, skil
 	return { ok = false, reason = "BadAction" }
 end
 
--- [[ ARMORY REMOTE ]]
--- Browse owned armors, Equip (stats + vanity) or Transmog (vanity only).
--- Gated on resting, like stats/spellbook. Stats always come from CurrentArmor;
--- visuals from CurrentVanity (which falls back to CurrentArmor).
+-- Lists owned armors, and handles Equip (stats and looks) and Transmog (looks only).
+-- Stats always come from CurrentArmor, and looks from CurrentVanity, which falls back
+-- to CurrentArmor.
 local ArmorConfig = require(ReplicatedStorage.modules:WaitForChild("ArmorConfig"))
 local ArmorAction = ReplicatedStorage.SpireSystem:WaitForChild("ArmorAction")
 
--- Swap the character's shirt/pants to a given armor's clothing (visual only).
+-- Shows an armor's clothing on the character. Looks only.
 local function applyArmorVisuals(character, armorName)
 	if not character then
 		return
@@ -351,8 +334,8 @@ local function applyArmorVisuals(character, armorName)
 	pants.PantsTemplate = data.PantsID
 end
 
--- Push an armor's buff multipliers into the player's ArmorBuffs folder. The
--- .Changed listeners in mainGameHandler recompute HP/attributes live.
+-- Writes an armor's buff multipliers to ArmorBuffs. mainGameHandler listens to those
+-- values and updates HP and attributes.
 local function applyArmorStats(player, armorName)
 	local stats = player:FindFirstChild("PlayerStats")
 	if not stats then
@@ -374,9 +357,8 @@ local function applyArmorStats(player, armorName)
 	end
 end
 
--- Read-only snapshot: owned armor names + their config stats, plus the current
--- stats-armor and vanity-armor. Ownership is resolved server-side; the client
--- never sees armors the player doesn't own.
+-- Lists the owned armors with their stats, and the current stats and looks armor. The
+-- client never sees armors that the player does not own.
 local function armorSnapshot(player, ok, reason)
 	local prof = DataManager.GetProfile(player)
 	local owned, armors = {}, {}
@@ -417,7 +399,7 @@ ArmorAction.OnServerInvoke = function(player, action, armorName)
 		if type(armorName) ~= "string" or not DataManager.OwnsArmor(player, armorName) then
 			return { ok = false, reason = "NotOwned" }
 		end
-		-- Equip = stats + vanity both become this armor; transmog override cleared.
+		-- Equip sets both stats and looks to this armor and clears the transmog.
 		DataManager.SetCurrentArmor(player, armorName)
 		DataManager.SetCurrentVanity(player, nil)
 		applyArmorVisuals(player.Character, armorName)
@@ -427,7 +409,7 @@ ArmorAction.OnServerInvoke = function(player, action, armorName)
 		if type(armorName) ~= "string" or not DataManager.OwnsArmor(player, armorName) then
 			return { ok = false, reason = "NotOwned" }
 		end
-		-- Transmog = vanity only; stats untouched.
+		-- Transmog changes only the looks.
 		DataManager.SetCurrentVanity(player, armorName)
 		applyArmorVisuals(player.Character, armorName)
 		return armorSnapshot(player, true, nil)

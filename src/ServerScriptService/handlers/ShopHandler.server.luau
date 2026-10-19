@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Sells race spins for Liturgy, in packs of 1 or 10.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Players = game:GetService("Players")
@@ -8,32 +11,25 @@ local BuySpinsRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("B
 local SPIN_COST = 1000
 
 BuySpinsRemote.OnServerEvent:Connect(function(player, amount)
-	-- 1. Validate Amount (Prevent exploiting)
+	-- Only packs of 1 and 10 exist.
 	if amount ~= 1 and amount ~= 10 then
 		return
 	end
 
 	local totalCost = amount * SPIN_COST
 
-	-- 2. Check Funds
+	-- TODO: Tell the client when the player cannot afford the spins.
 	if DataManager.GetLiturgy(player) >= totalCost then
-		-- 3. Transaction
 		local success = DataManager.RemoveLiturgy(player, totalCost)
 		if success then
 			DataManager.UpdateSpins(player, amount)
 
-			-- Optional: Play a "Ka-ching" sound at the player's position
 			if player.Character and player.Character:FindFirstChild("Head") then
 				local s = Instance.new("Sound", player.Character.Head)
-				s.SoundId = "rbxassetid://10066947742" -- Generic purchase sound
+				s.SoundId = "rbxassetid://10066947742"
 				s:Play()
 				game.Debris:AddItem(s, 1)
 			end
-
-			print(player.Name .. " purchased " .. amount .. " spins.")
 		end
-	else
-		-- Optional: Send a 'Not Enough Money' notification back
-		print(player.Name .. " failed purchase: Not enough Liturgy.")
 	end
 end)

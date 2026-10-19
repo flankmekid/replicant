@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Owns race appearance and race rolls: the spin with pity, the race visuals (skin,
+-- face, eyes, hair, race items, armor dye), the race passives, and the barber remotes.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ServerStorage = game:GetService("ServerStorage")
@@ -9,7 +13,6 @@ local RaceConfig = require(ReplicatedStorage.modules.RaceConfig)
 local RaceAssets = ServerStorage:FindFirstChild("RaceAssets")
 local FacesFolder = ReplicatedStorage:WaitForChild("faces")
 
--- [[ REMOTE SETUP ]] --
 local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
 	or Instance.new("Folder", ReplicatedStorage)
 Remotes.Name = "Remotes"
@@ -25,15 +28,11 @@ if not ReplicatedStorage:FindFirstChild("BarberEvent") then
 end
 local BarberEvent = ReplicatedStorage.BarberEvent
 
--- [[ CONFIGURATION ]] --
 local PITY_THRESHOLD = 30
 local DYE_COST = 1000
 local FEMALE_TORSO_ID = 48112070
 local playerPity = {}
 
--- [[ --------------------- HELPER FUNCTIONS --------------------- ]] --
-
--- 1. DATA WAITER
 local function WaitForData(player)
 	local timeout = 0
 	while not DataManager.GetProfile(player) do
@@ -46,18 +45,15 @@ local function WaitForData(player)
 	return true
 end
 
--- 2. RNG & PITY
+-- Rolls a race by rarity weight. A full pity counter guarantees a Legendary race.
 local function GetRandomRace(player)
-	-- Check Pity
 	local currentPity = DataManager.GetPity(player)
 	local forceLegendary = false
 
 	if currentPity >= PITY_THRESHOLD then
 		forceLegendary = true
-		print(player.Name .. " hit pity! Guaranteeing Legendary.")
 	end
 
-	-- Select Rarity
 	local selectedRarity = "Common"
 	if forceLegendary then
 		selectedRarity = "Legendary"
@@ -77,7 +73,6 @@ local function GetRandomRace(player)
 		end
 	end
 
-	-- Pick Race
 	local possible = {}
 	for race, data in pairs(RaceConfig.Races) do
 		if data.Rarity == selectedRarity then
@@ -91,7 +86,6 @@ local function GetRandomRace(player)
 	return possible[math.random(1, #possible)], selectedRarity
 end
 
--- 3. FACE SELECTION
 local function GetRandomFace(raceName)
 	local folder = FacesFolder:FindFirstChild(string.lower(raceName))
 	if not folder or #folder:GetChildren() == 0 then
@@ -110,7 +104,8 @@ local function GetRandomFace(raceName)
 	return "rbxassetid://0"
 end
 
--- [[ HELPER: CLEAN ACCESSORIES ]] --
+-- Removes every accessory except equipment (EquipSlot_*). The player's own avatar hair
+-- is kept on the head if keepDefaultHair is true, and otherwise stored in the player.
 local function CleanAccessories(char, keepDefaultHair)
 	local hum = char:FindFirstChild("Humanoid")
 	local player = game:GetService("Players"):GetPlayerFromCharacter(char)
@@ -118,7 +113,7 @@ local function CleanAccessories(char, keepDefaultHair)
 		return
 	end
 
-	-- Create the cache folder inside the PLAYER object, safely out of the Workspace
+	-- The hair cache is in the Player object, out of Workspace.
 	local hairCache = player:FindFirstChild("HairCache")
 	if not hairCache then
 		hairCache = Instance.new("Folder")
@@ -126,7 +121,7 @@ local function CleanAccessories(char, keepDefaultHair)
 		hairCache.Parent = player
 	end
 
-	-- 1. If we are resetting, bring the default hair out of hiding
+	-- When the default hair is kept, bring it back from the cache.
 	if keepDefaultHair then
 		for _, cachedHair in pairs(hairCache:GetChildren()) do
 			cachedHair.Parent = char
@@ -136,10 +131,9 @@ local function CleanAccessories(char, keepDefaultHair)
 		end
 	end
 
-	-- 2. Loop through and clean up
 	for _, child in pairs(char:GetChildren()) do
 		if child:IsA("Accessory") then
-			-- Tag the player's original avatar hair so we don't confuse it with Barber hair
+			-- Tag the original avatar hair, so it is not confused with barber hair.
 			if
 				child.AccessoryType == Enum.AccessoryType.Hair
 				and not child:GetAttribute("IsBarberHair")
@@ -150,17 +144,16 @@ local function CleanAccessories(char, keepDefaultHair)
 				end
 			end
 
-			-- Handle the default hair securely
 			if child:GetAttribute("IsDefaultHair") then
 				if keepDefaultHair then
-					continue -- Leave it safely on their head
+					continue
 				else
-					child.Parent = hairCache -- Hide it in the Player folder (removes it from the physical world!)
+					child.Parent = hairCache
 					continue
 				end
 			end
 
-			-- Destroy everything else (like old barber hair, hats, etc.)
+			-- Destroy everything else, such as old barber hair and hats.
 			if not string.find(child.Name, "EquipSlot_") then
 				child:Destroy()
 			end
@@ -174,7 +167,7 @@ local function CleanAccessories(char, keepDefaultHair)
 	end
 end
 
--- 5. LOAD HAIR ASSET (Barber Logic)
+-- Loads a barber hair accessory by asset ID and tints it with the race color.
 local function LoadAccessoryById(hum, id, raceColor)
 	if not id or id == 0 then
 		return
@@ -190,11 +183,10 @@ local function LoadAccessoryById(hum, id, raceColor)
 
 				local handle = item:FindFirstChild("Handle")
 				if handle then
-					-- Color
 					if raceColor then
 						handle.Color = raceColor
 					end
-					-- Texture Removal
+					-- Remove the texture so the color shows.
 					local mesh = handle:FindFirstChildOfClass("SpecialMesh")
 					if mesh then
 						mesh.TextureId = ""
@@ -210,10 +202,7 @@ local function LoadAccessoryById(hum, id, raceColor)
 	end
 end
 
--- [[ --------------------- MAIN VISUAL UPDATE --------------------- ]] --
-
 local function UpdateCharacterVisuals(player)
-	-- Safety Checks
 	if not player or not player.Parent then
 		return
 	end
@@ -226,19 +215,17 @@ local function UpdateCharacterVisuals(player)
 		return
 	end
 
-	-- Wait for Data
 	if not WaitForData(player) then
 		return
 	end
 
-	-- Fetch Data
 	local profile = DataManager.GetProfile(player)
-	local appData = DataManager.GetAppearance(player) -- Barber Data
+	local appData = DataManager.GetAppearance(player)
 	local raceName = profile.Data.Race or "Human"
 	local raceConfig = RaceConfig.Races[raceName]
 	local visuals = raceConfig.Visuals or {}
 
-	-- [[ NEW: DETERMINE HAIR STATUS BEFORE CLEANUP ]] --
+	-- Decide about the hair before the cleanup.
 	local invisibleHair = visuals.InvisibleHair or false
 	local hasCustomHair = false
 
@@ -251,26 +238,22 @@ local function UpdateCharacterVisuals(player)
 		end
 	end
 
-	-- We only keep default hair if they don't have custom hair AND their race allows hair
+	-- Keep the default hair only without custom hair, and only if the race allows hair.
 	local keepDefaultHair = (not hasCustomHair) and not invisibleHair
 
-	-- [[ 1. CLEANUP ]] --
-	CleanAccessories(char, keepDefaultHair) -- Passes our new parameter
+	CleanAccessories(char, keepDefaultHair)
 
-	-- Cleanup Character Meshes (Gender)
 	for _, v in pairs(char:GetChildren()) do
 		if v:IsA("CharacterMesh") and v.BodyPart == Enum.BodyPart.Torso then
 			v:Destroy()
 		end
 	end
 
-	-- Cleanup Default Face
 	local defaultFace = char.Head:FindFirstChild("face")
 	if defaultFace then
 		defaultFace:Destroy()
 	end
 
-	-- Reset Limb Transparency
 	local rArm = char:FindFirstChild("Right Arm")
 	if rArm then
 		rArm.Transparency = 0
@@ -281,7 +264,6 @@ local function UpdateCharacterVisuals(player)
 		headPart.Transparency = 0
 	end
 
-	-- [[ 2. GENDER LOGIC ]] --
 	if appData and appData.Gender == "Female" then
 		local mesh = Instance.new("CharacterMesh")
 		mesh.BodyPart = Enum.BodyPart.Torso
@@ -289,7 +271,6 @@ local function UpdateCharacterVisuals(player)
 		mesh.Parent = char
 	end
 
-	-- [[ 3. SKIN COLOR ]] --
 	if visuals.SkinColor then
 		for _, part in ipairs(char:GetChildren()) do
 			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -302,7 +283,6 @@ local function UpdateCharacterVisuals(player)
 		end
 	end
 
-	-- [[ 4. FACE & EYES ]] --
 	local face = char.Head:FindFirstChild("Face")
 	if not face then
 		face = Instance.new("Decal")
@@ -311,13 +291,11 @@ local function UpdateCharacterVisuals(player)
 		face.Parent = char.Head
 	end
 
-	-- Texture
 	local savedFace = DataManager.GetFace(player)
 	if savedFace then
 		face.Texture = savedFace
 	end
 
-	-- Eye Color Tint
 	if raceName == "Ancestor" then
 		face.Color3 = Color3.fromRGB(200, 0, 0)
 	else
@@ -325,7 +303,7 @@ local function UpdateCharacterVisuals(player)
 		face.Color3 = eyeColor or Color3.new(0, 0, 0)
 	end
 
-	-- [[ 5. INVISIBILITY FLAGS ]] --
+	-- Some races hide body parts.
 	local function setTransparency(partName, value)
 		local part = char:FindFirstChild(partName)
 		if part then
@@ -347,26 +325,23 @@ local function UpdateCharacterVisuals(player)
 		setTransparency("Right Arm", 0)
 	end
 
-	-- [[ 6. HAIR LOGIC (UPDATED) ]] --
 	local raceHairCol = visuals.HairColor or Color3.fromRGB(160, 160, 160)
 
 	if not invisibleHair then
 		if hasCustomHair then
-			-- Load Custom Barber Hair
 			for _, id in ipairs(appData.Hair) do
 				LoadAccessoryById(hum, id, raceHairCol)
 			end
 		else
-			-- Modify the Default Avatar Hair we spared earlier
+			-- Tint the default avatar hair that the cleanup kept.
 			for _, child in pairs(char:GetChildren()) do
 				if child:IsA("Accessory") and child:GetAttribute("IsDefaultHair") then
 					local handle = child:FindFirstChild("Handle")
 					if handle then
-						-- Color
 						if raceHairCol then
 							handle.Color = raceHairCol
 						end
-						-- Texture Removal
+						-- Remove the texture so the color shows.
 						local mesh = handle:FindFirstChildOfClass("SpecialMesh")
 						if mesh then
 							mesh.TextureId = ""
@@ -380,7 +355,7 @@ local function UpdateCharacterVisuals(player)
 		end
 	end
 
-	-- [[ 7. RACE ASSETS (Horns, Tails, etc.) ]] --
+	-- Race items, such as horns and tails.
 	if RaceAssets then
 		local accessoriesToLoad = {}
 		if visuals.Accessories then
@@ -406,7 +381,6 @@ local function UpdateCharacterVisuals(player)
 			end
 		end
 
-		-- Right Arm Replacement
 		if visuals.RightArm and RaceAssets:FindFirstChild("RightArm") then
 			local armAsset = RaceAssets.RightArm:FindFirstChild(visuals.RightArm)
 			if armAsset then
@@ -427,7 +401,6 @@ local function UpdateCharacterVisuals(player)
 			end
 		end
 
-		-- Head Asset Replacement
 		if visuals.HeadAsset and RaceAssets:FindFirstChild("HeadAsset") then
 			local asset = RaceAssets.HeadAsset:FindFirstChild(visuals.HeadAsset)
 			if asset then
@@ -446,7 +419,6 @@ local function UpdateCharacterVisuals(player)
 		end
 	end
 
-	-- [[ 8. ARMOR DYE LOGIC ]] --
 	if appData and appData.ArmorColor then
 		for _, child in pairs(char:GetChildren()) do
 			local isHair = false
@@ -475,22 +447,12 @@ local function UpdateCharacterVisuals(player)
 	end
 end
 
--- [[ RACE PASSIVES ]] --
--- Passive stat flags live as Character attributes. They used to be applied by two
--- hand-maintained lists (one on reroll, one on spawn) that had drifted apart:
---
---   * Reroll cleared Hyperarmor / Lifesteal / SeerESP, but never touched
---     ManaWhenHit, so an Aegir who rerolled kept mana-on-hit forever.
---   * Spawn only ever SET flags (`if raceStats.X then set(X) end`) and never
---     cleared them, and also never set ManaWhenHit at all, so Aegir never actually
---     got its passive on respawn.
---
--- Both lists are now derived from RaceConfig itself. Every known passive is cleared
--- first, then only the current race's are set. Adding a passive to a race in
--- RaceConfig is enough; nothing here needs editing.
+-- Race passives are character attributes, derived from RaceConfig. Every known passive
+-- is cleared first and then only the current race's are set, so a reroll never keeps
+-- the old race's passive. Adding a passive to a race in RaceConfig is enough.
 
--- Stats key in RaceConfig -> Character attribute name. Anything not listed here is
--- a numeric stat handled through PlayerStats, not an attribute.
+-- RaceConfig Stats key to character attribute name. Any other key is a numeric stat in
+-- PlayerStats, not an attribute.
 local RACE_PASSIVE_ATTRS = {
 	Hyperarmor = "Hyperarmor",
 	Lifesteal = "Lifesteal",
@@ -498,9 +460,6 @@ local RACE_PASSIVE_ATTRS = {
 	ManaWhenHit = "ManaWhenHit",
 }
 
--- Clears every passive attribute, then applies the ones the given race actually has.
--- Clearing first is what makes rerolls safe: a race that simply lacks a field must
--- REMOVE the previous race's flag, not silently leave it standing.
 local function ApplyRacePassives(char, raceName)
 	if not char then
 		return
@@ -517,33 +476,26 @@ local function ApplyRacePassives(char, raceName)
 	end
 end
 
--- [[ --------------------- EVENT HANDLERS --------------------- ]] --
-
--- 1. ROLL RACE
 RollRaceFunction.OnServerInvoke = function(player)
 	local spins = DataManager.GetSpins(player)
 	if spins > 0 then
 		DataManager.UpdateSpins(player, -1)
 
-		-- RNG
 		local newRace, rarity = GetRandomRace(player)
 		local raceInfo = RaceConfig.Races[newRace]
 
-		-- Update Pity
 		if rarity == "Legendary" then
 			DataManager.UpdatePity(player, 0, true)
 		else
 			DataManager.UpdatePity(player, 1, false)
 		end
 
-		-- Face Reroll
 		local newFace = GetRandomFace(newRace)
 		DataManager.SetFace(player, newFace)
 
-		-- Save Data
 		DataManager.SetRaceStats(player, newRace, raceInfo.Stats)
 
-		-- Update PlayerStats Folder (For Client Visuals/Replication)
+		-- The client reads the race stats from PlayerStats.
 		local statsFolder = player:FindFirstChild("PlayerStats")
 		if statsFolder then
 			if statsFolder:FindFirstChild("Race") then
@@ -566,7 +518,6 @@ RollRaceFunction.OnServerInvoke = function(player)
 			setVal("DashDuration", s.DashDuration or 0.2)
 			setVal("SlideDuration", s.SlideDuration or 2.0)
 
-			-- Max Mana Recalc
 			if statsFolder:FindFirstChild("MaxMana") then
 				local baseMana = 100
 				local newMax = baseMana * (s.ManaBoost or 1)
@@ -575,31 +526,21 @@ RollRaceFunction.OnServerInvoke = function(player)
 			end
 		end
 
-		-- Start Bonus
 		if raceInfo.StartBonus and raceInfo.StartBonus.Liturgy then
 			DataManager.AddLiturgy(player, raceInfo.StartBonus.Liturgy)
 		end
 
-		-- Update Attributes. Clears the OLD race's passives before applying the new
-		-- race's, so a reroll off Ancestor drops Lifesteal and a reroll off Aegir
-		-- drops ManaWhenHit.
 		if player.Character then
 			ApplyRacePassives(player.Character, newRace)
 
-			-- Drop any active buff. BuffService keys its state to the PLAYER, not the
-			-- character, so a buff running across a reroll carried the OLD race's
-			-- damage/heal modifier onto the new one.
+			-- Drop every buff. BuffService keys buffs to the player, so a buff would carry the old
+			-- race's modifier onto the new race.
 			local BuffService = require(game.ServerScriptService.modules.BuffService)
 			BuffService.ClearAll(player, player.Character)
 
-			-- Full Visual Refresh
 			UpdateCharacterVisuals(player)
 
-			-- Push the new race's stats into the Humanoid. The block above only wrote
-			-- the PlayerStats value objects; applyStats is what turns HPBoost into
-			-- Humanoid.MaxHealth. Skipping it left MaxHealth on the PREVIOUS race's
-			-- value while the stat object read the new one, so the HP bar and the
-			-- humanoid disagreed (the "low HP text" after rerolling into Maw/Seer).
+			-- Only applyStats turns HPBoost into Humanoid.MaxHealth.
 			if _G.ApplyStats then
 				_G.ApplyStats(player.Character)
 			end
@@ -611,7 +552,6 @@ RollRaceFunction.OnServerInvoke = function(player)
 	end
 end
 
--- 2. BARBER EVENTS
 BarberEvent.OnServerEvent:Connect(function(player, action, payload)
 	if action == "UpdateHair" then
 		DataManager.SetHair(player, 1, payload[1] or 0)
@@ -633,25 +573,12 @@ BarberEvent.OnServerEvent:Connect(function(player, action, payload)
 	end
 end)
 
--- 3. PLAYER SPAWN
 Players.PlayerAdded:Connect(function(player)
 	player.CharacterAdded:Connect(function(char)
 		if WaitForData(player) then
-			-- Wait for mainGameHandler to finish its half of the character setup.
-			--
-			-- Both scripts have their own CharacterAdded and both write appearance.
-			-- mainGameHandler owns armor (Shirt/Pants), stats, and inventory visuals;
-			-- this script owns skin, face, hair, race items, and runs CleanAccessories,
-			-- which DESTROYS any accessory not named EquipSlot_*.
-			--
-			-- The ordering used to rest on nothing but this script waiting 0.5s while
-			-- the other waited 0.3s. That is a race, not coordination: if
-			-- HandleCharacterLoad yielded long enough (WaitForChild with 10s timeouts,
-			-- a spin on IsDescendantOf), LoadAllVisuals would land after our wipe and
-			-- the player's equipment would vanish.
-			--
-			-- Wait on the explicit flag instead, with a bounded fallback so a failure
-			-- over there cannot hang appearance over here forever.
+			-- Wait for mainGameHandler to finish its part of the character setup, so
+			-- CleanAccessories cannot remove the inventory visuals. The wait is bounded, so a
+			-- failure there cannot block the appearance forever. See docs/systems-design.md.
 			local waited = 0
 			while not char:GetAttribute("BaseSetupComplete") and waited < 10 do
 				task.wait(0.1)
@@ -659,16 +586,12 @@ Players.PlayerAdded:Connect(function(player)
 			end
 			if not char:GetAttribute("BaseSetupComplete") then
 				warn(
-					"[RaceHandler] BaseSetupComplete never set for "
-						.. player.Name
-						.. "; applying visuals anyway (appearance may race)."
+					`[RaceHandler] BaseSetupComplete never set for {player.Name}. Applying visuals.`
 				)
 			end
 
-			-- Apply everything
 			UpdateCharacterVisuals(player)
 
-			-- Apply Stat-based Physical Attributes
 			local profile = DataManager.GetProfile(player)
 			local hum = char:WaitForChild("Humanoid")
 
@@ -679,7 +602,6 @@ Players.PlayerAdded:Connect(function(player)
 			local race = profile.Data.Race or "Human"
 			ApplyRacePassives(char, race)
 
-			-- Refresh Stats Folder visuals
 			local statsFolder = player:FindFirstChild("PlayerStats")
 			if statsFolder then
 				for _, child in pairs(statsFolder:GetChildren()) do
@@ -692,7 +614,7 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 end)
 
--- Handle players already in server
+-- Also set up players who joined before this script ran.
 for _, player in ipairs(Players:GetPlayers()) do
 	if player.Character then
 		task.spawn(function()

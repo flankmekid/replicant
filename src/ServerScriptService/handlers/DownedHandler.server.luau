@@ -1,10 +1,12 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Handles the client requests to execute, carry, or drop a downed body.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DownedManager = require(ServerScriptService.modules.DownedManager)
 local StateHandler = require(ReplicatedStorage.modules.stateHandler)
 
--- Ensure Remotes folder/event exists
 local Remotes = ReplicatedStorage:FindFirstChild("remotes")
 local InteractionRemote = Remotes:FindFirstChild("DownedInteraction")
 
@@ -15,11 +17,10 @@ InteractionRemote.OnServerEvent:Connect(function(player, action, targetChar)
 	end
 
 	if action == "Execute" then
-		-- Check if the player is ALREADY executing someone
+		-- A second Execute cancels the running execution.
 		if StateHandler.GetState(myChar, "Executing") then
 			DownedManager.StopExecution(myChar)
 		elseif targetChar then
-			-- Start a new execution
 			DownedManager.AttemptExecute(myChar, targetChar)
 		end
 	elseif action == "Carry" then
@@ -30,12 +31,9 @@ InteractionRemote.OnServerEvent:Connect(function(player, action, targetChar)
 			then
 				return
 			end
-			-- Pick up specific target
-			-- (Note: AttemptCarry already calls DropIfCarrying internally if they are holding someone else)
 			DownedManager.AttemptCarry(myChar, targetChar)
 		else
-			-- Drop (Client sent nil target)
-			-- The module now handles finding the victim and cleaning up all the AlignConstraints automatically
+			-- No target means drop.
 			DownedManager.DropIfCarrying(myChar)
 		end
 	end

@@ -1,13 +1,13 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Typing "mb" in chat removes every combat tag the player handed out.
 local Players = game:GetService("Players")
 
--- adjust this path to where CombatManager actually is
 local CombatManager = require(game.ServerScriptService.modules.combatTagManager)
 
 local function onMessage(player, message)
-	-- normalize: trim and lowercase
 	local msg = message:lower():gsub("^%s+", ""):gsub("%s+$", "")
-	-- match "mb" as its own word at the start: "mb", "mb all", "mb sorry"
-	-- but NOT "maybe", "mbappe", "mbtiles", etc.
+	-- Match "mb" as its own word at the start ("mb", "mb sorry"), not "maybe" or "mbappe".
 	if msg == "mb" or msg:match("^mb%s") then
 		CombatManager.ClearMyTags(player)
 	end
@@ -19,7 +19,7 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 end)
 
--- catch anyone already in-game when this script runs
+-- Also connect players who joined before this script ran.
 for _, player in ipairs(Players:GetPlayers()) do
 	player.Chatted:Connect(function(message)
 		onMessage(player, message)

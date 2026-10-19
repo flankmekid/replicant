@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Handles the quest remotes from the client: start, complete, track, abandon, the quest
+-- state query, and the ready signal that restores the session.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
@@ -14,13 +18,13 @@ QuestActionRemote.OnServerEvent:Connect(function(player, action, questId)
 	elseif action == "Complete" then
 		QuestManager.CompleteQuest(player, questId)
 	elseif action == "Track" then
-		-- questId may be nil (untrack)
+		-- A nil questId untracks.
 		QuestManager.SetTracked(player, questId)
 	elseif action == "Abandon" then
-		-- Block abandoning class quests
+		-- Class quests cannot be abandoned.
 		local def = QuestConfig.Quests[questId]
 		if def and def.ClassQuest then
-			warn(player.Name .. " attempted to abandon class quest: " .. tostring(questId))
+			warn(`[QuestNetworkHandler] {player.Name} tried to abandon class quest {questId}.`)
 			return
 		end
 		DataManager.ClearActiveQuest(player, questId, false)
@@ -64,7 +68,7 @@ end
 local QuestReadyRemote = ReplicatedStorage:WaitForChild("QuestSystem"):WaitForChild("QuestReady")
 
 QuestReadyRemote.OnServerEvent:Connect(function(player)
-	-- Client is ready, safe to restore
+	-- The client UI is ready, so the session can be restored.
 	task.wait(0.1)
 	QuestManager.RestoreSession(player)
 end)
