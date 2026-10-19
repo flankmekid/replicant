@@ -4,5 +4,8 @@
     "SerializedOverrides": {
       "BinaryString": ""
     }
+  },
+  "attributes": {
+    "Rojo_Target_Value": "HitboxProjectileFolder"
   }
 }

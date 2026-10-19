@@ -2,6 +2,27 @@
   "name": "REPLICANT",
   "tree": {
     "$className": "DataModel",
+    "Workspace": {
+      "$ignoreUnknownInstances": true,
+      "plrManager": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": true,
+        "alive": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true,
+          "$attributes": {
+            "Rojo_Id": "HitboxAliveFolder"
+          }
+        },
+        "projectiles": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true,
+          "$attributes": {
+            "Rojo_Id": "HitboxProjectileFolder"
+          }
+        }
+      }
+    },
     "ReplicatedStorage": {
       "$properties": {
         "SerializedOverrides": {
