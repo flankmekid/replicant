@@ -17,11 +17,6 @@ local ClientCameraShake = require(ReplicatedStorage.modules.ClientCameraShake)
 
 local loadedClientModules = {}
 
--- Action types whose folder name comes from a StringValue on the player.
-local typeToStringValue = {
-	Ability = "Plr_SkillSet",
-}
-
 remote.OnClientEvent:Connect(function(data, ...)
 	local actionType = data.Type
 	local moduleName = data.Action
@@ -39,22 +34,11 @@ remote.OnClientEvent:Connect(function(data, ...)
 		end
 	end
 
-	if actionType == "Combat" then
-		-- The server sends the weapon folder name.
-		folderName = data.FolderName
-		if not folderName then
-			warn(`[replicator] Combat replication arrived without FolderName.`)
-			return
-		end
-	else
-		-- Other types read the folder name from a StringValue.
-		local stringValueName = typeToStringValue[actionType]
-		local stringValue = plr:FindFirstChild(stringValueName)
-		if not stringValue then
-			warn(`[replicator] No StringValue for {actionType}.`)
-			return
-		end
-		folderName = stringValue.Value
+	-- The server sends only Combat replication, with the weapon folder name.
+	folderName = data.FolderName
+	if not folderName then
+		warn(`[replicator] Combat replication arrived without FolderName.`)
+		return
 	end
 
 	local typeFolder = ReplicationFolder:FindFirstChild(actionType)
