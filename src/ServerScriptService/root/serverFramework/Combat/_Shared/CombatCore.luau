@@ -786,10 +786,9 @@ function module.RunM1(plr, cfg, opts)
 		end
 	end
 
-	-- With a target, the lunge steers toward it during the windup, so a sprinting target
-	-- cannot outrun the windup. Without a target it is a plain forward burst. Steering is
-	-- rate-limited, so a sharp cut, a dodge, or a parry still beats it. The token stops
-	-- the lunge on a parry or a stun.
+	-- The boost always fires. Against a target who runs away, the lunge also steers
+	-- toward them during the windup. Steering is rate-limited, so a sharp cut, a dodge,
+	-- or a parry still beats it. The token stops the lunge on a parry or a stun.
 	if extraAtk == 6 then
 		-- A nil speed means the lunge is off for this weapon.
 		local lungeSpeed = DashConfig.Get("M1Lunge", getEquippedTool(plr))
