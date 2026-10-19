@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the weapon throw: sends the request, plays the grab animation at once,
+-- and plays the hit or whiff effects that the server replicates.
 local module = {}
 
 local Players = game:GetService("Players")
@@ -7,14 +11,14 @@ local ServerRemote = RP.remotes.server
 local plr = Players.LocalPlayer
 local animationHndlr = require(RP.modules.animationHandler)
 
--- Placeholder Animation IDs (REPLACE THESE)
-local ANIM = "rbxassetid://117582907989700" -- Attacker starts grab
-local ANIM_WHIFF = "rbxassetid://96311777205911" -- Attacker misses grab
+-- TODO: Replace the placeholder grab and whiff animations.
+local ANIM = "rbxassetid://117582907989700"
+local ANIM_WHIFF = "rbxassetid://96311777205911"
 
-local THROW_COOLDOWN = 5 -- Client side debounce for responsiveness
+-- A client-side debounce, for responsiveness. The server has its own cooldown.
+local THROW_COOLDOWN = 5
 local isThrowing = false
 
--- Helper to get tool name for the server request
 local function getEquippedToolName()
 	local char = plr.Character
 	if not char then
@@ -24,6 +28,9 @@ local function getEquippedToolName()
 	return tool and tool.Name
 end
 
+-- Throw.OnThrowActivated() - try a throw
+--
+-- Return: nothing.
 function module.OnThrowActivated()
 	local char = plr.Character
 	if not char then
@@ -34,7 +41,7 @@ function module.OnThrowActivated()
 		return
 	end
 
-	-- Standard Client-Side State Checks (Predictive)
+	-- Predict the server's state checks, so a throw it would reject does not play.
 	if
 		char:GetAttribute("CantAnything")
 		or char:GetAttribute("Stunned")
@@ -54,7 +61,6 @@ function module.OnThrowActivated()
 		return
 	end
 
-	-- Fire request to server
 	ServerRemote:FireServer({
 		Type = "Combat",
 		Action = "Throw",
@@ -62,17 +68,22 @@ function module.OnThrowActivated()
 		CombatType = toolName,
 	})
 
-	-- Play initial grab attempt animation immediately for responsiveness
-	-- The server will override this with a success/punish animation later
+	-- Play the grab animation now, for responsiveness. The server's hit or whiff
+	-- effect replaces it.
 	animationHndlr.LoadAnim(char, "ThrowStart", ANIM, nil, false)
 
-	-- Reset client debounce
 	task.delay(THROW_COOLDOWN, function()
 		isThrowing = false
 	end)
 end
 
--- Called by server to play sounds/effects
+-- Throw.ExecuteEffect() - play the hit or whiff effect of a throw
+-- @char: the throwing character
+-- @effectType: "Hit" or "Whiff"
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 function module.ExecuteEffect(char, effectType)
 	if effectType == "Whiff" then
 		local s = RP.assets.sounds.PunchSound:Clone()
@@ -87,7 +98,7 @@ function module.ExecuteEffect(char, effectType)
 		s.Parent = char.Torso
 		s:Play()
 		game.Debris:AddItem(s, 2)
-		-- Create an impact particle
+		-- TODO: Add an impact particle.
 	end
 end
 
