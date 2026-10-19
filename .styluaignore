@@ -2,12 +2,8 @@ src/ReplicatedStorage/TopbarPlus/
 src/ReplicatedStorage/modules/SmartBone/
 src/ReplicatedStorage/modules/CameraShaker/
 src/ReplicatedStorage/modules/hitboxClass/
-src/ReplicatedStorage/modules/FootstepModule/
 src/ReplicatedStorage/modules/ContextActionUtility.luau
 src/ServerScriptService/modules/ProfileStore.luau
 src/ServerScriptService/modules/Promise.luau
-src/ServerScriptService/modules/TableUtil.luau
 src/StarterPlayerScripts/PlayerModule/
 src/StarterCharacterScripts/Animate/
-src/StarterCharacterScripts/LocalFootsteps/
-src/StarterCharacterScripts/RagdollClient.client.luau

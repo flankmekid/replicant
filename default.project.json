@@ -93,7 +93,8 @@
       "ReplicatedStorage/Skyboxes",
       "ServerScriptService/modules/QuestServerBACKUP",
       "StarterPlayer/StarterCharacterScripts/QuestClientBACKUP",
-      "StarterPlayer/StarterCharacterScripts/Movement/DashOLD"
+      "StarterPlayer/StarterCharacterScripts/Movement/DashOLD",
+      "StarterPlayer/StarterCharacterScripts/LocalFootsteps"
     ]
   }
 }
