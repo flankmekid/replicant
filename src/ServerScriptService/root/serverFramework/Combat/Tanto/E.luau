@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Tanto E. A two-dash multihit with its own hit resolution instead of CombatCore.RunE.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -26,7 +29,6 @@ local hitboxParams = {
 
 local DataManager = require(game.ServerScriptService.modules.dataManager)
 
--- E Specific Settings
 local dmg = 5
 local GUARD_BREAK = false
 local WINDUP_DELAY = 0.5
@@ -68,6 +70,10 @@ local function leftSwing(char)
 	game.Debris:AddItem(attachment, 2)
 end
 
+-- E.ServerCheck() - run the Tanto E
+-- @plr: the player who pressed E
+--
+-- Return: nothing. Yields until the second dash ends.
 function module.ServerCheck(plr)
 	local function getEquippedTool()
 		local currentCharacter = plr.Character
@@ -87,16 +93,6 @@ function module.ServerCheck(plr)
 	end
 	local decision
 	local isBusy = false
-
-	-- 1. PER-PLAYER DEBOUNCE CHECK
-	--if playerEDebounces[plr] then isBusy = true
-	--elseif StateHandler.GetState(char, "M1") then isBusy = true
-	--elseif StateHandler.GetState(char, "E") then isBusy = true
-	--elseif StateHandler.GetState(char, "CantAnything") then isBusy = true
-	--elseif StateHandler.GetState(char, "Blocking") then isBusy = true
-	--elseif StateHandler.GetState(char, "Stunned") then isBusy = true
-	--elseif StateHandler.GetState(char, "Dodging") then isBusy = true
-	--end
 
 	if isBusy then
 		decision = "Declined"
@@ -139,7 +135,7 @@ function module.ServerCheck(plr)
 
 	StateHandler.SetState(char, "CantAnything", true, 1)
 
-	-- Reactive interrupt: cancel the dash mover + stop the swing anim on stun/down.
+	-- A stun or a down removes the dash mover and stops the swing animation.
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
@@ -153,8 +149,8 @@ function module.ServerCheck(plr)
 	end)
 
 	task.delay(0.3, function()
-		-- First half of the Tanto E: the short step. The longer second dash follows
-		-- below. Both halves are the move design, so both are exempt in DashConfig.
+		-- The Tanto E is two dashes: a short step here and a longer dash after the first
+		-- hit window. DashConfig exempts both, because they are part of the move.
 		local stepSpeed, stepLife = DashConfig.Get("TantoE1")
 		if stepSpeed then
 			local BV = Instance.new("BodyVelocity", char.HumanoidRootPart)
@@ -182,7 +178,7 @@ function module.ServerCheck(plr)
 
 	task.wait(WINDUP_DELAY)
 
-	-- INTERRUPT CHECK: stunned/downed during windup -> abort before the hitbox.
+	-- A stun or a down during the windup cancels the attack before the hitbox.
 	if StateHandler.IsInterrupted(char) then
 		stopWatch()
 		Helper.ResetSpeed(char)
@@ -205,7 +201,7 @@ function module.ServerCheck(plr)
 
 	local alreadyHit = {}
 
-	-- [[ FIX START: Connect the function BEFORE starting the hitbox ]] --
+	-- Connect before Start, so the first hit is not missed.
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
@@ -219,7 +215,6 @@ function module.ServerCheck(plr)
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= plr) then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
@@ -232,7 +227,6 @@ function module.ServerCheck(plr)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					-- (Dodging logic kept same)
 					local sound = RP.assets.sounds.Dodged:Clone()
 					sound.Parent = targetHRP
 					sound:Play()
@@ -247,13 +241,11 @@ function module.ServerCheck(plr)
 				local function doAttack(extraDmg, knockbackDistance)
 					local direction = (targetHRP.Position - attackerHRP.Position).Unit
 					Helper.ApplyKnockback(targetChar, direction, knockbackDistance, 0.2)
-					--ragdollManager.Ragdoll(targetChar, 1.5)
-					-- E hitstun (combo-starter); pinned walkspeed. Matches CombatCore E_HITSTUN.
+					-- The E hitstun pins WalkSpeed, so the victim cannot walk out of the combo.
 					StateHandler.SetStun(targetChar, true, 0.8, 2)
 					local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 					dmgModule.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
 
-					--targetChar:FindFirstChild("Humanoid"):TakeDamage(dmg + extraDmg)
 					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then
 						DataManager.AddWeaponXP(
 							game.Players:GetPlayerFromCharacter(char),
@@ -344,7 +336,7 @@ function module.ServerCheck(plr)
 				then
 					Hitbox:Destroy()
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- Route through BlockResolver (single chokepoint + guard bar).
+					-- BlockResolver applies the guard bar and returns the verdict.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
 						attacker = char,
@@ -445,7 +437,7 @@ function module.ServerCheck(plr)
 
 	task.wait(0.2)
 
-	-- Second half: the bigger dash that carries the multihit through.
+	-- The second, longer dash carries the multihit through.
 	local lungeSpeed, lungeLife = DashConfig.Get("TantoE2")
 	if lungeSpeed then
 		local BV = Instance.new("BodyVelocity", char.HumanoidRootPart)

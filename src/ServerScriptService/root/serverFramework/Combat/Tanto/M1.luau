@@ -1,6 +1,7 @@
--- Tanto server M1 (thin). Standard swing (no custom dispatch), plus its buff:
--- buffed hits deal double base damage and restore 5 mana (no heal). Shared flow
--- and generic swing FX come from CombatCore.
+-- SPDX-License-Identifier: MIT
+--
+-- Tanto M1. Sends hits through BuffService, so the Mystic Eyes buff applies, and
+-- otherwise runs CombatCore.RunM1.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -9,14 +10,17 @@ local CombatCore = require(SSS.root.serverFramework.Combat._Shared.CombatCore)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 local damageCalculator = require(SSS.modules.damageCalculator)
 
--- Buff (Mystic Eyes) is centralized in BuffService (activated from SkillHandler
--- on cast). This weapon just routes its hits through it.
 local BuffService = require(SSS.modules.BuffService)
 
 local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	BuffService.ApplyDamage(plr, char, targetChar, dmg, extraDmg, "Weapon")
 end
 
+-- M1.ServerCheck() - run the Tanto M1
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	CombatCore.RunM1(plr, WeaponConfig.Tanto.server.m1, {
 		onDamage = onDamage,
