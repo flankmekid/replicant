@@ -1,11 +1,9 @@
--- WeaponIdleStopper
--- Stops orphaned weapon idle animation tracks on demand.
--- Weapon inputHandlers load their idle as an AnimationTrack named "Idle".
--- During a server-driven weapon swap the old tool can be destroyed before
--- its Unequipped handler stops the idle, leaving a looping track with no
--- reference to stop it. The server fires StopWeaponIdle to clear them.
--- Nothing other than weapon equips names a track "Idle", so stopping by
--- name is safe here.
+-- SPDX-License-Identifier: MIT
+--
+-- Stops leftover weapon idle animations when the server fires StopWeaponIdle. During a
+-- weapon swap the old tool can be destroyed before it stops its "Idle" track, which
+-- then loops with no reference. Only weapon idles use that track name, so stopping by
+-- name is safe.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -28,11 +26,8 @@ local function sweepOnce()
 	end
 end
 
--- A single sweep races the swap: the old tool's Idle track can still be starting
--- (or restarting) on this frame, so one pass can miss it and leave it looping under
--- the new weapon's idle. Sweep across a few frames to catch a late starter. The new
--- weapon's own idle is only loaded when the player re-equips from the hotbar, which
--- happens after this window, so this cannot stop the intended new idle.
+-- The old idle can still be starting on this frame, so sweep for a few frames. The new
+-- weapon's idle loads only when the player equips it from the hotbar, after this window.
 local function stopIdleTracks()
 	for _ = 1, 4 do
 		sweepOnce()
