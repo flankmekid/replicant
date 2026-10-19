@@ -1,6 +1,7 @@
--- Greatsword server M1 (thin). Keeps only what's unique to the greatsword:
--- its swing dispatch (inverted L/R convention, downSwing, and the combo-6 groundSlam).
--- Everything shared (debounce, combo, hitbox, hit resolution) comes from CombatCore.
+-- SPDX-License-Identifier: MIT
+--
+-- Greatsword M1. Adds the greatsword swing FX and the ground slam on the running attack
+-- to CombatCore.RunM1.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -25,7 +26,8 @@ local function groundSlam(char)
 	game.Debris:AddItem(gs, 2)
 end
 
--- greatsword uses the inverted convention: rightSwing -> SlashRight, leftSwing -> SlashLeft
+-- Greatswords play SlashRight on odd combo hits, the opposite of the comboMap
+-- convention, and a down slash on the running attack and the air attack.
 local function swingDispatch(char, combo)
 	local E = CombatCore.EmitSlash
 	if combo == 1 or combo == 3 or combo == 5 then
@@ -42,6 +44,11 @@ local function swingDispatch(char, combo)
 	end
 end
 
+-- M1.ServerCheck() - run the Greatsword M1
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	CombatCore.RunM1(plr, WeaponConfig.Greatsword.server.m1, {
 		swingDispatch = swingDispatch,
