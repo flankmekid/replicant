@@ -14,8 +14,8 @@ local SpireRemote = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
 local SpireUpdate = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
 local StateHandler = require(ReplicatedStorage.modules:WaitForChild("stateHandler"))
 
--- Declared here because the rest helpers below use it.
-local getSpireDef
+-- Declared here because the rest helpers below use them.
+local getSpireDef, isNearSpire
 
 -- The spire part each player rests at, for the proximity check and cleanup on death
 -- or leave.
@@ -50,6 +50,9 @@ local function beginRest(player, spireId)
 	end
 	if not DataManager.IsAttuned(player, spireId) then
 		return false, "You are not attuned to that Spire."
+	end
+	if not isNearSpire(player, spireDef) then
+		return false, "You are too far from the Spire."
 	end
 
 	local character = player.Character
@@ -135,6 +138,20 @@ getSpireDef = function(spireId)
 	return nil
 end
 
+-- The spire prompt reaches 16 studs. The extra distance covers latency.
+local spireRange = 22
+
+-- Returns true if the player stands within spireRange of the spire part.
+isNearSpire = function(player, spireDef)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local part = workspace:FindFirstChild(spireDef.PartName, true)
+	if not root or not part or not part:IsA("BasePart") then
+		return false
+	end
+	return (root.Position - part.Position).Magnitude <= spireRange
+end
+
 local function teleportToSpire(player, spireId)
 	local spireDef = getSpireDef(spireId)
 	if not spireDef then
@@ -195,7 +212,8 @@ end)
 
 SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 	if action == "Attune" then
-		if not getSpireDef(spireId) then
+		local spireDef = getSpireDef(spireId)
+		if not spireDef or not isNearSpire(player, spireDef) then
 			return
 		end
 		local wasNew = DataManager.AddAttuned(player, spireId)
@@ -221,6 +239,11 @@ SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 		endRest(player)
 		SpireUpdate:FireClient(player, "RestEnded")
 	elseif action == "Teleport" then
+		-- The travel map opens only from the rest menu.
+		if not restingPlayers[player] then
+			SpireUpdate:FireClient(player, "TeleportFailed", "You must rest at a Spire to travel.")
+			return
+		end
 		-- Set the destination first, which works while anchored, then end the rest, so the
 		-- player arrives free to move and back in plrManager.alive.
 		local success, err = teleportToSpire(player, spireId)

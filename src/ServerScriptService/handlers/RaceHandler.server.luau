@@ -553,8 +553,23 @@ RollRaceFunction.OnServerInvoke = function(player)
 	end
 end
 
+-- Returns true for a hair asset ID, or 0 for an empty slot. The ID goes into the save.
+local function isHairId(id)
+	return typeof(id) == "number" and id >= 0 and id % 1 == 0 and id < 2 ^ 53
+end
+
+-- The payload goes into the player's save, so every field is checked first.
 BarberEvent.OnServerEvent:Connect(function(player, action, payload)
 	if action == "UpdateHair" then
+		if typeof(payload) ~= "table" then
+			return
+		end
+		for slot = 1, 3 do
+			if payload[slot] ~= nil and not isHairId(payload[slot]) then
+				warn(`[RaceHandler] {player.Name} sent a bad hair ID.`)
+				return
+			end
+		end
 		DataManager.SetHair(player, 1, payload[1] or 0)
 		DataManager.SetHair(player, 2, payload[2] or 0)
 		DataManager.SetHair(player, 3, payload[3] or 0)
@@ -563,9 +578,15 @@ BarberEvent.OnServerEvent:Connect(function(player, action, payload)
 		DataManager.ResetHair(player)
 		UpdateCharacterVisuals(player)
 	elseif action == "UpdateGender" then
+		if payload ~= "Male" and payload ~= "Female" then
+			return
+		end
 		DataManager.SetGender(player, payload)
 		UpdateCharacterVisuals(player)
 	elseif action == "DyeArmor" then
+		if typeof(payload) ~= "Color3" then
+			return
+		end
 		if DataManager.GetLiturgy(player) >= DYE_COST then
 			DataManager.RemoveLiturgy(player, DYE_COST)
 			DataManager.SetArmorColor(player, payload)

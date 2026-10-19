@@ -421,6 +421,17 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		return false
 	end
 
+	-- The client names the target, so check it before the item leaves its source. The
+	-- hotbar has slots 1 to 9, the same as UseHotbar.
+	if targetType == "Hotbar" then
+		local numTarget = tonumber(targetIndex)
+		if not numTarget or numTarget % 1 ~= 0 or numTarget < 1 or numTarget > 9 then
+			return false
+		end
+	elseif targetType ~= "Equipment" and targetType ~= "Inventory" then
+		return false
+	end
+
 	-- An equipment slot accepts only items of its category.
 	if targetType == "Equipment" then
 		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(itemData.Name)

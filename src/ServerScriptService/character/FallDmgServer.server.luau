@@ -1,8 +1,13 @@
 -- SPDX-License-Identifier: MIT
 --
--- Applies fall damage that the client reports. A roll reduces it, and a fall that
--- would kill knocks the player down instead.
+-- Applies fall damage. The server finds each landing itself with a ground ray and
+-- measures the fall from the takeoff height, so a client cannot skip the damage. The
+-- client report only adds the roll and the falls the server cannot measure, such as a
+-- drop from a climb. A roll reduces the damage, and a fall that would kill knocks the
+-- player down instead.
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage").remotes
 
 local fallEvent = ReplicatedStorage:WaitForChild("FallDmg")
@@ -10,6 +15,15 @@ local fallEvent = ReplicatedStorage:WaitForChild("FallDmg")
 local MIN_FALL_DAMAGE_HEIGHT = 30
 local FATAL_FALL_HEIGHT = 200
 local ROLL_DAMAGE_REDUCTION = 0.75
+
+-- An R6 root part rests about 3 studs above the floor.
+local groundRayLength = 4.5
+-- A larger height change in one step is a teleport, not a fall.
+local teleportStep = 50
+-- The client reports its landing about when the server sees it. A report counts this many
+-- seconds around the server landing, and the server waits this long for it.
+local reportWindow = 0.75
+local reportWait = 0.3
 
 local ragdoll = require(game.ServerScriptService.modules.ragdollManager)
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
@@ -27,12 +41,7 @@ local function calculateDamage(height)
 	return math.clamp(damage, 0, 1000)
 end
 
-fallEvent.OnServerEvent:Connect(function(player, clientCalculatedDistance, isRolling)
-	local character = player.Character
-	if not character then
-		return
-	end
-
+local function applyFall(character, fallDistance, isRolling)
 	local humanoid = character:FindFirstChild("Humanoid")
 	if not humanoid then
 		return
@@ -47,7 +56,7 @@ fallEvent.OnServerEvent:Connect(function(player, clientCalculatedDistance, isRol
 		return
 	end
 
-	local baseDamage = calculateDamage(clientCalculatedDistance)
+	local baseDamage = calculateDamage(fallDistance)
 
 	if baseDamage > 5 then
 		if isRolling then
@@ -94,4 +103,100 @@ fallEvent.OnServerEvent:Connect(function(player, clientCalculatedDistance, isRol
 			end
 		end
 	end
+end
+
+-- The last landing each client reported.
+local reports = {}
+
+fallEvent.OnServerEvent:Connect(function(player, clientDistance, isRolling)
+	if typeof(clientDistance) ~= "number" or clientDistance ~= clientDistance then
+		return
+	end
+	reports[player] = {
+		time = os.clock(),
+		distance = clientDistance,
+		rolling = isRolling == true,
+	}
+end)
+
+local rayParams = RaycastParams.new()
+rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- Returns whether the root part is over a floor, and whether that floor is water.
+local function probeGround(character, root)
+	rayParams.FilterDescendantsInstances = { character }
+	local result = workspace:Raycast(root.Position, Vector3.new(0, -groundRayLength, 0), rayParams)
+	if not result then
+		return false, false
+	end
+	return true, result.Material == Enum.Material.Water
+end
+
+local function onLanded(player, character, serverDistance)
+	local landedAt = os.clock()
+	task.wait(reportWait)
+	if player.Character ~= character then
+		return
+	end
+
+	-- The client measures from its own Freefall start, which can be higher than the
+	-- server takeoff, for example after a climb. A report never lowers the distance.
+	local distance = serverDistance
+	local isRolling = false
+	local report = reports[player]
+	if report and math.abs(report.time - landedAt) <= reportWindow then
+		distance = math.max(distance, report.distance)
+		isRolling = report.rolling
+		reports[player] = nil
+	end
+
+	applyFall(character, distance, isRolling)
+end
+
+-- Layout: tracked[character] = { airborne, startY, lastY }.
+local tracked = setmetatable({}, { __mode = "k" })
+
+RunService.Heartbeat:Connect(function()
+	for _, player in ipairs(Players:GetPlayers()) do
+		local character = player.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if not root then
+			continue
+		end
+
+		local y = root.Position.Y
+		local t = tracked[character]
+		if not t then
+			t = { airborne = false, startY = y, lastY = y }
+			tracked[character] = t
+		end
+
+		local teleported = math.abs(y - t.lastY) > teleportStep
+		t.lastY = y
+		local grounded, inWater = probeGround(character, root)
+
+		-- No fall counts in the menu, in a ragdoll, or across a teleport.
+		if
+			teleported
+			or not player:GetAttribute("HasPressedPlay")
+			or stateHandler.GetState(character, "Ragdolled")
+		then
+			t.startY = y
+			t.airborne = not grounded
+		elseif not grounded then
+			if not t.airborne then
+				t.airborne = true
+				t.startY = y
+			end
+		elseif t.airborne then
+			t.airborne = false
+			if not inWater then
+				task.spawn(onLanded, player, character, t.startY - y)
+			end
+		end
+	end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+	reports[player] = nil
 end)

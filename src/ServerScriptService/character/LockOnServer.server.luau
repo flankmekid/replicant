@@ -6,6 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local toggleEvent = ReplicatedStorage.remotes:WaitForChild("ToggleShiftLock")
 
 toggleEvent.OnServerEvent:Connect(function(player, shouldEnable)
+	if typeof(shouldEnable) ~= "boolean" then
+		return
+	end
 	-- DevEnableMouseLock = false also forces the player out of Shift Lock.
 	player.DevEnableMouseLock = shouldEnable
 end)

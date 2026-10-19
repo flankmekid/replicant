@@ -11,6 +11,17 @@ local allowedTypes = {
 	Combat = true,
 }
 
+-- The handler functions a client may call, by Action. Anything else, such as the
+-- CombatCore internals in _Shared, is server-only.
+local allowedFuncs = {
+	Equip = { Equip = true },
+	M1 = { ServerCheck = true },
+	M2 = { ServerCheck = true },
+	E = { ServerCheck = true },
+	Throw = { ServerCheck = true },
+	Block = { ParryActive = true, BlockActive = true, Deactivated = true },
+}
+
 ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	if typeof(data) ~= "table" or not allowedTypes[data.Type] then
 		warn(`[serverFramework] {plr.Name} sent a payload with no valid Type.`)
@@ -30,8 +41,22 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	local funcName = data.Func
 	local folderName = data.CombatType
 
-	if not plr.Character then
+	local allowed = allowedFuncs[moduleName]
+	if not allowed or not allowed[funcName] then
+		warn(`[serverFramework] {plr.Name} called {moduleName}.{funcName}, which is not allowed.`)
+		return
+	end
+
+	local char = plr.Character
+	if not char then
 		warn(`[serverFramework] Character of {plr.Name} not found.`)
+		return
+	end
+
+	-- The weapon modules trust CombatType, so it must be the tool the character holds.
+	local tool = char:FindFirstChildOfClass("Tool")
+	if not tool or tool.Name ~= folderName then
+		warn(`[serverFramework] {plr.Name} sent CombatType {folderName} without holding it.`)
 		return
 	end
 

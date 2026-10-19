@@ -20,8 +20,30 @@ end
 
 local PickupRemote = remotes:FindFirstChild("YunaInteraction")
 
+-- Latency slack on top of the reach of Yuna's prompt.
+local talkSlack = 6
+
+-- Each client moves Yuna up or down on its own screen, so only her horizontal position
+-- is the same on the server.
+local function isNearYuna(player)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local yuna = workspace:FindFirstChild("Yuna")
+	local torso = yuna and yuna:FindFirstChild("Torso")
+	local prompt = torso and torso:FindFirstChildWhichIsA("ProximityPrompt")
+	if not root or not torso or not prompt then
+		return false
+	end
+	local offset = root.Position - torso.Position
+	local flat = Vector3.new(offset.X, 0, offset.Z)
+	return flat.Magnitude <= prompt.MaxActivationDistance + talkSlack
+end
+
 PickupRemote.OnServerEvent:Connect(function(player, questId)
 	if questId ~= "Lantern" then
+		return
+	end
+	if not isNearYuna(player) then
 		return
 	end
 

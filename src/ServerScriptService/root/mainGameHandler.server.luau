@@ -671,8 +671,18 @@ local function IsInMenuArea(position)
 		and math.abs(diff.Z) <= MENU_AREA_HALF_SIZE.Z
 end
 
+-- The players between pressing Play and HasPressedPlay turning true.
+local spawning = {}
+
 SPAWN_EVENT.OnServerEvent:Connect(function(player)
+	-- Play works only from the menu. In the game it would teleport the player to their
+	-- saved position, out of any fight.
+	if player:GetAttribute("HasPressedPlay") or spawning[player] then
+		return
+	end
+	spawning[player] = true
 	task.delay(2.1, function()
+		spawning[player] = nil
 		player:SetAttribute("HasPressedPlay", true)
 	end)
 	local char = player.Character
@@ -819,6 +829,9 @@ local WEAPON_PRICES = {
 	["Scythe"] = 2500,
 }
 
+-- The family level that unlocks the branch weapons of a family.
+local branchUnlockLevel = 10
+
 BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 	-- A table here would throw inside FindFirstChild.
 	if type(weaponName) ~= "string" then
@@ -839,6 +852,30 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 
 	if DataManager.HasItem(player, weaponName) then
 		return
+	end
+
+	-- The vendor dialogues check these levels only on the client. A hybrid needs both
+	-- parent families at HybridUnlockLevel, and a branch weapon needs its family at
+	-- branchUnlockLevel.
+	local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
+	local parents = SkillConfig.HybridParents[weaponName]
+	if parents then
+		for _, parent in ipairs(parents) do
+			if DataManager.GetWeaponLevel(player, parent) < SkillConfig.HybridUnlockLevel then
+				warn(`[mainGameHandler] {player.Name} needs {parent} level for {weaponName}.`)
+				return
+			end
+		end
+	else
+		local family = SkillConfig.GetXPFamily(weaponName)
+		if
+			family
+			and family ~= weaponName
+			and DataManager.GetWeaponLevel(player, family) < branchUnlockLevel
+		then
+			warn(`[mainGameHandler] {player.Name} needs {family} level for {weaponName}.`)
+			return
+		end
 	end
 
 	local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
@@ -877,7 +914,6 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 		-- Buying a branch weapon completes the level 10 class quest of its family. It is
 		-- done here, at the only server purchase path, so a client cannot fake it. See
 		-- docs/systems-design.md.
-		local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 		local family = SkillConfig.GetXPFamily(weaponName)
 		-- Seed weapons map to themselves and are not a branch purchase.
 		if family and family ~= weaponName then
@@ -1131,8 +1167,11 @@ USE_HOTBAR_EVENT.OnServerEvent:Connect(function(player, slotNumber)
 end)
 
 ON_DEATH_EVENT.OnServerEvent:Connect(function(player, char)
+	if typeof(char) ~= "Instance" or char ~= player.Character then
+		return
+	end
 	local hum = char:FindFirstChild("Humanoid")
-	if hum and hum.Health > 0 and player.Character == char then
+	if hum and hum.Health > 0 then
 		hum.Health = 0
 	end
 end)

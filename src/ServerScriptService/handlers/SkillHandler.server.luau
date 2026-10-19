@@ -34,6 +34,10 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 	if type(skillName) ~= "string" then
 		return
 	end
+	-- The racial skills aim with mouseHit.Position, so anything but a CFrame is dropped.
+	if typeof(mouseHit) ~= "CFrame" then
+		mouseHit = nil
+	end
 
 	local char = player.Character
 	if not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then

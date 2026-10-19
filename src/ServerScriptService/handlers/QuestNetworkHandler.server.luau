@@ -1,7 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
--- Handles the quest remotes from the client: start, complete, track, abandon, the quest
--- state query, and the ready signal that restores the session.
+-- Handles the quest remotes from the client: track, abandon, the quest state query, and
+-- the ready signal that restores the session.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -13,12 +13,10 @@ local QuestActionRemote = ReplicatedStorage:WaitForChild("QuestSystem"):WaitForC
 local QuestStateRequest = ReplicatedStorage:WaitForChild("QuestSystem")
 	:WaitForChild("QuestStateRequest")
 
+-- The client may only track and abandon. Starting and completing a quest are server
+-- decisions: a client that could send them would skip the quest and take the rewards.
 QuestActionRemote.OnServerEvent:Connect(function(player, action, questId)
-	if action == "Start" then
-		QuestManager.AssignQuest(player, questId)
-	elseif action == "Complete" then
-		QuestManager.CompleteQuest(player, questId)
-	elseif action == "Track" then
+	if action == "Track" then
 		-- A nil questId untracks.
 		QuestManager.SetTracked(player, questId)
 	elseif action == "Abandon" then

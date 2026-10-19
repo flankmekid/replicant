@@ -25,8 +25,24 @@ if not PickupRemote then
 	PickupRemote.Parent = remotes
 end
 
+-- The shard prompt reaches 6 studs. The extra distance covers latency.
+local pickupRange = 12
+
+local function isNearShard(player)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	local shard = workspace:FindFirstChild("VoidStoneShard")
+	if not root or not shard or not shard:IsA("BasePart") then
+		return false
+	end
+	return (root.Position - shard.Position).Magnitude <= pickupRange
+end
+
 PickupRemote.OnServerEvent:Connect(function(player, questId)
 	if questId ~= "SidurguErrand" then
+		return
+	end
+	if not isNearShard(player) then
 		return
 	end
 
