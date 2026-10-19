@@ -1,14 +1,8 @@
--- CombatCore: shared server-side combat flow + hit resolution for M1 and M2.
--- Weapons call RunM1 / RunM2 with their config. resolveHit is the single shared
--- resolution core (dodge, damage, parry, block, guardbreak), parameterized by the
--- action string and an injected knockback function. Optional opts hooks:
---   opts.swingDispatch(char, combo)   -> custom M1 swing FX (greatsword downSwing)
---   opts.onWindupStart(char, combo)   -> M1 windup hook (fist FX)
---   opts.swingM2(char)                -> custom M2 swing (fist aerial)
---   opts.onDamage(plr,char,tgt,dmg,extra) -> custom damage step (buffs)
---   opts.xpMultiplier                 -> XP scaling (Caestus half)
---   opts.subType                      -> client-reported movement state for M1
---                                        ("Lunge" / "AirLunge" / "Uppercut" / nil)
+-- SPDX-License-Identifier: MIT
+--
+-- Runs the server side of the M1, M2, and E attacks and resolves their hits. Weapon
+-- modules call RunM1, RunM2, or RunE with their WeaponConfig entry. Every hit goes
+-- through resolveHit, which handles dodge, clash, parry, block, guard break, and damage.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -32,77 +26,41 @@ local BlockResolver = require(SSS.modules.BlockResolver)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 local DashConfig = require(RP.modules.DashConfig)
 
--- [[ M2 ENDLAG ]] --
--- How long CantAnything holds AFTER the M2 hitbox closes. Landing the hit buys you a
--- much shorter recovery, which is what turns M2 from a standalone commit into a combo
--- extender: connect, then cancel into M1 / E / a skill / a dash.
---
--- Whiffing still costs you. If both were short, M2 would be a free spam button with no
--- read attached to it.
---
--- These do NOT touch the M2 cooldown (cfg.postCooldown, 3-7s). You still cannot chain
--- M2 into another M2. M2 opens a window; it does not become the window.
+-- A landed M2 has a short recovery, so the player can cancel into M1, E, a skill, or a
+-- dash. A whiff has a long recovery, so M2 is not free to spam. The M2 cooldown
+-- (cfg.postCooldown) is separate, so M2 still cannot chain into another M2.
 local M2_ENDLAG_HIT = 0.1
-local M2_ENDLAG_WHIFF = 0.65 -- +0.2: whiffing a guardbreak is punished harder
+local M2_ENDLAG_WHIFF = 0.65
 
--- [[ M1 / E WHIFF RECOVERY ]] --
--- M1 and E have no hit/whiff split of their own: recovery is uniform (M1's is the
--- client cooldown; E's is cfg.eRecovery). This is the whiff-only penalty added AFTER
--- the hitbox resolves, as an extra CantAnything, ONLY when the swing connected with
--- nothing (token.didHit is false). On hit it never applies, so combos are untouched;
--- it only makes a missed swing cost you. token.didHit is already recorded by resolveHit
--- for every action, so both paths just read it.
+-- An extra lock after an M1 or E that hit nothing, so a missed swing can be punished.
+-- A landed swing skips it, so combos keep their timing.
 local M1E_WHIFF_RECOVERY = 0.2
 
--- [[ HITSTUN (per-move victim freeze) ]] --
--- How long a hit victim is frozen (the "Stunned" duration passed down to
--- damageCalculator). This is what decides what combos into what. A combo is
--- TRUE (unbreakable) when the victim's hitstun outlasts the attacker's own
--- recovery; it is a READ (parryable) when they come out of stun around the
--- time the next hitbox is live.
+-- Hitstun decides what combos into what. A combo is true when the victim's hitstun
+-- outlasts the attacker's recovery. It is a read (parryable) when the victim recovers
+-- around the time the next hitbox is live. All values are in seconds.
 --
--- The attacker's recovery for a basic M1 is its per-weapon client cooldown
--- (WeaponConfig[weapon].client.m1.cooldown: dagger 0.4 ... greatsword 1.1).
--- M1 hitstun is (that recovery + a small margin), which keeps the LINK
--- consistent across weapons even though their raw speeds differ: every
--- light/medium weapon lands at +M1_ADVANTAGE frame advantage whether it is a
--- fast dagger or a slower guandao. Startup/recovery vary; the link does not.
--- (Same idea as a 4f jab vs a 7f heavy jab still linking into the same follow-up.)
---
--- M2 and E are punctuation, not part of the tight M1 rhythm, so they take a
--- flat generous hitstun rather than a recovery-scaled one: landing one should
--- reliably let you continue, escapable by burst but not by a reactive parry.
---
--- Tune freely. Raising M1_ADVANTAGE makes M1 strings harder to parry out of
--- (toward true combos); lowering it (or negative) opens the parry window.
-local M1_ADVANTAGE = 0.20 -- seconds of frame advantage on a light/med M1.
--- At 0.20 the victim's hitstun outlasts the attacker's
--- recovery by enough that the NEXT M1's startup lands
--- while they are still frozen: a landed M1 is now a TRUE
--- combo (no walk-out, no dash-out). The only escape is a
--- parry, which is allowed mid-stun (see _Shared.Block).
-local M1_MIN_HITSTUN = 0.45 -- floor so a fast weapon still stuns meaningfully
-local GREATSWORD_M1_HITSTUN = 1.0 -- heavies do NOT get a free M1 chain: recovery
--- 1.1 minus this = negative advantage (a read,
--- never a guaranteed second light). Keyed by
--- WeaponConfig `family` (GS / DS / Deathbringer).
-local M2_HITSTUN = 1.10 -- flat: links into M1 on every weapon
-local E_HITSTUN = 1.00 -- flat: E is the combo STARTER, flows into M1
-local HITSTUN_STUNSPEED = 1 -- walkspeed while in weapon hitstun (near-immobile; kills S-hold backpedal-out)
+-- M1 hitstun is the weapon's M1 cooldown plus M1_ADVANTAGE, so light and medium weapons
+-- all link the same way at different speeds. At 0.20, a landed M1 string can only be
+-- escaped with a parry, which is allowed during stun. M2 and E use flat values, so
+-- landing one reliably leads into M1.
+local M1_ADVANTAGE = 0.20
+-- A floor so fast weapons still stun.
+local M1_MIN_HITSTUN = 0.45
+-- Greatsword-family M1s stun for less than their recovery, so a second M1 is a read.
+local GREATSWORD_M1_HITSTUN = 1.0
+local M2_HITSTUN = 1.10
+local E_HITSTUN = 1.00
+-- WalkSpeed during weapon hitstun. It is low so that walking backward cannot escape.
+local HITSTUN_STUNSPEED = 1
 
--- Resolve hitstun for a landed weapon hit. `action` is the move type
--- ("M1"/"M2"/"E"). `weaponName` is the equipped weapon, used for the M1 cooldown
--- lookup and the greatsword family check. Returns the stun duration in seconds.
--- In practice each knockback closure knows its own move, so it calls this with a
--- literal action; M2/E use the flat constants directly and M1 is the only one
--- that actually needs the weapon lookup.
+-- Returns the hitstun in seconds for a landed hit of the given action.
 local function computeHitstun(action, weaponName)
 	if action == "M2" then
 		return M2_HITSTUN
 	elseif action == "E" then
 		return E_HITSTUN
 	end
-	-- M1
 	local wc = weaponName and WeaponConfig[weaponName]
 	if wc and wc.family == "Greatsword" then
 		return GREATSWORD_M1_HITSTUN
@@ -111,33 +69,26 @@ local function computeHitstun(action, weaponName)
 	return math.max(recovery + M1_ADVANTAGE, M1_MIN_HITSTUN)
 end
 
--- [[ M2 AS COMBO ENDER ]] --
--- M2 always works as a standalone heavy. But when it lands WHILE an M1 combo is still
--- open (the server's Combo counter is at or above this threshold), it gets a finisher
--- payload: a launch + a longer stun instead of the plain push. "Combo ender" =
--- the move you cash an M1 string out into. Below the threshold it is the normal heavy.
--- Combo is 1-indexed and set on the first M1, so >= 2 means "you have thrown at least a
--- couple of M1s and the window has not lapsed."
+-- An M2 that lands while an M1 combo is open is a combo ender. It launches the victim
+-- up and away and stuns longer. Combo is 1-indexed, so 2 means at least two M1s.
 local M2_FINISHER_MIN_COMBO = 2
-local M2_FINISHER_LAUNCH_UP = 40 -- upward pop on a combo-ender M2
-local M2_FINISHER_LAUNCH_BACK = 20 -- backward shove so they travel away as they rise
+local M2_FINISHER_LAUNCH_UP = 40
+local M2_FINISHER_LAUNCH_BACK = 20
 local M2_FINISHER_STUN = 1.2
 
--- [[ UPPERCUT / JUGGLE ]] --
--- The uppercut (slide + M1) launches BOTH the attacker and the victim into a short
--- hang, so the attacker can follow with an M1 string / E / M2 while both are airborne.
--- The hang is a real gravity-suspend: a sustained upward drive for LAUNCH_WINDOW, not a
--- one-frame pop. Both parties get the "Launched" attribute for the window, which the
--- M1 path reads to force a GROUND combo in the air (see RunM1) instead of the aerial
--- attack. The victim is held in a hittable stun (NOT ragdolled: a ragdoll flops out of
--- hitboxes and cannot be cleanly juggled).
-local LAUNCH_WINDOW = WeaponConfig.Uppercut.HangWindow -- apex hold + Launched-flag lifetime (shared with client M1 via WeaponConfig.Uppercut)
+-- The uppercut (slide + M1) lifts the attacker and the victim into a short hang, so the
+-- attacker can follow up in the air. Both get the Launched attribute for the hang, and
+-- RunM1 then uses the ground combo instead of the aerial attack. The victim is stunned
+-- and not ragdolled, because a ragdoll falls out of hitboxes.
+local LAUNCH_WINDOW = WeaponConfig.Uppercut.HangWindow
 
 local comboResetTime = 5
 local comboResetTasks = {}
 local playerM1Debounces = {}
 local playerM2Debounces = {}
-local activeAttacks = setmetatable({}, { __mode = "k" }) -- [char] = { cancelled, hitboxStart, action }
+-- The attack in flight for each character. The clash check reads the other fighter's
+-- token from here.
+local activeAttacks = setmetatable({}, { __mode = "k" })
 
 local function getEquippedTool(plr)
 	local currentCharacter = plr.Character
@@ -151,17 +102,15 @@ local function getEquippedTool(plr)
 	return nil
 end
 
--- Suspend a character in the air for `window` seconds: a strong upward burst followed
--- by a weaker sustained lift that fights gravity so they hang instead of dropping.
--- `back` is an optional horizontal component along the reference look vector (used to
--- push a launched victim away from the attacker as they rise). Cleans itself up.
+-- A strong upward burst, then a weaker lift that holds the character in the air. back
+-- also pushes the character along lookVec, away from the attacker.
 local function floatUp(char, burstUp, hangUp, back, lookVec, window)
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return
 	end
 
-	-- clear any prior launch mover so two uppercuts do not stack drives
+	-- Two launches must not stack their drives.
 	local old = root:FindFirstChild("JuggleForce")
 	if old then
 		old:Destroy()
@@ -182,7 +131,7 @@ local function floatUp(char, burstUp, hangUp, back, lookVec, window)
 	BV.Velocity = Vector3.new(horizontal.X, burstUp, horizontal.Z)
 	BV.Parent = root
 
-	-- after the burst, drop to the weaker hold so they float rather than rocket
+	-- The weaker lift makes the character float instead of shooting up.
 	task.delay(0.12, function()
 		if BV.Parent then
 			BV.Velocity = Vector3.new(0, hangUp, 0)
@@ -192,9 +141,8 @@ local function floatUp(char, burstUp, hangUp, back, lookVec, window)
 	game.Debris:AddItem(BV, window)
 end
 
--- Eases an HRP up to `targetPos` and HOLDS it there for `window`, then releases. Used for
--- the uppercut juggle: an AlignPosition replicates to the target's own client and moves it,
--- so this works on a victim we do NOT own the network ownership of, no ownership juggling.
+-- AlignPosition replicates to the victim's own client and moves the victim there, so
+-- this works without network ownership of the victim.
 local function juggleFloat(hrp, targetPos, window, responsiveness)
 	if not hrp then
 		return
@@ -215,17 +163,15 @@ local function juggleFloat(hrp, targetPos, window, responsiveness)
 	game.Debris:AddItem(att, window)
 end
 
--- Hitstop: on a clean landed hit, briefly freeze both fighters' animations (via a
--- replicated client call) and lock the victim's movement so they are stuck in the
--- hit for the freeze window. Movement lock is server-authoritative (WalkSpeed etc.
--- replicate from here); animation freeze is cosmetic and done per-client.
+-- Hitstop freezes the animations of both fighters on every client and locks the
+-- victim's movement on the server for the freeze. The animation freeze is cosmetic.
 local HITSTOP_DEFAULT = 0.12
-local hitstopLocks = setmetatable({}, { __mode = "k" }) -- [char] = { walk, jumpP, jumpH, autoRotate }
+-- The jump and rotation values of each victim in hitstop, restored when it ends.
+local hitstopLocks = setmetatable({}, { __mode = "k" })
 
 local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 	duration = duration or HITSTOP_DEFAULT
 
-	-- tell every client to freeze both fighters' animations
 	ReplicateRemote:FireAllClients({
 		Type = "Combat",
 		Action = action,
@@ -233,9 +179,8 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 		FolderName = getEquippedTool(plr),
 	}, attackerChar, targetChar)
 
-	-- lock the victim in place for the freeze window (server side, so it holds).
-	-- do NOT touch a victim who is already fully Stunned or Downed (a real hit
-	-- reaction owns their movement; hitstop must not shorten or fight it).
+	-- A Stunned or Downed victim already has a hit reaction that owns their movement.
+	-- Hitstop must not shorten it.
 	local humanoid = targetChar:FindFirstChild("Humanoid")
 	if not humanoid then
 		return
@@ -248,16 +193,15 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 	end
 	if hitstopLocks[targetChar] then
 		return
-	end -- already frozen; let it ride
+	end
 
 	hitstopLocks[targetChar] = {
 		jumpP = humanoid.JumpPower,
 		jumpH = humanoid.JumpHeight,
 		autoRotate = humanoid.AutoRotate,
 	}
-	-- WalkSpeed is owned by SpeedService now (STUN priority, same band as a real stun
-	-- so a stun taking over during the freeze doesn't get out-prioritised). Jump and
-	-- AutoRotate are still stashed/restored locally: they aren't part of the speed race.
+	-- Hitstop uses the STUN priority so that a real stun starting during the freeze is not
+	-- outranked. Jump and AutoRotate are not part of SpeedService, so they are saved here.
 	SpeedService.Push(targetChar, "Hitstop", 0, SpeedService.Priority.STUN)
 	humanoid.JumpPower = 0
 	humanoid.JumpHeight = 0
@@ -271,14 +215,12 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 		end
 		local h = targetChar:FindFirstChild("Humanoid")
 		if not h then
-			-- humanoid gone: still drop the modifier so it can't linger on a rig reuse
+			-- Pop the modifier anyway, so it cannot stay on a reused rig.
 			SpeedService.Pop(targetChar, "Hitstop")
 			return
 		end
-		-- Always pop the hitstop speed modifier. If a real stun took over during the
-		-- freeze it pushed its own STUN modifier, so Resolve keeps the 0-lock; we don't
-		-- need the old "return early to avoid stomping" dance. Jump/AutoRotate are only
-		-- restored when no stun owns them (a live stun owns those for its duration).
+		-- A stun that started during the freeze has its own modifier, so popping this one is
+		-- safe. Jump and AutoRotate belong to that stun until it ends.
 		SpeedService.Pop(targetChar, "Hitstop")
 		if StateHandler.GetState(targetChar, "Stunned") then
 			return
@@ -289,35 +231,10 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 	end)
 end
 
--- generic slash emitter (rightSwing/leftSwing/upSwing collapsed to data)
-local function emitSlash(char, folderPath, slashChild, partName)
-	--[[
-	local folder = RP.assets.FX
-	for seg in folderPath:gmatch("[^.]+") do
-		folder = folder and folder:FindFirstChild(seg)
-	end
-	if not folder then return end
-	local template = folder:FindFirstChild(slashChild)
-	if not template then return end
-	local host = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild(partName) or char:FindFirstChild("Torso")
-	if not host then return end
-	local attachment = template:Clone()
-	attachment.CFrame = host.CFrame
-	attachment.Parent = host
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = attachment.Parent
-	weld.Part1 = host
-	weld.Parent = attachment.Parent
-	for _, v in pairs(attachment:GetDescendants()) do
-		if v:IsA("ParticleEmitter") then
-			v:Emit(v:GetAttribute("EmitCount") or 10)
-		end
-	end
-	game.Debris:AddItem(attachment, 2)
-	]]
-end
+-- Slash FX are disabled. Callers still pass their FX data, so the function stays.
+local function emitSlash(char, folderPath, slashChild, partName) end
 
--- combo -> swing FX using the comboMap ("R"=rightSwing/SlashFXLeft, "L"=leftSwing/SlashFXRight, "U"=upSwing/SlashFXUp)
+-- In comboMap, R plays SlashFXLeft, L plays SlashFXRight, and U plays SlashFXUp.
 local function genericSwing(char, combo, cfg)
 	local fx = cfg.swingFX
 	if not fx then
@@ -357,7 +274,7 @@ local function setTrail(char, trailBlade, on)
 	end
 end
 
--- afterimage effect (shared by the M2 dash)
+-- Leaves a fading black afterimage of the character for the M2 dash.
 local function dashEff(char)
 	for _, v in pairs(char:GetChildren()) do
 		if v:IsA("BasePart") and v.Transparency ~= 1 then
@@ -379,10 +296,8 @@ local function dashEff(char)
 	end
 end
 
--- M2 knockback. Plain push + brief stun by default. When `isFinisher` is set (M2 landed
--- as a combo ender), it launches the victim up-and-back and holds a longer stun, so the
--- ender reads as a real payoff for the M1 string that fed it. It is a closure captured
--- per-call in RunM2 so the combo decision (made once, up front) is fixed for the swing.
+-- A combo-ender M2 launches the victim up and back and stuns longer. RunM2 decides this
+-- once per swing, and the closure keeps the decision fixed for the whole swing.
 local function makeM2Knockback(isFinisher)
 	return function(char, targetChar, targetHRP, attackerHRP, direction, knockbackDistance)
 		if isFinisher then
@@ -403,14 +318,14 @@ local function makeM2Knockback(isFinisher)
 	end
 end
 
--- shared hit resolution. action = "M1"/"M2"/"E" (replication tag).
--- ctx = { dmg, guardbreak, onDamage, xpMultiplier, xpName, applyKnockback }
--- E knockback: strong push (x2) + E hitstun (the combo-starter freeze)
 local function eKnockback(char, targetChar, targetHRP, attackerHRP, direction, knockbackDistance)
 	Helper.ApplyKnockback(targetChar, direction, knockbackDistance * 2, 0.2)
 	StateHandler.SetStun(targetChar, true, E_HITSTUN, HITSTUN_STUNSPEED)
 end
 
+-- The action argument is the replication tag: "M1", "M2", or "E". The ctx table holds
+-- dmg, guardbreak, onDamage, xpMultiplier, xpName, applyKnockback, hitstopDuration,
+-- and token.
 local function resolveHit(plr, char, Hitbox, action, ctx)
 	local alreadyHit = {}
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
@@ -475,12 +390,9 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 
 				local function doAttack(extraDmg, knockbackDistance)
 					local direction = (targetHRP.Position - attackerHRP.Position).Unit
-					-- Knockback first: it must run before a hit can down the target, so
-					-- we never stun/juggle a freshly-downed body. The knockback closure
-					-- is the sole HITSTUN authority for weapon hits (per-move values set
-					-- in eKnockback / makeM2Knockback / m1Knockback). damageCalculator
-					-- deliberately SKIPS its own stun when dmgType == "Weapon", so there
-					-- is no second writer to clobber the per-move value.
+					-- Knockback runs before damage, so a hit that downs the target never stuns or
+					-- juggles the downed body. The knockback closure is the only source of weapon
+					-- hitstun. damageCalculator skips its own stun for the "Weapon" damage type.
 					ctx.applyKnockback(
 						char,
 						targetChar,
@@ -493,12 +405,11 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					if ctx.onDamage then
 						ctx.onDamage(plr, char, targetChar, ctx.dmg, extraDmg)
 					else
-						-- default path: BuffService applies any active buff, else plain damage
 						BuffService.ApplyDamage(plr, char, targetChar, ctx.dmg, extraDmg, "Weapon")
 					end
 					local xpName = ctx.xpName or getEquippedTool(plr)
-					-- no XP off a downed body: they take no damage (damageCalculator bails on
-					-- Downed) and cannot fight back, so awarding XP here is a free farm.
+					-- No XP for hitting a Downed body. It takes no damage and cannot fight back, so
+					-- the XP would be free to farm.
 					if
 						targetChar.Humanoid.Health > 0
 						and targetChar.Humanoid.MaxHealth < 10000
@@ -528,19 +439,14 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					end)
 					alreadyHit[targetChar] = true
 
-					-- Record the connect on the attack token. RunM2 reads this to cut
-					-- its endlag on hit: landing an M2 should reward you with a faster
-					-- recovery than whiffing one.
+					-- The endlag and the whiff recovery depend on whether the swing connected.
 					if ctx.token then
 						ctx.token.didHit = true
 					end
 
-					-- On-hit mana restore for the attacker. Buff-agnostic by design:
-					-- it lives in doAttack (the shared damage-landed point) rather than
-					-- in BuffService, so it fires the same amount whether or not a buff
-					-- is active. M1 = 2% of MaxMana, M2/E = 4%. The action string arg is
-					-- unreliable (the E path tags itself "M1" for replication), so we key
-					-- off ctx.token.action, which is set correctly per Run function.
+					-- On-hit mana for the attacker: 2% of MaxMana on M1, 4% on M2 and E. It is here
+					-- and not in BuffService, so the amount is the same with or without a buff. The
+					-- action comes from the token, because the E path uses "M1" as its tag.
 					if plr and plr:FindFirstChild("PlayerStats") then
 						local stats = plr.PlayerStats
 						local manaVal = stats:FindFirstChild("Mana")
@@ -554,7 +460,7 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					end
 				end
 
-				-- clash / interrupt-on-hit: target mid-attack resolves by who started first
+				-- When the target is mid-attack, the fighter whose hitbox started first wins.
 				local targetToken = activeAttacks[targetChar]
 				if targetToken then
 					local iAmArmored = ctx.token and ctx.token.hyperArmored
@@ -564,8 +470,8 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 						and ctx.token.hitboxStart
 						and targetToken.hitboxStart < ctx.token.hitboxStart
 					then
-						-- their hitbox started first: I lose the clash, unless my move is
-						-- armored, in which case I trade (eat their hit, keep swinging).
+						-- The target started first. An armored move trades instead: it takes
+						-- the hit and keeps swinging.
 						if not iAmArmored then
 							ctx.token.cancelled = true
 							AnimationHandler.StopAnim(char, "ALL")
@@ -573,9 +479,8 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 							return
 						end
 					elseif not targetToken.hyperArmored then
-						-- I started first, tie, or they are still in windup: I win, cancel them.
-						-- An armored (guardbreak) move can't be clashed out: they eat the hit
-						-- and keep swinging, so we leave their token alone.
+						-- We started first, it is a tie, or the target is still in windup.
+						-- An armored target is not cancelled.
 						targetToken.cancelled = true
 						AnimationHandler.StopAnim(targetChar, "ALL")
 					end
@@ -635,10 +540,8 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 						false
 					)
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- All block outcomes route through BlockResolver (the single
-					-- chokepoint that also owns the guard bar). It performs the guard
-					-- bar / state side effects and returns a verdict; we apply damage
-					-- (via doAttack) and FX here, since those vary per weapon.
+					-- BlockResolver applies the guard bar and state effects and returns a verdict.
+					-- Damage and FX vary per weapon, so they stay here.
 					local class = (ctx.token and ctx.token.action) or action
 					local verdict = BlockResolver.Resolve({
 						attacker = char,
@@ -650,18 +553,18 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 						dmg = ctx.dmg,
 					})
 
-					-- doAttack takes an ADDITIVE extraDmg on top of ctx.dmg, so to land
-					-- exactly verdict.chipDamage we pass (chipDamage - ctx.dmg).
+					-- Because doAttack adds extraDmg to ctx.dmg, this makes the total chipDamage.
 					local extra = verdict.chipDamage - ctx.dmg
 
 					if verdict.outcome == "GuardBreak" then
 						AnimationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 						if verdict.broke then
-							-- bar-triggered block-break: GuardBarService already set the
-							-- stun + break anim. Deal the chip and announce the break.
+							-- The guard bar broke. GuardBarService already set the stun and
+							-- the break animation.
 							doAttack(extra, verdict.knockback)
 						else
-							-- attack-guardbreak (e.g. M2): full damage.
+							-- The attack itself is a guard break, for example an M2, so it deals
+							-- full damage.
 							damageCalculator.CalculateDamage(
 								char,
 								targetChar,
@@ -693,19 +596,13 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 							FolderName = getEquippedTool(plr),
 						}, char, targetChar)
 					else
-						-- normal successful block (chip + frame advantage already set).
-						--
-						-- BUGFIX: this used to call doAttack(), which routes through
-						-- applyKnockback and lands the FULL per-move weapon hitstun on the
-						-- blocker (0.45s on M1, ~1.0s on E). Blocking a hit is not the same as
-						-- eating one: it should barely stagger. So we no longer run the on-hit
-						-- pipeline (that also wrongly gave the attacker mana/XP for a blocked
-						-- swing). We deal only the chip and a short, light block-stun here.
-						-- dmgType nil = true damage (no stat re-scaling; chip is already final),
-						-- with an explicit small stunOverride so the blocker is only briefly
-						-- checked, not comboed.
+						-- A blocked hit deals only chip damage and a short stagger. It skips
+						-- doAttack, because a block must not land the full weapon hitstun or give
+						-- the attacker mana and XP. A nil damage type is true damage, because
+						-- chipDamage is already final.
 						local BLOCK_STUN = 0.18
-						local BLOCK_STUN_SPEED = 8 -- can still shuffle; not pinned like a real hit
+						-- The blocker can still move a little, unlike in a real hitstun.
+						local BLOCK_STUN_SPEED = 8
 						BlockResolver.OnAttackerLandedHit(char)
 						local direction = (targetHRP.Position - attackerHRP.Position).Unit
 						Helper.ApplyKnockback(targetChar, direction, verdict.knockback, 0.2)
@@ -760,6 +657,19 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 	end)
 end
 
+-- CombatCore.RunM1() - run one M1 swing on the server and resolve its hit
+-- @plr: the attacking player
+-- @cfg: the server.m1 entry of the weapon in WeaponConfig
+-- @opts: optional hooks and values:
+--        swingDispatch(char, combo) plays custom swing FX,
+--        onWindupStart(char, combo) runs when the windup starts,
+--        onDamage(plr, char, target, dmg, extraDmg) replaces the damage step,
+--        xpMultiplier scales the weapon XP,
+--        subType is the client movement state ("Lunge", "AirLunge", "Uppercut", or nil)
+--
+-- Yields for the windup.
+--
+-- Return: nothing.
 function module.RunM1(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
@@ -774,7 +684,7 @@ function module.RunM1(plr, cfg, opts)
 
 	local Combo = StateHandler.GetState(char, "Combo")
 
-	-- one attack in flight per player; also the clash/interrupt registry
+	-- Only one attack per character can be in flight.
 	if activeAttacks[char] then
 		ReplicateRemote:FireClient(plr, {
 			Type = "Combat",
@@ -788,16 +698,15 @@ function module.RunM1(plr, cfg, opts)
 	local token = { cancelled = false, hitboxStart = nil, action = "M1" }
 	activeAttacks[char] = token
 
-	-- HYPERARMOR: M1 is not a guardbreak by default, but honor cfg.hyperArmor so any
-	-- move flagged in WeaponConfig gets armor, and always stamp token.hyperArmored so
-	-- the clash logic reads a real value. See RunM2 for the full rationale.
+	-- An M1 has armor only when WeaponConfig flags it. The clash check always reads
+	-- token.hyperArmored.
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
 	if hyperArmored then
 		char:SetAttribute("HyperArmor", true)
 	end
 
-	-- reactive interrupt: a stun/downed cancels the whole sequence
+	-- A stun or a down during the swing cancels it.
 	local stopWatch = StateHandler.WatchInterrupt(char, windupDelay + 0.6, function()
 		if hyperArmored then
 			return
@@ -817,10 +726,8 @@ function module.RunM1(plr, cfg, opts)
 	local function abort()
 		StateHandler.RemoveStates(char, "Windup")
 		StateHandler.RemoveStates(char, "Active")
-		-- Safety net: the M1 slow (SetSpeed) is no longer reset before the hitbox; it is
-		-- held through the endlag now (see the finish block). If the swing is interrupted
-		-- after windup, reset here so an aborted attacker is never left slowed. ResetSpeed
-		-- no-ops when no slow was stored, so the running-attack case needs no guard.
+		-- The M1 slow lasts through the recovery. An interrupted swing must reset it here,
+		-- or the attacker stays slow. ResetSpeed does nothing when no slow is stored.
 		if cfg.setSpeed then
 			Helper.ResetSpeed(char)
 		end
@@ -833,23 +740,10 @@ function module.RunM1(plr, cfg, opts)
 
 	setTrail(char, cfg.trailBlade, true)
 
-	-- combo + extra-attack (per call, not shared state)
-	--
-	-- READ opts.subType, NOT GetAttribute. Running and Sliding are set by LocalScripts
-	-- (StarterCharacterScripts.Movement.Running / .Slide) via stateHandler.SetState.
-	-- SetState writes a Lua table AND calls char:SetAttribute, but BOTH are client-only
-	-- here: the state table is the client VM's, and a client's SetAttribute does not
-	-- replicate up to the server (only server->client attribute writes replicate). So
-	-- the old GetAttribute("Running") on the server was ALWAYS nil, exactly like the
-	-- GetState before it, and the running/slide branches never fired server-side.
-	--
-	-- The honest channel is the M1 remote: the client, which DOES know its own state,
-	-- stamps SubType into the payload and we trust that. Freefall we can still verify
-	-- ourselves, because Humanoid states genuinely replicate.
-	--
-	-- Launched (the uppercut juggle-float) forces a ground combo: a juggled player is
-	-- technically in Freefall, but their M1 should read as the normal combo performed
-	-- in the air, not the aerial attack. Same gate the client applies.
+	-- Running and Sliding are client-set attributes and do not replicate, so the movement
+	-- state comes from opts.subType. Freefall is read here, because Humanoid states
+	-- replicate. A Launched player is in Freefall during the juggle but gets the ground
+	-- combo, the same as on the client.
 	local subType = opts.subType
 	local launched = char:GetAttribute("Launched")
 	local extraAtk = 0
@@ -883,38 +777,20 @@ function module.RunM1(plr, cfg, opts)
 		comboResetTasks[plr] = nil
 	end)
 
-	-- [[ RUNNING ATTACK ]] --
-	-- extraAtk 6 is the running attack, and it does NOT take the setSpeed slow.
-	--
-	-- The slow is the right call for a standing M1: it is the commitment, the tell
-	-- the defender reads. On a running attack it was self-defeating. The boost closes
-	-- roughly 15 studs (50 * 0.3s), then setSpeed pins the attacker at walkspeed 4
-	-- while a sprinting target keeps doing ~28. Over the ~0.6s from boost-end to
-	-- hitbox they take back 13-15 studs: every stud the lunge just bought. Net
-	-- displacement against a runner was about zero, which is exactly why the running
-	-- attack never landed on one, and why a bigger hitbox would not have helped.
+	-- The running attack (extraAtk 6) skips the setSpeed slow. With the slow, a sprinting
+	-- target walks back out of range before the hitbox, and the lunge gains nothing.
 	if extraAtk ~= 6 then
 		if cfg.setSpeed then
 			Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2])
 		end
 	end
 
-	-- The lunge itself. Server-side now: it used to be a client one-shot BodyVelocity
-	-- fired down lookVector at t=0, so it went wherever the target USED to be and
-	-- never corrected. It now steers.
-	--
-	-- The step-in timing is unchanged (burst, then the animation plays, then the
-	-- swing). What is new is that with a target acquired it keeps a weaker drive
-	-- through the wait, so a sprinter cannot simply out-accelerate the windup. With
-	-- NO target it is a plain forward burst and dies at 0.3s, exactly as before.
-	--
-	-- Beatable by design: steering is rate-limited, so cutting hard across the
-	-- attacker's facing breaks the track, and a well-timed dodge or parry wins
-	-- outright, because the lunge only closes DISTANCE. The hitbox still has to land.
-	-- `token` kills it on a parry or stun rather than dragging the attacker onward.
+	-- With a target, the lunge steers toward it during the windup, so a sprinting target
+	-- cannot outrun the windup. Without a target it is a plain forward burst. Steering is
+	-- rate-limited, so a sharp cut, a dodge, or a parry still beats it. The token stops
+	-- the lunge on a parry or a stun.
 	if extraAtk == 6 then
-		-- Speed comes from DashConfig now, not from WeaponConfig. A nil back means the
-		-- lunge dash is switched off for this weapon, so we skip the whole thing.
+		-- A nil speed means the lunge is off for this weapon.
 		local lungeSpeed = DashConfig.Get("M1Lunge", getEquippedTool(plr))
 		if lungeSpeed then
 			local chaseUntil = windupDelay + (cfg.lungeWait or 0.4)
@@ -941,7 +817,6 @@ function module.RunM1(plr, cfg, opts)
 
 	task.wait(windupDelay - 0.1)
 
-	-- interrupted during windup: no swing VFX, no hitbox
 	if token.cancelled then
 		abort()
 		return
@@ -966,18 +841,13 @@ function module.RunM1(plr, cfg, opts)
 	nextCombo = oldCombo
 
 	task.wait(0.1)
-	-- The M1 slow is intentionally NOT reset here anymore. It used to lift right after
-	-- the swing (before the hitbox even went active), so the commitment vanished the
-	-- instant you swung. It now holds through the endlag and is reset in the finish
-	-- block below (recovery + 0.2s), with abort() as the interrupt safety net.
 
-	-- interrupted right before the hitbox: abort cleanly
 	if token.cancelled then
 		abort()
 		return
 	end
 
-	-- ACTIVE phase: hitbox live; stamp the clash timestamp
+	-- The clash check compares hitbox start times.
 	StateHandler.RemoveStates(char, "Windup")
 	StateHandler.SetState(char, "Active", true, 0.25)
 	token.hitboxStart = os.clock()
@@ -995,21 +865,14 @@ function module.RunM1(plr, cfg, opts)
 
 	StateHandler.SetState(char, "M1", true, 0.2)
 
-	-- Is this swing the uppercut (slide + M1)? Decided once, here, from the honest
-	-- signal, and captured by the knockback closure so it is fixed for the swing.
+	-- Decided once and captured by the knockback closure, so it is fixed for the swing.
 	local isUppercut = (extraAtk == 8)
 
-	-- On the uppercut, BOTH the attacker's launch and the Launched flag are now gated on
-	-- a confirmed hit. Nothing happens to the attacker here at hitbox-start: if the swing
-	-- whiffs, they do not rise and are never flagged Launched. The attacker's rise + flag
-	-- are set inside m1Knockback (the on-hit closure), right where the victim is juggled,
-	-- so attacker and victim only ever leave the ground together and only on a connect.
-	-- (A whiffing uppercut is just a committed swing that missed, punishable like any M1.)
+	-- The attacker rises only when the uppercut connects, in m1Knockback. A whiffed
+	-- uppercut is a normal M1 that can be punished.
 
-	-- Per-move M1 hitstun, resolved once from the equipped weapon (recovery-scaled
-	-- for light/med, flat for greatswords) and captured by the closure below so it
-	-- is fixed for this swing. Only the plain-hit branch uses it; uppercut and the
-	-- combo-5 finisher keep their own longer launch stuns.
+	-- Only plain M1 hits use this. The uppercut and the combo-5 finisher have their own
+	-- stuns.
 	local m1Hitstun = computeHitstun("M1", getEquippedTool(plr))
 
 	local function m1Knockback(
@@ -1021,11 +884,8 @@ function module.RunM1(plr, cfg, opts)
 		knockbackDistance
 	)
 		if isUppercut then
-			-- Launch the victim to the SAME apex height the attacker rides to (client-side),
-			-- placed UC.Offset studs ahead of the attacker so the follow-up M1 string reaches
-			-- them. AlignPosition eases them up and holds; the constraint replicates to the
-			-- victim's own client and moves them, so no network-ownership juggling. Held in a
-			-- hittable stun (NOT ragdolled: a ragdoll flops out of the hitbox).
+			-- Move the victim to the apex height of the attacker, UC.Offset studs in front of
+			-- the attacker, so the follow-up M1 string reaches them.
 			local UC = WeaponConfig.Uppercut
 			local thrp = ktargetChar:FindFirstChild("HumanoidRootPart")
 			local look = kattackerHRP.CFrame.LookVector
@@ -1047,12 +907,8 @@ function module.RunM1(plr, cfg, opts)
 			end)
 			StateHandler.SetStun(ktargetChar, true, LAUNCH_WINDOW, HITSTUN_STUNSPEED)
 
-			-- HIT-GATED ATTACKER LAUNCH. We are inside the on-hit closure, so this only
-			-- runs when the uppercut actually connected. Flag the attacker Launched (so
-			-- their follow-up M1/E/M2 reads as the ground combo in the air) and tell THEIR
-			-- client to author the rise (client owns the lift; see _Shared.M1 UppercutRise).
-			-- On a whiff, m1Knockback never fires, so the attacker neither rises nor gets
-			-- flagged. Attacker and victim leave the ground together and only on a connect.
+			-- This runs only on a connect. The attacker gets Launched so the follow-up reads as
+			-- the ground combo, and the attacker's own client performs the rise.
 			kchar:SetAttribute("Launched", true)
 			task.delay(LAUNCH_WINDOW, function()
 				if kchar then
@@ -1070,9 +926,6 @@ function module.RunM1(plr, cfg, opts)
 			StateHandler.SetStun(ktargetChar, true, 0.5, HITSTUN_STUNSPEED)
 		else
 			Helper.ApplyKnockback(ktargetChar, direction, knockbackDistance, 0.2)
-			-- Plain M1: the per-move hitstun that makes M1 strings a parry READ.
-			-- m1Hitstun is computed once in RunM1 from the equipped weapon (recovery
-			-- + margin, or the flat greatsword value) and captured by this closure.
 			StateHandler.SetStun(ktargetChar, true, m1Hitstun, HITSTUN_STUNSPEED)
 		end
 	end
@@ -1093,15 +946,11 @@ function module.RunM1(plr, cfg, opts)
 		setTrail(char, cfg.trailBlade, false)
 		StateHandler.RemoveStates(char, "Active")
 		StateHandler.SetState(char, "Recovery", true, 0.25)
-		-- Whiff recovery: a missed M1 (nothing in the hitbox) eats an extra lock so a
-		-- fished swing is punishable. A landed M1 skips this entirely, so the combo
-		-- string keeps its normal timing. token.didHit is set by resolveHit on connect.
 		if not token.didHit then
 			StateHandler.SetState(char, "CantAnything", true, M1E_WHIFF_RECOVERY)
 		end
-		-- Hold the movement slow through the endlag, then lift it 0.2s past the
-		-- recovery window (0.25 recovery + 0.2). Running attacks (extraAtk 6) never
-		-- took the slow, so they are skipped. abort() covers the interrupted case.
+		-- Release the slow 0.2 seconds after the 0.25-second recovery. Running attacks never
+		-- took the slow.
 		if cfg.setSpeed and extraAtk ~= 6 then
 			task.delay(0.45, function()
 				if char and char.Parent then
@@ -1113,6 +962,17 @@ function module.RunM1(plr, cfg, opts)
 	end)
 end
 
+-- CombatCore.RunM2() - run one M2 swing on the server and resolve its hit
+-- @plr: the attacking player
+-- @cfg: the server.m2 entry of the weapon in WeaponConfig
+-- @opts: optional hooks and values:
+--        swingM2(char) plays a custom swing,
+--        onDamage(plr, char, target, dmg, extraDmg) replaces the damage step,
+--        xpMultiplier scales the weapon XP
+--
+-- Yields for the windup.
+--
+-- Return: nothing.
 function module.RunM2(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
@@ -1152,11 +1012,7 @@ function module.RunM2(plr, cfg, opts)
 		return
 	end
 
-	-- [[ COMBO ENDER DECISION ]] --
-	-- Read the live M1 combo counter BEFORE the M2 sequence starts. If a combo is open
-	-- (>= threshold), this M2 is a finisher and its knockback launches + longer-stuns.
-	-- Standalone M2 (no combo, or the window lapsed) uses the plain push. Decided once,
-	-- here, so the whole swing commits to one behavior.
+	-- Decide once, before the swing starts, whether this M2 is a combo ender.
 	local comboNow = StateHandler.GetState(char, "Combo")
 	local isFinisher = (type(comboNow) == "number" and comboNow >= M2_FINISHER_MIN_COMBO)
 	local m2Knockback = makeM2Knockback(isFinisher)
@@ -1165,11 +1021,9 @@ function module.RunM2(plr, cfg, opts)
 	activeAttacks[char] = token
 	playerM2Debounces[plr] = true
 
-	-- HYPERARMOR: every M2 is a guardbreak, so every M2 gets armor; cfg.hyperArmor lets
-	-- any other move opt in. token.hyperArmored is read by the clash logic in resolveHit
-	-- so a clash can't cancel an armored swing either. The HyperArmor attribute makes
-	-- SetStun no-op on this character for the window, so an incoming hit deals damage but
-	-- does not stop the swing anim or stun us out of it. Cleared in finish().
+	-- Every M2 is a guard break and has armor. With the HyperArmor attribute, SetStun
+	-- does nothing on this character, so a hit still deals damage but does not stop the
+	-- swing. The clash check reads token.hyperArmored.
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
 	if hyperArmored then
@@ -1180,7 +1034,6 @@ function module.RunM2(plr, cfg, opts)
 	StateHandler.SetState(char, "Windup", true, WINDUP_DELAY + 0.2)
 
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
-		-- Armored: absorb the interrupt, keep swinging. Non-armored: cancel as before.
 		if hyperArmored then
 			return
 		end
@@ -1227,8 +1080,8 @@ function module.RunM2(plr, cfg, opts)
 	parrysfx:Play()
 	game.Debris:AddItem(parrysfx, 3)
 
-	-- Resolve the weapon now, not inside the delay. A swap during those 0.3s would
-	-- otherwise read the new weapon's dash for a swing the old weapon started.
+	-- Read the weapon now. A weapon swap during the delay must not change the dash of a
+	-- swing that the old weapon started.
 	local m2Weapon = getEquippedTool(plr)
 	task.delay(0.3, function()
 		if token.cancelled then
@@ -1320,34 +1173,16 @@ function module.RunM2(plr, cfg, opts)
 		token = token,
 	})
 
-	-- [[ M2 ENDLAG ]] --
-	--
-	-- CantAnything was set up front for WINDUP + HITBOX + 0.5, so you were frozen for
-	-- half a second after the hitbox closed no matter what happened. That is what made
-	-- M2 a dead end: you could not cancel it into anything, so it was a standalone
-	-- commit rather than a combo tool.
-	--
-	-- Now the lock is released as soon as the hitbox resolves, and how fast depends on
-	-- whether you connected:
-	--
-	--   ON HIT  -> M2_ENDLAG_HIT   : short. You earned the cancel. Chain into M1, E,
-	--                                a skill, a dash. M2 becomes a combo extender.
-	--   ON WHIFF-> M2_ENDLAG_WHIFF : longer. Missing a guardbreak should still cost
-	--                                you something, or M2 is a free spam button with
-	--                                no read attached.
-	--
-	-- The M2 COOLDOWN (POST_COOLDOWN, 3-7s) is untouched: you still cannot chain M2
-	-- into another M2. Only the endlag moves. That is the point: M2 opens a window,
-	-- it does not become the window.
+	-- Replace the long lock from the start of the swing with the endlag for a hit or a
+	-- whiff.
 	task.delay(HITBOX_DURATION, function()
 		Hitbox:Destroy()
 		StateHandler.RemoveStates(char, "Active")
 
 		local endlag = token.didHit and M2_ENDLAG_HIT or M2_ENDLAG_WHIFF
 
-		-- Clear the long lock set at the top and re-apply only the endlag we actually
-		-- want. RemoveStates cancels the original timer, so there is no race between
-		-- the old CantAnything expiring and this one.
+		-- RemoveStates cancels the original timer, so the old lock cannot expire on top of
+		-- this one.
 		StateHandler.RemoveStates(char, "CantAnything")
 		if endlag > 0 then
 			StateHandler.SetState(char, "CantAnything", true, endlag)
@@ -1362,6 +1197,18 @@ function module.RunM2(plr, cfg, opts)
 	end)
 end
 
+-- CombatCore.RunE() - run one E swing on the server and resolve its hit
+-- @plr: the attacking player
+-- @cfg: the server.e entry of the weapon in WeaponConfig
+-- @opts: optional hooks and values:
+--        onWindupStart(char) runs when the windup starts,
+--        swingE(char) plays a custom swing,
+--        onDamage(plr, char, target, dmg, extraDmg) replaces the damage step,
+--        xpMultiplier scales the weapon XP
+--
+-- Yields for the windup.
+--
+-- Return: nothing.
 function module.RunE(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
@@ -1383,8 +1230,7 @@ function module.RunE(plr, cfg, opts)
 	local token = { cancelled = false, hitboxStart = nil, action = "E" }
 	activeAttacks[char] = token
 
-	-- HYPERARMOR: honor cfg.hyperArmor / cfg.guardbreak (an E can be flagged guardbreak
-	-- in WeaponConfig) and always stamp token.hyperArmored for the clash logic.
+	-- An E has armor only when WeaponConfig flags it.
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
 	if hyperArmored then
@@ -1414,10 +1260,7 @@ function module.RunE(plr, cfg, opts)
 		finish()
 	end
 
-	-- E is a combo STARTER, so the lock has to expire WITH the swing, not on a flat timer.
-	-- This sat at 0.8s regardless of weapon while RunM1 used windupDelay + 0.05. On a fast
-	-- E (windup 0.6) that left you locked out long after the hitbox resolved, which is why
-	-- a landed E could not chain into anything. Windup-relative now, matching RunM1.
+	-- E starts combos, so the lock ends with the windup, the same as in RunM1.
 	StateHandler.SetState(char, "CantAnything", true, windupDelay + 0.05)
 	StateHandler.SetState(char, "Windup", true, windupDelay + 0.2)
 	setTrail(char, cfg.trailBlade, true)
@@ -1496,13 +1339,8 @@ function module.RunE(plr, cfg, opts)
 		token = token,
 	})
 
-	-- Teardown. This was a flat 0.5s against RunM1's 0.1s, and finish() is what releases
-	-- activeAttacks[char]. Until it fires, RunM1 hits its busy-check and DECLINES, so the
-	-- follow-up M1 was not merely slow, it was being eaten. The lock above and this release
-	-- have to land together or you just move the dead input somewhere else.
-	--
-	-- eRecovery is per-weapon (WeaponConfig server.e) so the heavy classes can keep a real
-	-- tail. Default matches RunM1.
+	-- RunM1 declines input until finish() releases activeAttacks, so this delay must match
+	-- the lock above. Heavy weapons set a longer eRecovery in WeaponConfig.
 	local E_RECOVERY = cfg.eRecovery or 0.1
 
 	task.delay(E_RECOVERY, function()
@@ -1510,9 +1348,6 @@ function module.RunE(plr, cfg, opts)
 		setTrail(char, cfg.trailBlade, false)
 		StateHandler.RemoveStates(char, "Active")
 		StateHandler.SetState(char, "Recovery", true, 0.25)
-		-- Whiff recovery: a missed E eats an extra lock so a fished starter is
-		-- punishable. A landed E skips it, so E still flows into the M1 string as a
-		-- combo starter. token.didHit is set by resolveHit on connect.
 		if not token.didHit then
 			StateHandler.SetState(char, "CantAnything", true, M1E_WHIFF_RECOVERY)
 		end
@@ -1529,27 +1364,51 @@ Players.PlayerRemoving:Connect(function(plr)
 	end
 end)
 
--- ── shared attack registry (players + mob AI share this for clash / interrupt) ──
+-- CombatCore.BeginAttack() - register an attack in flight for clash checks
+-- @char: the attacking character, a player or a mob
+--
+-- Players and mob AI share the registry.
+--
+-- Return: the attack token. Pass it to MarkHitbox and FinishAttack.
 function module.BeginAttack(char)
 	local token = { cancelled = false, hitboxStart = nil }
 	activeAttacks[char] = token
 	return token
 end
+-- CombatCore.GetAttack() - get the attack in flight of a character
+-- @char: the character
+--
+-- Return: the attack token, or nil.
 function module.GetAttack(char)
 	return activeAttacks[char]
 end
+-- CombatCore.MarkHitbox() - record that the hitbox of an attack is live
+-- @token: the attack token from BeginAttack, or nil
+--
+-- Return: nothing.
 function module.MarkHitbox(token)
 	if token then
 		token.hitboxStart = os.clock()
 	end
 end
+-- CombatCore.FinishAttack() - remove an attack from the registry
+-- @char: the attacking character
+-- @token: the attack token from BeginAttack
+--
+-- Does nothing if a newer attack replaced the token.
+--
+-- Return: nothing.
 function module.FinishAttack(char, token)
 	if activeAttacks[char] == token then
 		activeAttacks[char] = nil
 	end
 end
--- attackerToken's hitbox hits targetChar. Returns "lose" (attacker beaten, cancel self),
--- "win" + targetToken (attacker wins, cancel target), or nil (target not mid-attack).
+-- CombatCore.ResolveClash() - decide a clash when an attack hits a fighter
+-- @attackerToken: the token of the attack that hit
+-- @targetChar: the character that was hit
+--
+-- Return: "lose" when the target's hitbox started first, "win" and the target's token
+-- otherwise, or nil when the target is not attacking.
 function module.ResolveClash(attackerToken, targetChar)
 	local targetToken = activeAttacks[targetChar]
 	if not targetToken then
@@ -1566,6 +1425,15 @@ function module.ResolveClash(attackerToken, targetChar)
 	return "win", targetToken
 end
 
+-- CombatCore.EmitSlash() - play a slash FX on a character
+-- @char: the character
+-- @folderPath: the FX folder path under ReplicatedStorage.assets.FX
+-- @slashChild: the name of the slash template
+-- @partName: the part to attach to when the character has no HumanoidRootPart
+--
+-- Slash FX are disabled, so this does nothing.
+--
+-- Return: nothing.
 module.EmitSlash = emitSlash
 
 return module

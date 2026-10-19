@@ -1,7 +1,7 @@
--- Thin standard server M1. Resolves the equipped weapon's config and hands off to
--- CombatCore. Serves every standard weapon via the dispatcher fallback. Weapons
--- with special mechanics (buffs, downSwing, fist FX) keep their own server M1 that
--- calls CombatCore.RunM1 with the appropriate hooks.
+-- SPDX-License-Identifier: MIT
+--
+-- Default server M1 for weapons without their own M1 module. Looks up the equipped
+-- weapon in WeaponConfig and runs CombatCore.RunM1.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -21,9 +21,13 @@ local function getEquippedTool(plr)
 	return nil
 end
 
--- data.SubType carries the client's movement state ("Lunge" / "Uppercut" / "AirLunge"
--- / nil). It is the only honest signal the server gets: Running and Sliding are
--- client-set attributes that never replicate up, so CombatCore reads this instead.
+-- M1.ServerCheck() - run the M1 of the equipped weapon
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state ("Lunge", "AirLunge",
+--        "Uppercut", or nil). The server cannot read it any other way, because
+--        Running and Sliding are client-set attributes and do not replicate.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	local weapon = getEquippedTool(plr)
 	if not weapon then

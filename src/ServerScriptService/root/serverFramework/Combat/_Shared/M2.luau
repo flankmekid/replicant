@@ -1,6 +1,7 @@
--- Thin standard server M2. Resolves the equipped weapon's config and hands off to
--- CombatCore.RunM2. Serves every standard M2 weapon via the dispatcher fallback.
--- Fist weapons with the aerial variant keep their own M2 that passes opts.swingM2.
+-- SPDX-License-Identifier: MIT
+--
+-- Default server M2 for weapons without their own M2 module. Looks up the equipped
+-- weapon in WeaponConfig and runs CombatCore.RunM2.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -20,6 +21,10 @@ local function getEquippedTool(plr)
 	return nil
 end
 
+-- M2.ServerCheck() - run the M2 of the equipped weapon
+-- @plr: the player who pressed M2
+--
+-- Return: nothing.
 function module.ServerCheck(plr)
 	local weapon = getEquippedTool(plr)
 	if not weapon then

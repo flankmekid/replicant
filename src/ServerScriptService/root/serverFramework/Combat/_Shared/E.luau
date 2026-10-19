@@ -1,7 +1,7 @@
--- Thin standard server E. Resolves the equipped weapon's config and hands off to
--- CombatCore.RunE. Serves every standard E (dash attack) via the dispatcher fallback.
--- Fist weapons keep their own E (particle FX / mana), and Dagger/Tanto keep their
--- custom throw/heavy E.
+-- SPDX-License-Identifier: MIT
+--
+-- Default server E (dash attack) for weapons without their own E module. Looks up the
+-- equipped weapon in WeaponConfig and runs CombatCore.RunE.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -21,6 +21,10 @@ local function getEquippedTool(plr)
 	return nil
 end
 
+-- E.ServerCheck() - run the E of the equipped weapon
+-- @plr: the player who pressed E
+--
+-- Return: nothing.
 function module.ServerCheck(plr)
 	local weapon = getEquippedTool(plr)
 	if not weapon then

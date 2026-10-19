@@ -1,6 +1,7 @@
--- Shared server Block. Identical across every weapon (no per-weapon config), so
--- all weapons route here via the dispatcher fallback. Handles the block/parry state
--- (ParryActive, BlockActive, Deactivated); ParryService is the cooldown authority.
+-- SPDX-License-Identifier: MIT
+--
+-- Server side of block and parry for every weapon. No weapon has its own block module,
+-- so serverFramework always routes here. ParryService owns the parry cooldown.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -18,15 +19,19 @@ local GuardBarService = require(SSS.modules.GuardBarService)
 local parryHighlightTemplate = RP.assets.FX:WaitForChild("parryHighlight")
 local blockVFXTemplate = RP.assets.FX:WaitForChild("blockVFXPart"):WaitForChild("blockVFXAttach")
 
-local parryWindow = 0.28 -- widened from 0.2 for a more forgiving parry
+-- Length of the parry window in seconds.
+local parryWindow = 0.28
 
+-- Block.ParryActive() - open the parry window for a player
+-- @plr: the player who pressed parry
+--
+-- Return: nothing.
 module.ParryActive = function(plr)
 	local char = plr.Character
 	if not char then
 		return
 	end
 
-	-- Server-authoritative parry cooldown gate.
 	if not ParryService.CanParry(plr) then
 		return
 	end
@@ -52,27 +57,27 @@ module.ParryActive = function(plr)
 	end)
 end
 
+-- Block.BlockActive() - start blocking and slow the player
+-- @plr: the player who pressed block
+--
+-- Return: nothing.
 module.BlockActive = function(plr)
 	local char = plr.Character
 	if not char then
 		return
 	end
 
-	-- Guard-broken players cannot block until the recovery window ends. The client
-	-- already gates this (and flashes the bar), but the server is authoritative.
+	-- A guard-broken player cannot block until recovery ends. The client checks this too,
+	-- but the server has the final say.
 	if GuardBarService.IsGuardBroken(char) then
 		return
 	end
 
 	StateHandler.SetState(char, "Blocking", true, 99999999)
-	-- Block owns its own speed modifier (priority BLOCK). It no longer routes through
-	-- Helper.SetSpeed: that pushes a SKILL-priority "HelperSlow" and would collide with
-	-- an M1's slow on the same key. A dedicated "Block" source means an M1 thrown while
-	-- blocking layers cleanly on top and, when it ends, speed settles back to block.
+	-- Block has its own speed source, so an M1 thrown while blocking stacks on top, and
+	-- the speed returns to block speed when the M1 ends.
 	SpeedService.Push(char, "Block", 3, SpeedService.Priority.BLOCK)
 
-	-- Block VFX: clone the attachment onto the HRP and keep it enabled for the
-	-- duration of the block. Cleaned up in Deactivated (Debris'd so particles fade).
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	if hrp and not hrp:FindFirstChild("blockVFXAttach") then
 		local vfx = blockVFXTemplate:Clone()
@@ -86,6 +91,10 @@ module.BlockActive = function(plr)
 	end
 end
 
+-- Block.Deactivated() - stop blocking and parrying
+-- @plr: the player who released block
+--
+-- Return: nothing.
 module.Deactivated = function(plr)
 	local char = plr.Character
 	if not char then
@@ -98,16 +107,12 @@ module.Deactivated = function(plr)
 
 	task.delay(0.2, function()
 		StateHandler.RemoveStates(char, "Parrying")
-		-- Pop the block speed modifier, but ONLY if the player hasn't started blocking
-		-- again in the 0.2s window (a fast release+repress re-pushes Block; this delayed
-		-- pop must not yank the speed out from under the new block). SpeedService then
-		-- recomputes: a still-live stun/hitstop keeps its pin, otherwise full base speed.
+		-- Keep the block speed if the player blocked again during the delay.
 		if not StateHandler.GetState(char, "Blocking") then
 			SpeedService.Pop(char, "Block")
 		end
 	end)
 
-	-- Tear down the block VFX immediately when block is released.
 	local hrp = char:FindFirstChild("HumanoidRootPart")
 	local vfx = hrp and hrp:FindFirstChild("blockVFXAttach")
 	if vfx then
