@@ -1,10 +1,12 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The spires and the teleport cost between them.
+
 local SpireConfig = {}
 
--- Each Spire entry:
--- Id          : unique string key, used for saving attunement
--- Name        : display name shown on the world map
--- Zone        : zone label shown beneath the name
--- PartName    : name of the Part in Workspace the ProximityPrompt is attached to
+-- Each spire has an Id (the key saved for attunement), a Name (shown on the world
+-- map), a Zone (shown under the name), and a PartName (the Workspace part that holds
+-- the ProximityPrompt).
 
 SpireConfig.Spires = {
 	{
