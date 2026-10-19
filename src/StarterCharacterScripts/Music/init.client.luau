@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Plays random tracks from ReplicatedStorage.music in a loop, and stops on death.
+
 local player = game.Players.LocalPlayer
 
 repeat
