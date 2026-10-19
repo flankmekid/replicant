@@ -5,20 +5,54 @@
 
 local animHandler = require(game.ReplicatedStorage.modules.animationHandler)
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
+local SpeedService = require(game.ServerScriptService.modules.SpeedService)
 
 -- The cleanup task of each player, so step 2 can cancel the cleanup of step 1.
 local cleanupTasks = {}
 
-script.Parent.OnServerEvent:connect(function(player, hitPos, hitNormal, stepName, x)
-	local char = player.Character
-	local hrp = char:FindFirstChild("HumanoidRootPart")
-	local hum = char:FindFirstChild("Humanoid")
+-- Every step is a burst upward, so the server checks what the client claims. The climb
+-- client waits climbCooldown (1.25 s) between climbs and sends step 2 about 0.3 s after
+-- step 1. The windows below add latency slack.
+local stepOneInterval = 1.1
+local stepTwoWindow = 1
+-- The client finds the wall 3 studs ahead of the head.
+local wallReach = 6
 
-	if not hrp or not hum then
+-- Layout: lastStepOne[player] = os.clock() of the last accepted step 1.
+local lastStepOne = {}
+-- The players whose accepted step 1 still allows one step 2.
+local stepTwoOpen = {}
+
+-- Every character has its own copy of this script and its remote, so a copy serves only
+-- the player of its own character.
+local ownerChar = script:FindFirstAncestorOfClass("Model")
+
+local wallParams = RaycastParams.new()
+wallParams.FilterType = Enum.RaycastFilterType.Exclude
+
+-- Returns true if a collidable wall is within reach behind hitNormal.
+local function hasWall(char, origin, hitNormal)
+	wallParams.FilterDescendantsInstances = { char }
+	local result = workspace:Raycast(origin, -hitNormal.Unit * wallReach, wallParams)
+	return result ~= nil and result.Instance.CanCollide
+end
+
+script.Parent.OnServerEvent:Connect(function(player, hitPos, hitNormal, stepName, x)
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	local hum = char and char:FindFirstChild("Humanoid")
+
+	if not hrp or not hum or char ~= ownerChar then
+		return
+	end
+	if stepName ~= "Step1" and stepName ~= "Step2" then
+		return
+	end
+	if typeof(hitNormal) ~= "Vector3" or hitNormal.Magnitude < 0.5 then
 		return
 	end
 
-	-- Step 1 checks the state. Step 2 skips it, so the climb flows.
+	local now = os.clock()
 	if stepName == "Step1" then
 		if stateHandler.GetState(char, "CantAnything") then
 			return
@@ -26,6 +60,27 @@ script.Parent.OnServerEvent:connect(function(player, hitPos, hitNormal, stepName
 		if stateHandler.GetState(char, "Stunned") then
 			return
 		end
+		if lastStepOne[player] and now - lastStepOne[player] < stepOneInterval then
+			return
+		end
+	else
+		-- Step 2 skips the state checks, because step 1 set CantAnything, but it needs a
+		-- fresh step 1.
+		if not stepTwoOpen[player] or now - lastStepOne[player] > stepTwoWindow then
+			return
+		end
+	end
+
+	local head = char:FindFirstChild("Head")
+	if not hasWall(char, head and head.Position or hrp.Position, hitNormal) then
+		return
+	end
+
+	if stepName == "Step1" then
+		lastStepOne[player] = now
+		stepTwoOpen[player] = true
+	else
+		stepTwoOpen[player] = nil
 	end
 
 	-- Cancel the cleanup of the previous step, so the player does not fall mid-climb.
@@ -42,7 +97,7 @@ script.Parent.OnServerEvent:connect(function(player, hitPos, hitNormal, stepName
 
 	stateHandler.SetState(char, "CantAnything", true, 0.5)
 	hum.AutoRotate = false
-	hum.WalkSpeed = 0
+	SpeedService.Push(char, "Climb", 0, SpeedService.Priority.SKILL)
 
 	local bg = Instance.new("BodyGyro")
 	bg.Name = "ClimbGyro"
@@ -109,8 +164,12 @@ script.Parent.OnServerEvent:connect(function(player, hitPos, hitNormal, stepName
 			bv:Destroy()
 		end
 		hum.AutoRotate = true
-		-- FIXME: This writes WalkSpeed directly, but SpeedService owns it.
-		hum.WalkSpeed = 16
+		SpeedService.Pop(char, "Climb")
 		cleanupTasks[player] = nil
 	end)
+end)
+
+game.Players.PlayerRemoving:Connect(function(player)
+	lastStepOne[player] = nil
+	stepTwoOpen[player] = nil
 end)
