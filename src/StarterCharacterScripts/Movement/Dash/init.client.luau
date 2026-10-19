@@ -1,11 +1,15 @@
---// Services
+-- SPDX-License-Identifier: MIT
+--
+-- The dash (Q): picks the direction from the movement, spends a dash charge, and moves
+-- the character with a LinearVelocity. Stamina can give a second charge. The charge,
+-- direction, and buffer rules are in docs/combat-design.md.
+
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 
---// Modules & Remotes
 local modules = ReplicatedStorage:WaitForChild("modules")
 local stateHandler = require(modules:WaitForChild("stateHandler"))
 local CooldownTracker = require(modules:WaitForChild("CooldownTracker"))
@@ -13,20 +17,17 @@ local StatScaling = require(modules:WaitForChild("StatScaling"))
 local remotes = ReplicatedStorage:WaitForChild("remotes")
 local stateRemote = remotes:WaitForChild("stateRepl")
 
---// Player Variables
 local Player = Players.LocalPlayer
 local Char = Player.Character or Player.CharacterAdded:Wait()
 local HumRP = Char:WaitForChild("HumanoidRootPart")
 local Hum = Char:WaitForChild("Humanoid")
 
---// Assets & UI
 local assets = ReplicatedStorage:WaitForChild("assets")
 local dashEff = assets:WaitForChild("Dash"):WaitForChild("Attachment")
 local dashEffect2 = assets:WaitForChild("dashEff2")
 local Remote = script:WaitForChild("Remote")
 Remote:FireServer()
 
---// Animations Loading Helper
 local function loadAnim(name)
 	local anim = Hum:LoadAnimation(script:WaitForChild(name))
 	anim.Priority = Enum.AnimationPriority.Action2
@@ -42,33 +43,24 @@ local Anims = {
 	Cancel = loadAnim("CancelAnim"),
 }
 
---// Configuration (Tweak your dash settings here!)
 local DASH_CONFIG = {
-	Cooldown = 2.5, -- per-charge cooldown for a SINGLE-charge build
-	MultiCooldown = 3.5, -- per-charge cooldown when the player has 2 charges
-	-- (slightly longer: the "bit higher total cooldown" tradeoff)
-	Duration = 0.3, -- How long the dash lasts in seconds
-	BaseSpeed = 60, -- Standardized speed for all directions
-	HealthThreshold = 0.3, -- Kicks in at 30% HP
-	HealthMultiplier = 0.65, -- Speed drops to 75%
+	Cooldown = 2.5, -- Seconds per charge with one charge.
+	MultiCooldown = 3.5, -- Seconds per charge with two charges, a bit longer.
+	Duration = 0.3, -- Seconds.
+	BaseSpeed = 60,
+	HealthThreshold = 0.3, -- Below 30% HP the dash slows down.
+	HealthMultiplier = 0.65,
 }
 
 local isDashing = false
 
--- [[ DASH CHARGE SYSTEM (Stamina stat) ]]
--- Charges are modeled as fixed SLOTS (1..maxCharges). Each slot recovers on its own
--- timer. maxCharges is read live from the Stamina stat so respec/level-up takes effect
--- immediately.
---
--- Cooldown UI rule: there is NO persistent bar. When the player consumes a slot, that
--- exact slot gets its own cooldown entry ("Dash 1", "Dash 2", ...) which the GUI counts
--- down and auto-prunes when it expires. No slots on cooldown = no bars = you can dash.
--- Slots are consumed lowest-ready-first so the labels stay stable.
+-- Each charge is a slot with its own cooldown, and the number of slots follows the
+-- Stamina stat live. A used slot shows its own HUD entry until it is ready again.
 
--- slots[i] = false when ready, or an os.clock() "returnAt" timestamp while on cooldown.
-local slots = nil -- lazy-init to a table of `maxCharges` ready slots
-local lastDashDir = nil -- direction (Enum.NormalId) of the previous dash while chaining;
--- a consecutive dash may NOT reuse it. Cleared when ALL slots are ready.
+-- Each slot is false when ready, or the os.clock() time when it is ready again.
+local slots = nil
+-- The direction of the previous dash in a chain. The next dash may not repeat it.
+local lastDashDir = nil
 
 local function getMaxCharges()
 	local stam = 0
@@ -86,18 +78,18 @@ local function perChargeCooldown()
 	return (getMaxCharges() >= 2) and DASH_CONFIG.MultiCooldown or DASH_CONFIG.Cooldown
 end
 
--- Build the slot table on first use, sized to the current max.
+-- Builds the slot table on first use, sized to the current maximum.
 local function ensureSlots()
 	if slots == nil then
 		slots = {}
 		for i = 1, getMaxCharges() do
-			slots[i] = false -- ready
+			slots[i] = false
 		end
 	end
 	return slots
 end
 
--- True if every slot is currently ready (used to clear the no-repeat-direction rule).
+-- Returns true if every slot is ready.
 local function allSlotsReady()
 	for i = 1, #slots do
 		if slots[i] ~= false then
@@ -107,7 +99,7 @@ local function allSlotsReady()
 	return true
 end
 
--- Lowest-numbered ready slot index, or nil if none.
+-- Returns the lowest ready slot, or nil. Using the lowest keeps the HUD labels stable.
 local function firstReadySlot()
 	ensureSlots()
 	for i = 1, #slots do
@@ -118,20 +110,19 @@ local function firstReadySlot()
 	return nil
 end
 
--- Consume the given slot, register its cooldown UI entry, and schedule its refill.
+-- Uses a slot, shows its cooldown on the HUD, and schedules its refill.
 local function consumeSlot(slotIndex)
 	local cd = perChargeCooldown()
 	local returnAt = os.clock() + cd
 	slots[slotIndex] = returnAt
 
-	-- With a single dash charge, show just "Dash" (no "1" suffix). The internal
-	-- cooldown ID stays unique per slot so slot bookkeeping/Remove are unaffected.
+	-- With one charge the HUD shows "Dash", not "Dash 1". The cooldown ID stays per slot.
 	local dashLabel = (getMaxCharges() <= 1) and "Dash" or ("Dash " .. slotIndex)
 	CooldownTracker.Register("Dash" .. slotIndex, dashLabel, cd)
 
 	task.delay(cd, function()
-		-- Only free the slot if this exact cooldown is still the active one (guards
-		-- against a respec rebuilding the table mid-cooldown).
+		-- Free the slot only if this cooldown is still the active one, in case a respec
+		-- rebuilt the table.
 		if slots[slotIndex] == returnAt then
 			slots[slotIndex] = false
 			if allSlotsReady() then
@@ -145,10 +136,8 @@ local function canDashNow()
 	return firstReadySlot() ~= nil
 end
 
--- When Stamina changes (level-up / respec), resize the slot table to the new max.
--- Gaining the 2nd-dash threshold grants the extra slot immediately as READY. Lowering
--- max drops the highest slots; any in-flight cooldown on a removed slot is cleared from
--- the UI so no orphan bar lingers.
+-- Resizes the slots when Stamina changes. A new slot is ready at once. A removed slot
+-- also loses its HUD entry.
 local function syncChargesToMax()
 	ensureSlots()
 	local maxC = getMaxCharges()
@@ -156,7 +145,7 @@ local function syncChargesToMax()
 
 	if maxC > cur then
 		for i = cur + 1, maxC do
-			slots[i] = false -- newly unlocked slot is ready right away
+			slots[i] = false
 		end
 	elseif maxC < cur then
 		for i = cur, maxC + 1, -1 do
@@ -176,7 +165,7 @@ do
 			syncChargesToMax()
 		end
 	end
-	-- The Stats folder may not exist yet at script start; retry until it does.
+	-- The Stats folder may not exist yet, so retry until it does.
 	task.spawn(function()
 		local tries = 0
 		while tries < 60 do
@@ -192,13 +181,13 @@ do
 	end)
 end
 
--- Calculates which animation and particle direction to use based on where the player is moving relative to their camera
+-- Returns the animation, particle direction, and sound for a dash in moveDir, relative
+-- to the character.
 local function GetDashData(moveDir)
 	local relativeDir = HumRP.CFrame:VectorToObjectSpace(moveDir)
 	local absX = math.abs(relativeDir.X)
 	local absZ = math.abs(relativeDir.Z)
 
-	-- Check if the player is moving more horizontally (X) or vertically (Z) relative to their character
 	if absX > absZ then
 		if relativeDir.X > 0 then
 			return Anims.Right, Enum.NormalId.Right, script.dash2
@@ -255,25 +244,17 @@ local function SpawnAirEffects(emissionDir)
 	end)
 end
 
--- [[ INPUT BUFFER ]]
--- A Q press that fails the state check (CantAnything, Stunned, M1/M2, no ready slot,
--- etc.) is stashed with a timestamp instead of being dropped. A Heartbeat loop retries
--- the real action every frame while the press is still fresh; the first frame the gates
--- clear, the dash fires and the buffer is consumed. Validation is NOT forked -- the
--- retry runs the exact same tryDash() as the live press, so you can never buffer your
--- way out of a ragdoll or skip the no-repeat-direction rule.
+-- A Q press that fails a check is buffered and retried every frame for BUFFER_WINDOW
+-- seconds. The retry runs the same tryDash, so a buffer can never skip a check.
 local BUFFER_WINDOW = 0.2
 local bufferedAt = nil
 
--- Runs the full dash validate-and-execute. Returns true if a dash actually fired,
--- false if any gate rejected it. Has no knowledge of buffering -- it just answers
--- "can I dash right this instant, and if so, do it."
+-- Checks and runs a dash. Returns true if the dash started, false otherwise.
 local function tryDash()
 	if not canDashNow() or isDashing then
 		return false
 	end
 
-	-- 1. Validate State
 	if HumRP.Anchored or Hum.Health <= 0 or Hum.MoveDirection.Magnitude <= 0 then
 		return false
 	end
@@ -284,13 +265,8 @@ local function tryDash()
 		return false
 	end
 
-	-- "DashLocked" is a short-lived server-set flag with two writers:
-	--   1. stateHandler.SetStun: set for a brief window AFTER a stun clears, so a
-	--      frame-perfect buffered dash can't slip out in the gap before the next M1
-	--      hitbox (keeps an M1 string a true combo end to end).
-	--   2. the Null Gaze slow (RacialSkills): held for the slow's duration, because a
-	--      dash uses a LinearVelocity that ignores WalkSpeed, so a WalkSpeed slow alone
-	--      does nothing to a dash. This is what actually stops a slowed target dashing.
+	-- The server sets DashLocked briefly after a stun, so a buffered dash cannot slip out
+	-- of a true combo, and during the Null Gaze slow, which a dash would otherwise ignore.
 	local blockedStates = {
 		"Blocking",
 		"Stunned",
@@ -308,46 +284,38 @@ local function tryDash()
 		end
 	end
 
-	-- Ragdoll guard: the "Ragdolled" attribute can lag behind (it replicates
-	-- server->client), but the humanoid being in the Physics state is local and
-	-- immediate. Block the dash on either, which closes the replication-gap window
-	-- where you could dash out of a ragdoll.
+	-- The Ragdolled attribute replicates late, but the local Physics state is immediate,
+	-- so check both.
 	if Hum:GetState() == Enum.HumanoidStateType.Physics then
 		return false
 	end
 
-	-- Get Animation & Direction Data (computed BEFORE consuming a charge so we
-	-- can reject a repeated direction without spending the dash).
+	-- Compute the direction before using a charge, so a repeated direction costs nothing.
 	local moveDir = Hum.MoveDirection
 	local anim, particleDir, soundToPlay = GetDashData(moveDir)
 	local isAirborne = Hum:GetState() == Enum.HumanoidStateType.Freefall
 
-	-- NO-REPEAT-DIRECTION RULE: a consecutive dash (while below max charges)
-	-- may not reuse the previous dash's direction bucket.
+	-- A chained dash may not repeat the previous direction.
 	if lastDashDir ~= nil and particleDir == lastDashDir then
 		return false
 	end
 
-	-- Claim the lowest ready slot. (canDashNow already confirmed one exists, but
-	-- re-check to be safe against any state change between the guard and here.)
+	-- Check the slot again, in case the state changed since canDashNow.
 	local slotIndex = firstReadySlot()
 	if not slotIndex then
 		return false
 	end
 
-	-- 2. Setup Dash
 	isDashing = true
-	lastDashDir = particleDir -- remember this dash's direction for the next consecutive one
-	consumeSlot(slotIndex) -- consumes the slot, schedules its refill, and drives that slot's cooldown UI
+	lastDashDir = particleDir
+	consumeSlot(slotIndex)
 	stateRemote:FireServer("Dodge")
 
-	-- Health Penalty Logic
 	local hpPercentage = Hum.Health / Hum.MaxHealth
 	local speedMultiplier = (hpPercentage <= DASH_CONFIG.HealthThreshold)
 			and DASH_CONFIG.HealthMultiplier
 		or 1
 
-	-- 3. Execute Visuals & Audio
 	anim:Play()
 	soundToPlay:Play()
 
@@ -357,27 +325,24 @@ local function tryDash()
 		script.Effect:FireServer()
 	end
 
-	-- 4. Execute Movement (Modern Physics)
 	local attachment = Instance.new("Attachment", HumRP)
 
 	local linearVelocity = Instance.new("LinearVelocity", HumRP)
 	linearVelocity.Attachment0 = attachment
-	linearVelocity.MaxForce = 100000 -- High force to override gravity and friction instantly
+	-- A high force overrides gravity and friction at once.
+	linearVelocity.MaxForce = 100000
 	linearVelocity.VectorVelocity = moveDir * (DASH_CONFIG.BaseSpeed * speedMultiplier)
 
-	-- [[ THE FIX: Prevent stumbling by locking orientation ]] --
+	-- Lock the orientation to the facing at the start, so the character does not stumble.
 	local alignOrientation = Instance.new("AlignOrientation", HumRP)
 	alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	alignOrientation.Attachment0 = attachment
-	-- Lock the orientation to exactly how they are facing when the dash starts
 	alignOrientation.CFrame = HumRP.CFrame
 	alignOrientation.RigidityEnabled = true
-	-- ======================================================== --
 
-	-- 5. Cleanup & Reset
 	task.delay(DASH_CONFIG.Duration, function()
 		linearVelocity:Destroy()
-		alignOrientation:Destroy() -- Clean up the orientation lock!
+		alignOrientation:Destroy()
 		attachment:Destroy()
 		isDashing = false
 		stateHandler.SetState(Char, "Dodging", false)
@@ -386,7 +351,6 @@ local function tryDash()
 	return true
 end
 
---// Main Input Handling
 UserInputService.InputBegan:Connect(function(Input, IsTyping)
 	if IsTyping then
 		return
@@ -395,15 +359,13 @@ UserInputService.InputBegan:Connect(function(Input, IsTyping)
 		return
 	end
 
-	-- Fire immediately if possible; otherwise open a buffer window so the press
-	-- isn't wasted if the gates clear in the next half second.
+	-- Dash now if possible, otherwise buffer the press.
 	if not tryDash() then
 		bufferedAt = os.clock()
 	end
 end)
 
--- Buffer retry: while a press is still within its window, keep attempting the dash.
--- Consume the buffer the instant one succeeds, or drop it when the window expires.
+-- Retry a buffered press until it succeeds or the window ends.
 RunService.Heartbeat:Connect(function()
 	if not bufferedAt then
 		return

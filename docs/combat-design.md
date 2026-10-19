@@ -375,3 +375,25 @@ recovered without a respawn.
 Every check reads attributes, not `stateHandler.GetState`, because server states never
 reach the client's state table. Reading `GetState` here is why players could once lock
 onto downed players.
+
+## Dash
+
+The dash (Q) is client-side movement with a LinearVelocity. It tells the server
+through `stateRepl` ("Dodge"), and the server sets the `Dodging` state that negates
+hits.
+
+- Charges: each dash charge is a slot with its own cooldown. Stamina 30 gives a second
+  charge, with a slightly longer cooldown per charge. The slot count follows Stamina
+  live, so a level-up or respec applies at once. A used slot shows its own HUD entry
+  ("Dash 1", "Dash 2") until it is ready, and slots are used lowest first so the labels
+  stay stable.
+- No repeated direction: a chained dash may not repeat the direction of the previous
+  dash. The rule clears when every slot is ready again.
+- Buffer: a Q press that fails a check is retried every frame for 0.2 s. The retry
+  runs the same checks as a live press, so a buffer cannot skip one.
+- `DashLocked`: the server sets it briefly after every stun, so a buffered dash cannot
+  slip out of a true combo in the gap before the next hitbox. The Null Gaze slow sets
+  it too, because a dash ignores WalkSpeed.
+- Ragdoll: the `Ragdolled` attribute replicates late, so the dash also checks the
+  local Physics state.
+- Below 30% HP the dash is slower (`HealthMultiplier`).
