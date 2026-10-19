@@ -41,6 +41,18 @@ local function calculateDamage(height)
 	return math.clamp(damage, 0, 1000)
 end
 
+-- Puffs dust from both legs. A rig without R6 legs gets no dust.
+local function emitDust(character)
+	for _, legName in ipairs({ "Right Leg", "Left Leg" }) do
+		local leg = character:FindFirstChild(legName)
+		if leg then
+			local eff = game.ReplicatedStorage.assets.FX.DUST:Clone()
+			eff.Parent = leg
+			eff:Emit(10)
+		end
+	end
+end
+
 local function applyFall(character, fallDistance, isRolling)
 	local humanoid = character:FindFirstChild("Humanoid")
 	if not humanoid then
@@ -66,12 +78,7 @@ local function applyFall(character, fallDistance, isRolling)
 				humanoid:TakeDamage(reducedDamage)
 			end
 
-			local eff = game.ReplicatedStorage.assets.FX.DUST:Clone()
-			eff.Parent = character["Right Leg"]
-			eff:Emit(10)
-			local eff2 = game.ReplicatedStorage.assets.FX.DUST:Clone()
-			eff2.Parent = character["Left Leg"]
-			eff2:Emit(10)
+			emitDust(character)
 		else
 			local willDown = (baseDamage > (0.9 * humanoid.MaxHealth))
 				or (humanoid.Health - baseDamage <= 0)
@@ -86,16 +93,11 @@ local function applyFall(character, fallDistance, isRolling)
 			DownedManager.DropIfCarrying(character)
 
 			local sound = game.ReplicatedStorage.assets.sounds.Bonebreak:Clone()
-			sound.Parent = character.HumanoidRootPart
+			sound.Parent = character:FindFirstChild("HumanoidRootPart") or character
 			sound:Play()
 			game.Debris:AddItem(sound, sound.TimeLength + 1)
 
-			local eff = game.ReplicatedStorage.assets.FX.DUST:Clone()
-			eff.Parent = character["Right Leg"]
-			eff:Emit(10)
-			local eff2 = game.ReplicatedStorage.assets.FX.DUST:Clone()
-			eff2.Parent = character["Left Leg"]
-			eff2:Emit(10)
+			emitDust(character)
 
 			if not willDown then
 				ragdoll.Ragdoll(character, 1)

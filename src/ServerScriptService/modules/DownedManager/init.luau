@@ -404,7 +404,13 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 		return
 	end
 
-	local dist = (executorChar.HumanoidRootPart.Position - victimChar.HumanoidRootPart.Position).Magnitude
+	local executorRoot = executorChar:FindFirstChild("HumanoidRootPart")
+	local victimRoot = victimChar:FindFirstChild("HumanoidRootPart")
+	local executorHum = executorChar:FindFirstChild("Humanoid")
+	if not executorRoot or not victimRoot or not executorHum then
+		return
+	end
+	local dist = (executorRoot.Position - victimRoot.Position).Magnitude
 	if dist > EXECUTE_RANGE then
 		return
 	end
@@ -416,18 +422,18 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 	DownedData[victimChar].BeingExecuted = true
 	DownedData[victimChar].Executor = executorChar
 
-	local anim = executorChar.Humanoid:LoadAnimation(script.ExecuteAnim)
+	local anim = executorHum:LoadAnimation(script.ExecuteAnim)
 	anim.Priority = Enum.AnimationPriority.Action4
 	anim:Play()
 	ActiveExecuteTracks[executorChar] = anim
 
-	executorChar.HumanoidRootPart.Anchored = true
+	executorRoot.Anchored = true
 
 	task.wait(2)
 
 	if StateHandler.GetState(executorChar, "Executing") then
 		local sound = game.ReplicatedStorage.assets.sounds.DeadSoundOLD:Clone()
-		sound.Parent = executorChar.HumanoidRootPart
+		sound.Parent = executorRoot
 		sound:Play()
 		game.Debris:AddItem(sound, sound.TimeLength)
 
@@ -439,8 +445,9 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 			StateHandler.RemoveStates(victimChar, "Downed")
 			StateHandler.RemoveStates(victimChar, "CantAnything")
 			StateHandler.RemoveStates(victimChar, "BeingExecuted")
-			executorChar.HumanoidRootPart.Anchored = false
 		end
+		-- Free the executor even when the victim lost its Humanoid during the wait.
+		executorRoot.Anchored = false
 
 		if ActiveExecuteTracks[executorChar] then
 			ActiveExecuteTracks[executorChar] = nil
@@ -498,7 +505,17 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 	end
 
 	if not DownedData[victimChar].Carrier then
-		local dist = (carrierChar.HumanoidRootPart.Position - victimChar.HumanoidRootPart.Position).Magnitude
+		local carrierRoot = carrierChar:FindFirstChild("HumanoidRootPart")
+		local victimRoot = victimChar:FindFirstChild("HumanoidRootPart")
+		if
+			not carrierRoot
+			or not victimRoot
+			or not carrierChar:FindFirstChild("Humanoid")
+			or not victimChar:FindFirstChild("Humanoid")
+		then
+			return
+		end
+		local dist = (carrierRoot.Position - victimRoot.Position).Magnitude
 		if dist > EXECUTE_RANGE then
 			return
 		end
@@ -563,9 +580,6 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 			vHum.AutoRotate = false
 			vHum:ChangeState(Enum.HumanoidStateType.Physics)
 		end
-
-		local carrierRoot = carrierChar.HumanoidRootPart
-		local victimRoot = victimChar.HumanoidRootPart
 
 		victimRoot.CFrame = carrierRoot.CFrame * CFrame.new(CARRY_OFFSET) * CFrame.Angles(0, 0, 0)
 

@@ -492,11 +492,14 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(name)
 			or game:GetService("ServerStorage"):FindFirstChild("Equipment"):FindFirstChild(name)
 		if toolPrefab then
-			if not self.Player:FindFirstChild("Backpack"):FindFirstChild(name) then
-				toolPrefab:Clone().Parent = self.Player:FindFirstChild("Backpack")
+			-- Both are missing for a moment during a respawn.
+			local backpack = self.Player:FindFirstChild("Backpack")
+			local starterGear = self.Player:FindFirstChild("StarterGear")
+			if backpack and not backpack:FindFirstChild(name) then
+				toolPrefab:Clone().Parent = backpack
 			end
-			if not self.Player:FindFirstChild("StarterGear"):FindFirstChild(name) then
-				toolPrefab:Clone().Parent = self.Player:FindFirstChild("StarterGear")
+			if starterGear and not starterGear:FindFirstChild(name) then
+				toolPrefab:Clone().Parent = starterGear
 			end
 		end
 	end

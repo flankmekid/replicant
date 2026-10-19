@@ -41,7 +41,9 @@ MobAI.Registry = {}
 
 MobAI.AttackTokens = {}
 
-local aliveFolder = workspace:FindFirstChild("plrManager"):FindFirstChild("alive")
+-- The checks below handle a missing folder, so a missing plrManager must not throw here.
+local plrManager = workspace:FindFirstChild("plrManager")
+local aliveFolder = plrManager and plrManager:FindFirstChild("alive")
 
 local DETECTION_FX_TEMPLATE = ReplicatedStorage.assets:FindFirstChild("MobDetection")
 local DETECTION_SOUND_TEMPLATE = ReplicatedStorage.assets.sounds:FindFirstChild("MobDetectionSound")

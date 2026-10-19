@@ -186,7 +186,7 @@ function module.ServerCheck(plr)
 				game.Debris:AddItem(sound, 3)
 				game.Debris:AddItem(effect, 0.3)
 
-				if targetChar.Torso then
+				if targetChar:FindFirstChild("Torso") then
 					for _, part in pairs(targetChar:GetChildren()) do
 						if
 							part:IsA("BasePart")
