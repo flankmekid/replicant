@@ -1,4 +1,7 @@
--- 0xdawid (discord) | flankmekid (github & roblox)
+-- SPDX-License-Identifier: MIT
+--
+-- Spawns the mobs from the zone parts in Workspace.Spawners, one folder per mob type
+-- in MobConfig, respawns them, and runs the mob and boss AI each Heartbeat.
 
 local RunService = game:GetService("RunService")
 local PhysicsService = game:GetService("PhysicsService")
@@ -8,8 +11,6 @@ local MobConfig = require(script.Parent.MobConfig)
 local MobAI = require(script.Parent.MobAI)
 local BossAI = require(script.Parent.BossAI)
 
--- mob setups
-
 pcall(function()
 	PhysicsService:RegisterCollisionGroup("Mobs")
 	PhysicsService:RegisterCollisionGroup("Players")
@@ -18,11 +19,11 @@ end)
 
 local SpawnersFolder = workspace:FindFirstChild("Spawners")
 if not SpawnersFolder then
-	warn("[MobServer] No 'Spawners' folder found in Workspace.")
+	warn("[MobServer] No Spawners folder found in Workspace.")
 	return
 end
 
-local ActiveMobs = {} -- array of mob objects
+local ActiveMobs = {}
 
 local function randomPositionInPart(part)
 	local sx = part.Size.X / 2
@@ -78,7 +79,7 @@ local function spawnFromZone(mobName, zone)
 					newMob.Respawn = self.Respawn
 					table.insert(ActiveMobs, newMob)
 				else
-					warn("[MobServer] Respawn failed for: " .. mobName)
+					warn(`[MobServer] Respawn failed for {mobName}.`)
 				end
 
 				for idx, m in ipairs(ActiveMobs) do
@@ -100,7 +101,7 @@ for _, categoryFolder in ipairs(SpawnersFolder:GetChildren()) do
 	end
 	local mobName = categoryFolder.Name
 	if not MobConfig.Mobs[mobName] then
-		warn("[MobServer] No config entry for spawner: " .. mobName)
+		warn(`[MobServer] No MobConfig entry for spawner {mobName}.`)
 		continue
 	end
 	for _, zone in ipairs(categoryFolder:GetChildren()) do
@@ -143,5 +144,3 @@ RunService.Heartbeat:Connect(function()
 		end
 	end
 end)
-
-print("[MobServer] Initialised. " .. #ActiveMobs .. " mobs spawned.")

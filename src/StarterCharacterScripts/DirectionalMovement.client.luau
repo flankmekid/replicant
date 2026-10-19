@@ -1,3 +1,9 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Tilts the R6 joints toward the move direction, relative to the root part, at up to
+-- 60 updates a second. Set the script's Toggle attribute to false to return the joints
+-- to rest.
+
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
@@ -30,13 +36,14 @@ local LeftShoulderTilt = CFrame.new()
 local RightHipTilt = CFrame.new()
 local LeftHipTilt = CFrame.new()
 
-local DefaultLerpAlpha = 0.145 -- Lerping Speed
-local dotThreshold = 0.9 -- dotThreshold (Do not edit)
-local lastTime = 0 -- Last Time (Do not edit)
-local tickRate = 1 / 60 -- 60 fps limit
+local DefaultLerpAlpha = 0.145
+-- The minimum dot product between the move direction and a direction to tilt that way.
+local dotThreshold = 0.9
+local lastTime = 0
+local tickRate = 1 / 60
 
 local function UpdateDirectionalMovement(DeltaTime)
-	local Now = workspace:GetServerTimeNow() -- os.clock Instead? Idrk
+	local Now = workspace:GetServerTimeNow()
 
 	if Now - lastTime >= tickRate then
 		lastTime = Now
@@ -44,8 +51,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 		local MoveDirection = HumanoidRootPart.CFrame:VectorToObjectSpace(Humanoid.MoveDirection)
 
 		if MoveDirection:Dot(Vector3.new(1, 0, -1).Unit) > dotThreshold then
-			-- print("Forwards-Right")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
 				DefaultLerpAlpha
@@ -82,8 +87,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(1, 0, 1).Unit) > dotThreshold then
-			-- print("Backwards-Right")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25),
 				DefaultLerpAlpha
@@ -120,8 +123,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(-1, 0, 1).Unit) > dotThreshold then
-			-- print("Backwards-Left")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25),
 				DefaultLerpAlpha
@@ -158,8 +159,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(-1, 0, -1).Unit) > dotThreshold then
-			-- print("Forwards-Left")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
 				DefaultLerpAlpha
@@ -196,8 +195,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(0, 0, -1).Unit) > dotThreshold then
-			-- print("Forwards")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0),
 				DefaultLerpAlpha
@@ -220,8 +217,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(1, 0, 0).Unit) > dotThreshold then
-			-- print("Right")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35),
 				DefaultLerpAlpha
@@ -256,8 +251,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(0, 0, 1).Unit) > dotThreshold then
-			-- print("Backwards")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0),
 				DefaultLerpAlpha
@@ -280,8 +273,6 @@ local function UpdateDirectionalMovement(DeltaTime)
 			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection:Dot(Vector3.new(-1, 0, 0).Unit) > dotThreshold then
-			-- print("Left")
-
 			RootJointTilt = RootJointTilt:Lerp(
 				CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35),
 				DefaultLerpAlpha
