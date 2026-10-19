@@ -346,8 +346,12 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then
+				if not attackerHRP then
 					return
+				end
+				-- A target without a root part is skipped, not the rest of the batch.
+				if not targetHRP then
+					continue
 				end
 
 				if StateHandler.GetState(char, "Stunned") then
