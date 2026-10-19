@@ -17,7 +17,7 @@ local RP = game:GetService("ReplicatedStorage")
 local plr = Players.LocalPlayer
 local playerGui = plr:WaitForChild("PlayerGui")
 
-local MAX = 100   -- must match GuardBarService.MAX
+local MAX = 100 -- must match GuardBarService.MAX
 
 -- Colours: calm gold when low, hot red as it approaches break.
 local LOW_COLOR = Color3.fromRGB(210, 200, 120)
@@ -112,7 +112,8 @@ local function flash()
 	flashToken += 1
 	local myToken = flashToken
 
-	local baseRatio = math.clamp((plr.Character and plr.Character:GetAttribute("GuardBar") or 0) / MAX, 0, 1)
+	local baseRatio =
+		math.clamp((plr.Character and plr.Character:GetAttribute("GuardBar") or 0) / MAX, 0, 1)
 	local baseColor = LOW_COLOR:Lerp(HIGH_COLOR, baseRatio)
 
 	fill.BackgroundColor3 = FLASH_COLOR
@@ -122,7 +123,9 @@ local function flash()
 
 	-- After easing back, re-render so visibility and height settle to the true value.
 	task.delay(0.3, function()
-		if myToken ~= flashToken then return end
+		if myToken ~= flashToken then
+			return
+		end
 		render(plr.Character and plr.Character:GetAttribute("GuardBar") or 0)
 	end)
 end
@@ -141,8 +144,13 @@ end
 
 local currentConn
 local function hook(char)
-	if currentConn then currentConn:Disconnect() currentConn = nil end
-	if not char then return end
+	if currentConn then
+		currentConn:Disconnect()
+		currentConn = nil
+	end
+	if not char then
+		return
+	end
 
 	task.spawn(function()
 		-- On a respawn the model can be parented before the root part lands inside it.
@@ -156,5 +164,7 @@ local function hook(char)
 	end)
 end
 
-if plr.Character then hook(plr.Character) end
+if plr.Character then
+	hook(plr.Character)
+end
 plr.CharacterAdded:Connect(hook)

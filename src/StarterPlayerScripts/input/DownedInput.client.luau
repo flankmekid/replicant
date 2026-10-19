@@ -19,9 +19,13 @@ local SEARCH_RADIUS = 5
 -- [[ HELPER: Find Target ]] --
 local function GetNearestDownedPlayer()
 	local char = player.Character
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return nil end
+	if not root then
+		return nil
+	end
 
 	local nearestChar = nil
 	local minDist = SEARCH_RADIUS
@@ -49,7 +53,9 @@ end
 
 -- [[ INPUT LISTENER ]] --
 UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then return end
+	if processed then
+		return
+	end
 
 	-- EXECUTE (B)
 	if input.KeyCode == Enum.KeyCode.B then
@@ -76,11 +82,13 @@ end)
 
 -- [[ UI UPDATE LOOP ]] --
 RunService.RenderStepped:Connect(function()
-	if not interactionGui or not promptLabel then return end
+	if not interactionGui or not promptLabel then
+		return
+	end
 	local char = player.Character
-	if not char then 
+	if not char then
 		interactionGui.Enabled = false
-		return 
+		return
 	end
 
 	-- Check 1: Are we carrying someone?

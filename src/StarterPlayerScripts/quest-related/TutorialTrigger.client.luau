@@ -27,7 +27,9 @@ local function wireHover(button)
 		TweenService:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = 0.1 }):Play()
 	end)
 	button.MouseLeave:Connect(function()
-		TweenService:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = BG_TRANSPARENCY }):Play()
+		TweenService
+			:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = BG_TRANSPARENCY })
+			:Play()
 	end)
 end
 wireHover(yesButton)
@@ -87,8 +89,8 @@ requestClose.Parent = gui
 yesButton.MouseButton1Click:Connect(showPanel)
 noButton.MouseButton1Click:Connect(close)
 closeButton.MouseButton1Click:Connect(function()
-	close()              -- always close the panel, regardless of how it opened
-	requestClose:Fire()  -- sync the topbar icon (no-op if it wasn't selected)
+	close() -- always close the panel, regardless of how it opened
+	requestClose:Fire() -- sync the topbar icon (no-op if it wasn't selected)
 end)
 
 -- ===== trigger touch (client-side, session-only) =====

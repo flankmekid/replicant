@@ -24,9 +24,9 @@ local WALL_RUN_DISTANCE = 3
 local WALL_RUN_SPEED = 30
 local WALL_RUN_Y_VELOCITY = 2
 local ANGLE_TOLERANCE = 0.45 -- Strict angle
-local WALL_RUN_DURATION = 3 
-local COOLDOWN = 0.5 
-local LEDGE_THRESHOLD = 2 
+local WALL_RUN_DURATION = 3
+local COOLDOWN = 0.5
+local LEDGE_THRESHOLD = 2
 -- Input buffer window: a space tap this many seconds BEFORE entering freefall still
 -- counts as a "pressed in air" intent once freefall begins.
 local BUFFER_WINDOW = 0.5
@@ -36,7 +36,9 @@ local function getMaxWallRuns()
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
 		local sf = stats:FindFirstChild("Stats")
-		if sf and sf:FindFirstChild("Stamina") then stam = sf.Stamina.Value end
+		if sf and sf:FindFirstChild("Stamina") then
+			stam = sf.Stamina.Value
+		end
 	end
 	return StatScaling.GetWallRunCount(stam) -- 2, or 3 at stamina >= 10
 end
@@ -44,9 +46,9 @@ end
 -- STATE
 local isWallRunning = false
 local wallRunBV = nil
-local startTime = 0 
+local startTime = 0
 local lastWallRunTime = 0
-local wallRunCount = 0 
+local wallRunCount = 0
 
 -- INPUT STATE
 local spacePressedInAir = false -- Tracks if space was pressed specifically while in freefall
@@ -64,14 +66,14 @@ player.CharacterAdded:Connect(function(newChar)
 	Root = char:WaitForChild("HumanoidRootPart")
 	Head = char:WaitForChild("Head")
 	animator = hum:WaitForChild("Animator")
-	wallRunCount = 0 
+	wallRunCount = 0
 	spacePressedInAir = false
 	spaceBufferedAt = nil
 end)
 
 local params = RaycastParams.new()
 params.FilterType = Enum.RaycastFilterType.Exclude
-params.FilterDescendantsInstances = {char}
+params.FilterDescendantsInstances = { char }
 
 local function getWallRunDirection(forward, normal)
 	local dir = (forward - forward:Dot(normal) * normal)
@@ -79,9 +81,11 @@ local function getWallRunDirection(forward, normal)
 end
 
 local function isNearLedge(hitPart, hitPos)
-	if not hitPart then return false end
+	if not hitPart then
+		return false
+	end
 	local localPos = hitPart.CFrame:PointToObjectSpace(hitPos)
-	local localLedgePos = Vector3.new(localPos.X, hitPart.Size.Y/2, localPos.Z)
+	local localLedgePos = Vector3.new(localPos.X, hitPart.Size.Y / 2, localPos.Z)
 	local ledgePos = hitPart.CFrame:PointToWorldSpace(localLedgePos)
 	local verticalDist = math.abs(ledgePos.Y - Head.Position.Y)
 
@@ -94,14 +98,18 @@ end
 -- VISUAL EFFECTS FUNCTIONS
 local function createEffects()
 	-- Clean up old ones just in case
-	if leftTrail then leftTrail:Destroy() end
-	if rightTrail then rightTrail:Destroy() end
+	if leftTrail then
+		leftTrail:Destroy()
+	end
+	if rightTrail then
+		rightTrail:Destroy()
+	end
 
 	local dashEff = ReplicatedStorage.assets.Dash.Attachment
 	local dashEffect2 = ReplicatedStorage.assets.dashEff2
-	
+
 	local eff = dashEffect2:Clone()
-	for _,effect in pairs(eff:GetChildren()) do
+	for _, effect in pairs(eff:GetChildren()) do
 		if effect:IsA("ParticleEmitter") then
 			effect.Parent = char.Torso
 			effect.EmissionDirection = Enum.NormalId.Back
@@ -112,13 +120,13 @@ local function createEffects()
 			effect:FindFirstChildWhichIsA("ParticleEmitter"):Emit(9)
 		end
 	end
-	
+
 	game.Debris:AddItem(eff, 5)
 
 	-- Left Arm Effect
 	leftTrail = dashEff:Clone()
 	leftTrail.Parent = char:FindFirstChild("Left Arm") or char:FindFirstChild("LeftHand") -- R6/R15 Fallback
-	leftTrail.Position = Vector3.new(-.5,-1,0)
+	leftTrail.Position = Vector3.new(-0.5, -1, 0)
 	if leftTrail.Parent and leftTrail.Parent:FindFirstChild("LeftGripAttachment") then
 		leftTrail.Trail.Attachment1 = leftTrail.Parent.LeftGripAttachment
 	end
@@ -126,22 +134,27 @@ local function createEffects()
 	-- Right Arm Effect
 	rightTrail = dashEff:Clone()
 	rightTrail.Parent = char:FindFirstChild("Right Arm") or char:FindFirstChild("RightHand")
-	rightTrail.Position = Vector3.new(.5,-1,0)
+	rightTrail.Position = Vector3.new(0.5, -1, 0)
 	if rightTrail.Parent and rightTrail.Parent:FindFirstChild("RightGripAttachment") then
 		rightTrail.Trail.Attachment1 = rightTrail.Parent.RightGripAttachment
 	end
-	
+
 	game.Debris:AddItem(leftTrail, 5)
 	game.Debris:AddItem(rightTrail, 5)
 end
 
 local function removeEffects()
-	if leftTrail then leftTrail:Destroy() leftTrail = nil end
-	if rightTrail then rightTrail:Destroy() rightTrail = nil end
+	if leftTrail then
+		leftTrail:Destroy()
+		leftTrail = nil
+	end
+	if rightTrail then
+		rightTrail:Destroy()
+		rightTrail = nil
+	end
 end
 
 function startWallRun(WallHit, WallSide)
-
 	local forward = Root.CFrame.LookVector
 	local runDir = getWallRunDirection(forward, WallHit.Normal)
 
@@ -152,15 +165,16 @@ function startWallRun(WallHit, WallSide)
 		-- Gravity / Duration Logic
 		local currentY = WALL_RUN_Y_VELOCITY
 		if elapsedTime > WALL_RUN_DURATION then
-			currentY = -20 
+			currentY = -20
 			if elapsedTime > (WALL_RUN_DURATION + 0.5) then
 				stopWallRun()
 				return
 			end
 		end
 
-		wallRunBV.Velocity = Vector3.new(runDir.X * WALL_RUN_SPEED, currentY, runDir.Z * WALL_RUN_SPEED)
-		return 
+		wallRunBV.Velocity =
+			Vector3.new(runDir.X * WALL_RUN_SPEED, currentY, runDir.Z * WALL_RUN_SPEED)
+		return
 	end
 
 	-- DEBOUNCE
@@ -170,9 +184,9 @@ function startWallRun(WallHit, WallSide)
 
 	-- INITIALIZE NEW RUN
 	isWallRunning = true
-	wallRunCount = wallRunCount + 1 
+	wallRunCount = wallRunCount + 1
 	startTime = tick()
-	hum.AutoRotate = false 
+	hum.AutoRotate = false
 	stateRemote:FireServer("StartWallR")
 
 	-- Trigger Visuals
@@ -185,7 +199,8 @@ function startWallRun(WallHit, WallSide)
 		wallRunBV.Parent = Root
 	end
 
-	wallRunBV.Velocity = Vector3.new(runDir.X * WALL_RUN_SPEED, WALL_RUN_Y_VELOCITY, runDir.Z * WALL_RUN_SPEED)
+	wallRunBV.Velocity =
+		Vector3.new(runDir.X * WALL_RUN_SPEED, WALL_RUN_Y_VELOCITY, runDir.Z * WALL_RUN_SPEED)
 
 	-- Animations
 	if WallSide == "RightWall" then
@@ -202,10 +217,12 @@ function startWallRun(WallHit, WallSide)
 end
 
 function stopWallRun()
-	if not isWallRunning then return end 
+	if not isWallRunning then
+		return
+	end
 
 	isWallRunning = false
-	lastWallRunTime = tick() 
+	lastWallRunTime = tick()
 	hum.AutoRotate = true
 	stateRemote:FireServer("StopWallR")
 
@@ -227,11 +244,15 @@ end
 
 -- INPUT HANDLING
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	
-	if char:GetAttribute("Stunned") then return end
+	if gp then
+		return
+	end
+
+	if char:GetAttribute("Stunned") then
+		return
+	end
 	--if char:GetAttribute("CantAnything") then return end
-	
+
 	if input.KeyCode == Enum.KeyCode.Space then
 		-- Only register valid wallrun input if we press space WHILE in the air
 		if hum:GetState() == Enum.HumanoidStateType.Freefall then
@@ -310,7 +331,13 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	else
 		-- Start Run: Requires specific "Pressed In Air" flag
-		if WallHit and spacePressedInAir and angleCheck and isFreefall and wallRunCount < getMaxWallRuns() then
+		if
+			WallHit
+			and spacePressedInAir
+			and angleCheck
+			and isFreefall
+			and wallRunCount < getMaxWallRuns()
+		then
 			startWallRun(WallHit, WallSide)
 		end
 	end

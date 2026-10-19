@@ -8,19 +8,19 @@ local Lighting = game:GetService("Lighting")
 local RunService = game:GetService("RunService")
 
 -- === CONFIG ===
-local CYCLE_SECONDS = 20 * 60      -- full 24h cycle in real seconds
-local DAY_FRACTION  = 0.575        -- share of the cycle that is daytime (06-18). slight summer lean.
+local CYCLE_SECONDS = 20 * 60 -- full 24h cycle in real seconds
+local DAY_FRACTION = 0.575 -- share of the cycle that is daytime (06-18). slight summer lean.
 
 -- Moon phases, in display order for a no-new-moon loop.
 -- Advances one step at each day->night boundary.
 local MOON_PHASES = {
 	"rbxassetid://115183707506411", -- full
-	"rbxassetid://98566249817591",  -- waning gibbous
-	"rbxassetid://72720763605036",  -- last quarter
+	"rbxassetid://98566249817591", -- waning gibbous
+	"rbxassetid://72720763605036", -- last quarter
 	"rbxassetid://116282218634687", -- waning crescent
-	"rbxassetid://79635214986055",  -- waxing crescent
-	"rbxassetid://87549301799580",  -- first quarter
-	"rbxassetid://99628020701653",  -- waxing gibbous
+	"rbxassetid://79635214986055", -- waxing crescent
+	"rbxassetid://87549301799580", -- first quarter
+	"rbxassetid://99628020701653", -- waxing gibbous
 }
 
 -- === DERIVED ===

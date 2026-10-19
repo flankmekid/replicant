@@ -1,10 +1,10 @@
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
-local Players             = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local QuestConfig         = require(ReplicatedStorage.QuestSystem.QuestConfig)
-local QuestUpdateRemote   = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
-local DataManager         = require(ServerScriptService.modules.dataManager)
+local QuestConfig = require(ReplicatedStorage.QuestSystem.QuestConfig)
+local QuestUpdateRemote = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
+local DataManager = require(ServerScriptService.modules.dataManager)
 
 local QuestManager = {}
 
@@ -16,7 +16,9 @@ local CLASS_QUEST_LITURGY_COST = {
 
 local function buildPayload(questId, progress)
 	local def = QuestConfig.Quests[questId]
-	if not def then return nil end
+	if not def then
+		return nil
+	end
 	return { Id = questId, Data = def, Progress = progress or 0 }
 end
 
@@ -34,12 +36,19 @@ end
 
 function QuestManager.AssignQuest(player, questId)
 	local questDef = QuestConfig.Quests[questId]
-	if not questDef then warn("Invalid Quest ID: " .. tostring(questId)) return end
+	if not questDef then
+		warn("Invalid Quest ID: " .. tostring(questId))
+		return
+	end
 
 	local questData = DataManager.GetQuestData(player)
-	if not questData then return end
+	if not questData then
+		return
+	end
 
-	if DataManager.IsQuestActive(player, questId) then return end
+	if DataManager.IsQuestActive(player, questId) then
+		return
+	end
 
 	if questDef.Prerequisite and not table.find(questData.Completed, questDef.Prerequisite) then
 		print("Prerequisite not met for: " .. questId)
@@ -65,7 +74,7 @@ function QuestManager.AssignQuest(player, questId)
 
 	if questDef.ClassQuest then
 		QuestUpdateRemote:FireClient(player, "ClassQuestUnlocked", {
-			Id   = questId,
+			Id = questId,
 			Data = questDef,
 		})
 	end
@@ -77,14 +86,20 @@ end
 
 function QuestManager.IncrementProgress(player, questId, amount)
 	local questDef = QuestConfig.Quests[questId]
-	if not questDef then return end
-	if not DataManager.IsQuestActive(player, questId) then return end
+	if not questDef then
+		return
+	end
+	if not DataManager.IsQuestActive(player, questId) then
+		return
+	end
 
 	local newProgress = DataManager.UpdateQuestProgress(player, questId, amount)
 
 	if newProgress > questDef.MaxProgress then
 		local entry = DataManager.GetActiveQuestEntry(player, questId)
-		if entry then entry.Progress = questDef.MaxProgress end
+		if entry then
+			entry.Progress = questDef.MaxProgress
+		end
 		newProgress = questDef.MaxProgress
 	end
 
@@ -92,18 +107,22 @@ function QuestManager.IncrementProgress(player, questId, amount)
 		QuestManager.CompleteQuest(player, questId)
 	else
 		QuestUpdateRemote:FireClient(player, "Update", {
-			Id       = questId,
+			Id = questId,
 			Progress = newProgress,
-			Max      = questDef.MaxProgress,
+			Max = questDef.MaxProgress,
 		})
 	end
 end
 
 function QuestManager.CompleteQuest(player, questId)
-	if not DataManager.IsQuestActive(player, questId) then return end
+	if not DataManager.IsQuestActive(player, questId) then
+		return
+	end
 
 	local questDef = QuestConfig.Quests[questId]
-	if not questDef then return end
+	if not questDef then
+		return
+	end
 
 	if questDef.ClassQuest and questDef.Milestone and questDef.Milestone > 10 then
 		local cost = CLASS_QUEST_LITURGY_COST[questDef.Milestone] or 0
@@ -112,7 +131,7 @@ function QuestManager.CompleteQuest(player, questId)
 			if not success then
 				QuestUpdateRemote:FireClient(player, "InsufficientFunds", {
 					Required = cost,
-					QuestId  = questId,
+					QuestId = questId,
 				})
 				return
 			end
@@ -130,7 +149,11 @@ function QuestManager.CompleteQuest(player, questId)
 	local newTracked = DataManager.GetTrackedQuest(player)
 	if newTracked then
 		local entry = DataManager.GetActiveQuestEntry(player, newTracked)
-		QuestUpdateRemote:FireClient(player, "Tracked", buildPayload(newTracked, entry and entry.Progress or 0))
+		QuestUpdateRemote:FireClient(
+			player,
+			"Tracked",
+			buildPayload(newTracked, entry and entry.Progress or 0)
+		)
 	else
 		QuestUpdateRemote:FireClient(player, "Tracked", nil)
 	end
@@ -151,7 +174,7 @@ function QuestManager.CompleteQuest(player, questId)
 			QuestManager.AssignQuest(player, questDef.NextQuest)
 		end
 	end
-	
+
 	print("[QuestServer] Completing quest: " .. questId)
 	print("[QuestServer] RewardItem: " .. tostring(questDef.RewardItem))
 	print("[QuestServer] ItemRewardManager: " .. tostring(_G.ItemRewardManager))
@@ -168,12 +191,18 @@ function QuestManager.CompleteQuest(player, questId)
 end
 
 function QuestManager.SetTracked(player, questId)
-	if questId ~= nil and not DataManager.IsQuestActive(player, questId) then return end
+	if questId ~= nil and not DataManager.IsQuestActive(player, questId) then
+		return
+	end
 	DataManager.SetTrackedQuest(player, questId)
 
 	if questId then
 		local entry = DataManager.GetActiveQuestEntry(player, questId)
-		QuestUpdateRemote:FireClient(player, "Tracked", buildPayload(questId, entry and entry.Progress or 0))
+		QuestUpdateRemote:FireClient(
+			player,
+			"Tracked",
+			buildPayload(questId, entry and entry.Progress or 0)
+		)
 	else
 		QuestUpdateRemote:FireClient(player, "Tracked", nil)
 	end
@@ -212,17 +241,25 @@ end
 -- Evaluates one weapon family and assigns the correct next class quest, if any.
 -- Safe to call as often as you like; a no-op when nothing has changed.
 function QuestManager.ReconcileClassQuests(player, family)
-	if not family then return end
+	if not family then
+		return
+	end
 
 	local questData = DataManager.GetQuestData(player)
-	if not questData then return end
+	if not questData then
+		return
+	end
 
 	-- One at a time. If a checkpoint is open, the player owes the trainer a visit
 	-- before the next one unlocks.
-	if getActiveClassQuest(player, family) then return end
+	if getActiveClassQuest(player, family) then
+		return
+	end
 
 	local level = DataManager.GetWeaponLevel(player, family)
-	if level <= 0 then return end
+	if level <= 0 then
+		return
+	end
 
 	-- Lowest milestone that is earned by level and not yet completed.
 	for _, milestone in ipairs(CLASS_MILESTONES) do
@@ -269,20 +306,28 @@ function QuestManager.ReconcileHybrids(player)
 		local lowest = math.huge
 		for _, parentFamily in ipairs(parents) do
 			local lvl = DataManager.GetWeaponLevel(player, parentFamily)
-			if lvl < lowest then lowest = lvl end
+			if lvl < lowest then
+				lowest = lvl
+			end
 		end
-		if lowest == math.huge then lowest = 0 end
+		if lowest == math.huge then
+			lowest = 0
+		end
 
 		local skills = SkillConfig.WeaponSkills[hybridName]
 		if skills then
 			for slotIndex, threshold in pairs(SkillConfig.HybridSkillThresholds) do
 				local skillName = skills[slotIndex]
-				if skillName and lowest >= threshold and not DataManager.HasSpell(player, skillName) then
+				if
+					skillName
+					and lowest >= threshold
+					and not DataManager.HasSpell(player, skillName)
+				then
 					DataManager.UnlockSpell(player, skillName)
 					QuestUpdateRemote:FireClient(player, "HybridSkillUnlocked", {
 						Weapon = hybridName,
-						Skill  = skillName,
-						Slot   = SkillConfig.SlotKeys[slotIndex],
+						Skill = skillName,
+						Slot = SkillConfig.SlotKeys[slotIndex],
 					})
 				end
 			end
@@ -322,7 +367,9 @@ function QuestManager.RestoreSession(player)
 	DataManager.YieldUntilLoaded(player)
 
 	local questData = DataManager.GetQuestData(player)
-	if not questData then return end
+	if not questData then
+		return
+	end
 
 	-- Reconcile BEFORE building the list. This is the recovery path: any checkpoint
 	-- stranded in a previous session (missed because it fired while another quest
@@ -332,7 +379,9 @@ function QuestManager.RestoreSession(player)
 	QuestManager.ReconcileAllClassQuests(player)
 
 	local activeList = buildActiveList(player)
-	if #activeList == 0 then return end
+	if #activeList == 0 then
+		return
+	end
 
 	for _, entry in ipairs(activeList) do
 		QuestUpdateRemote:FireClient(player, "New", buildPayload(entry.Id, entry.Progress))

@@ -2,25 +2,25 @@ local SkillConfig = {}
 
 -- [[ 1. WEAPON MAPPING ]] --
 SkillConfig.WeaponSkills = {
-	["Greatsword"] = {"Whirlwind", "Abyssal Scream", "Berserker Armor"},
-	["Dragon Slayer"] = {"Whirlwind", "Abyssal Scream", "Berserker Armor"},
-	["Deathbringer"] = {"Whirlwind", "Abyssal Scream", "Berserker Armor"},
-	
-	["Sword"] 		  = {"Elfin Dance", "Air Wave", "Morgan"},
-	["Excalibur"]     = {"Elfin Dance", "Air Wave", "Morgan"},
-	
-	["Fists"] = {}, 
-	["Caestus"]       = {"Mantra Palm", "Monastic Stance", "Rising Dragon"},
-	["Shackles"]      = {"Gohadoken", "Asura Glide", "Messatsu"},
-	
-	["Katana"]        = {"Zanshin", "Kurai", "Kirikizu"},
-	["Vermillion"]    = {"Zanshin", "Kurai", "Kirikizu"},
-	
-	["Dagger"]        = {"Hidden Daggers", "Ying Yang Spiral", "Mystic Eyes"},
-	["Tanto"]         = {"Hidden Daggers", "Ying Yang Spiral", "Mystic Eyes"},
-	
-	["Guandao"]       = {"Downward Cleave", "Tianshi", "Dao"},
-	
+	["Greatsword"] = { "Whirlwind", "Abyssal Scream", "Berserker Armor" },
+	["Dragon Slayer"] = { "Whirlwind", "Abyssal Scream", "Berserker Armor" },
+	["Deathbringer"] = { "Whirlwind", "Abyssal Scream", "Berserker Armor" },
+
+	["Sword"] = { "Elfin Dance", "Air Wave", "Morgan" },
+	["Excalibur"] = { "Elfin Dance", "Air Wave", "Morgan" },
+
+	["Fists"] = {},
+	["Caestus"] = { "Mantra Palm", "Monastic Stance", "Rising Dragon" },
+	["Shackles"] = { "Gohadoken", "Asura Glide", "Messatsu" },
+
+	["Katana"] = { "Zanshin", "Kurai", "Kirikizu" },
+	["Vermillion"] = { "Zanshin", "Kurai", "Kirikizu" },
+
+	["Dagger"] = { "Hidden Daggers", "Ying Yang Spiral", "Mystic Eyes" },
+	["Tanto"] = { "Hidden Daggers", "Ying Yang Spiral", "Mystic Eyes" },
+
+	["Guandao"] = { "Downward Cleave", "Tianshi", "Dao" },
+
 	["Scythe"] = {},
 }
 
@@ -28,17 +28,17 @@ SkillConfig.WeaponSkills = {
 -- Maps the "Race" string in PlayerStats to the Skill Name
 SkillConfig.RaceSkills = {
 	["Human"] = "Adrenaline Surge",
-	["Elezen"]   = "Arcane Siphon",
+	["Elezen"] = "Arcane Siphon",
 	["Seer"] = "Null Gaze",
-	["Meskar"]  = "Spectre Round",
-	["Karu"]    = "Headbutt",
+	["Meskar"] = "Spectre Round",
+	["Karu"] = "Headbutt",
 	["Verdis"] = "Root Prison",
 	["Marasi"] = "Tidal Slug",
-	["Cruor"]   = "Parasitic Impale",
-	["Arach"]  = "Silk Grasp",
+	["Cruor"] = "Parasitic Impale",
+	["Arach"] = "Silk Grasp",
 	["Maw"] = "Void Crunch",
-	["Ancestor"]  = "Vampire Drain",
-	["Grob"]  = "Jury-Rigged Bomb",
+	["Ancestor"] = "Vampire Drain",
+	["Grob"] = "Jury-Rigged Bomb",
 	["Aegir"] = "Draco Kick",
 }
 
@@ -66,18 +66,18 @@ SkillConfig.Skills = {
 
 	-- [[ VERMILLION ]] --
 	["Zanshin"] = { Mana = 15, Cooldown = 6, HPCost = 5 },
-	["Kurai"] = { Mana = 15, Cooldown = 5, },
+	["Kurai"] = { Mana = 15, Cooldown = 5 },
 	["Kirikizu"] = { Mana = 25, Cooldown = 10, HPCost = 10 },
 
 	-- [[ TANTO ]] --
 	["Hidden Daggers"] = { Mana = 15, Cooldown = 8 },
 	["Ying Yang Spiral"] = { Mana = 20, Cooldown = 10 },
 	["Mystic Eyes"] = { Mana = 50, Cooldown = 60, Type = "Buff" },
-	
+
 	-- [[ GUANDAO ]] --
 	["Downward Cleave"] = { Mana = 20, Cooldown = 10 },
 	["Tianshi"] = { Mana = 25, Cooldown = 14 },
-	["Dao"] = {Mana = 30, Cooldown = 15},
+	["Dao"] = { Mana = 30, Cooldown = 15 },
 
 	-- [[ RACIAL SKILLS (NEW) ]] --
 	["Adrenaline Surge"] = { Mana = 0, Cooldown = 60, Type = "Buff" }, -- Vermeer (HPCost handled in logic)
@@ -89,10 +89,10 @@ SkillConfig.Skills = {
 	["Tidal Slug"] = { Mana = 30, Cooldown = 10 }, -- Glaucus
 	["Parasitic Impale"] = { Mana = 30, Cooldown = 25 }, -- Cruor
 	["Silk Grasp"] = { Mana = 20, Cooldown = 10 }, -- Skotos
-	["Void Crunch"] = { Mana = 30, Cooldown = 15 },  -- Porphyr
+	["Void Crunch"] = { Mana = 30, Cooldown = 15 }, -- Porphyr
 	["Vampire Drain"] = { Mana = 15, Cooldown = 20 }, -- Caelum
-	["Jury-Rigged Bomb"] = { Mana = 5, Cooldown = 30 },  -- Virdis
-	["Draco Kick"] = {Mana = 25, Cooldown = 10}, -- Aegir
+	["Jury-Rigged Bomb"] = { Mana = 5, Cooldown = 30 }, -- Virdis
+	["Draco Kick"] = { Mana = 25, Cooldown = 10 }, -- Aegir
 }
 
 -- [[ 4. WEAPON -> SEED FAMILY MAPPING ]] --
@@ -100,25 +100,25 @@ SkillConfig.Skills = {
 -- so cross-branch skill mixing (e.g. Monk Z + Akuma X) lives in one loadout.
 -- Hybrids (Guandao, Scythe) are their own families since they have their own skill lists.
 SkillConfig.WeaponFamily = {
-	["Fists"]        = "Fists",
-	["Caestus"]      = "Fists",
-	["Shackles"]     = "Fists",
+	["Fists"] = "Fists",
+	["Caestus"] = "Fists",
+	["Shackles"] = "Fists",
 
-	["Sword"]        = "Sword",
-	["Excalibur"]    = "Sword",
+	["Sword"] = "Sword",
+	["Excalibur"] = "Sword",
 
-	["Katana"]       = "Katana",
-	["Vermillion"]   = "Katana",
+	["Katana"] = "Katana",
+	["Vermillion"] = "Katana",
 
-	["Dagger"]       = "Dagger",
-	["Tanto"]        = "Dagger",
+	["Dagger"] = "Dagger",
+	["Tanto"] = "Dagger",
 
-	["Greatsword"]   = "Greatsword",
-	["Dragon Slayer"]= "Greatsword",
+	["Greatsword"] = "Greatsword",
+	["Dragon Slayer"] = "Greatsword",
 	["Deathbringer"] = "Greatsword",
 
-	["Guandao"]      = "Guandao",
-	["Scythe"]       = "Scythe",
+	["Guandao"] = "Guandao",
+	["Scythe"] = "Scythe",
 }
 
 -- [[ 4b. HYBRID WEAPONS ]] --
@@ -136,7 +136,7 @@ SkillConfig.WeaponFamily = {
 -- granted by the reconciler when both parents cross a threshold.
 SkillConfig.HybridParents = {
 	["Guandao"] = { "Sword", "Dagger" },
-	["Scythe"]  = { "Greatsword", "Dagger" },
+	["Scythe"] = { "Greatsword", "Dagger" },
 }
 
 -- Thresholds a hybrid's parents must BOTH reach. Index = skill slot (1=Z,2=X,3=C).
@@ -152,7 +152,9 @@ end
 -- Returns nil for hybrids (they feed two; use HybridParents), and nil for
 -- anything unrecognised, so callers can bail rather than silently no-op.
 function SkillConfig.GetXPFamily(weaponName)
-	if SkillConfig.HybridParents[weaponName] then return nil end
+	if SkillConfig.HybridParents[weaponName] then
+		return nil
+	end
 	return SkillConfig.WeaponFamily[weaponName]
 end
 
@@ -168,7 +170,9 @@ function SkillConfig.GetSlotIndex(family, skillName)
 			local list = SkillConfig.WeaponSkills[weaponName]
 			if list then
 				for i, name in ipairs(list) do
-					if name == skillName then return i end
+					if name == skillName then
+						return i
+					end
 				end
 			end
 		end

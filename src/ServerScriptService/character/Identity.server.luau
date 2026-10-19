@@ -1,15 +1,15 @@
 -- [[ IDENTITY SERVER ]]
 -- Location: ServerScriptService (Script)
 
-local Players             = game:GetService("Players")
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataManager = require(ServerScriptService.modules.dataManager)
 local TitleManager = require(ServerScriptService.modules.TitleManager)
 
 local SOUL_COLORS = {
-	Color3.fromRGB(160, 40,  40),
+	Color3.fromRGB(160, 40, 40),
 	Color3.fromRGB(200, 180, 120),
 	Color3.fromRGB(220, 220, 230),
 	Color3.fromRGB(125, 147, 162),
@@ -55,13 +55,13 @@ end
 
 local function buildNameText(player)
 	local displayName = player.DisplayName
-	local title       = player:GetAttribute("Title") or ""
+	local title = player:GetAttribute("Title") or ""
 
 	--local specialTitle = SPECIAL_TITLES[player.UserId]
 	--if specialTitle then
 	--	return displayName .. ", " .. specialTitle
 	--end
-	
+
 	if title ~= "" then
 		return displayName .. ", " .. title
 	end
@@ -70,52 +70,60 @@ local function buildNameText(player)
 end
 
 local function refreshOverhead(player, character)
-	if not character or not character.Parent then return end
+	if not character or not character.Parent then
+		return
+	end
 
 	local head = character:FindFirstChild("Head")
 	if not head then
 		head = character:WaitForChild("Head", 10)
 	end
 	-- Character may have been removed/respawned while we waited.
-	if not head or not head.Parent or character.Parent == nil then return end
-	if player.Character ~= character then return end
+	if not head or not head.Parent or character.Parent == nil then
+		return
+	end
+	if player.Character ~= character then
+		return
+	end
 
 	local existing = head:FindFirstChild("ReplicantTag")
-	if existing then existing:Destroy() end
+	if existing then
+		existing:Destroy()
+	end
 
-	local color    = player:GetAttribute("SoulColor") or Color3.new(1, 1, 1)
-	local fontName = player:GetAttribute("SoulFont")  or "Fantasy"
-	local font     = Enum.Font[fontName] or Enum.Font.Fantasy
+	local color = player:GetAttribute("SoulColor") or Color3.new(1, 1, 1)
+	local fontName = player:GetAttribute("SoulFont") or "Fantasy"
+	local font = Enum.Font[fontName] or Enum.Font.Fantasy
 
 	local billboard = Instance.new("BillboardGui")
-	billboard.Name             = "ReplicantTag"
-	billboard.Size             = UDim2.new(0, 220, 0, 50)
-	billboard.StudsOffset      = Vector3.new(0, 3.5, 0)
-	billboard.AlwaysOnTop      = false
-	billboard.MaxDistance      = 100
+	billboard.Name = "ReplicantTag"
+	billboard.Size = UDim2.new(0, 220, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 3.5, 0)
+	billboard.AlwaysOnTop = false
+	billboard.MaxDistance = 100
 	billboard.PlayerToHideFrom = player
-	billboard.Parent           = head
+	billboard.Parent = head
 
 	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size                  = UDim2.new(1, 0, 1, 0)
+	nameLabel.Size = UDim2.new(1, 0, 1, 0)
 	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text                  = buildNameText(player)
-	nameLabel.TextColor3            = color
-	nameLabel.Font                  = font
-	nameLabel.TextSize              = 24
+	nameLabel.Text = buildNameText(player)
+	nameLabel.TextColor3 = color
+	nameLabel.Font = font
+	nameLabel.TextSize = 24
 	nameLabel.TextStrokeTransparency = 0.6
-	nameLabel.TextStrokeColor3      = Color3.new(0, 0, 0)
-	nameLabel.Parent                = billboard
+	nameLabel.TextStrokeColor3 = Color3.new(0, 0, 0)
+	nameLabel.Parent = billboard
 end
 
 -- ── PLAYER JOIN ───────────────────────────────────────────────────────────────
 
 Players.PlayerAdded:Connect(function(player)
 	local randomColor = SOUL_COLORS[math.random(1, #SOUL_COLORS)]
-	local randomFont  = SOUL_FONTS[math.random(1, #SOUL_FONTS)]
+	local randomFont = SOUL_FONTS[math.random(1, #SOUL_FONTS)]
 
 	player:SetAttribute("SoulColor", randomColor)
-	player:SetAttribute("SoulFont",  randomFont.Name)
+	player:SetAttribute("SoulFont", randomFont.Name)
 
 	-- Tracks the profile-load state so character handling can gate on it
 	-- without racing the CharacterAdded connection.
@@ -128,7 +136,9 @@ Players.PlayerAdded:Connect(function(player)
 		end
 		-- Only build the tag once the saved title is loaded, so it appears
 		-- complete the first time instead of popping in name-only.
-		if not profileReady then return end
+		if not profileReady then
+			return
+		end
 		refreshOverhead(player, character)
 		TitleManager.UpdateAura(player, player:GetAttribute("Title"))
 	end
@@ -140,7 +150,9 @@ Players.PlayerAdded:Connect(function(player)
 	player:GetAttributeChangedSignal("Title"):Connect(function()
 		TitleManager.UpdateAura(player, player:GetAttribute("Title"))
 		local char = player.Character
-		if char then refreshOverhead(player, char) end
+		if char then
+			refreshOverhead(player, char)
+		end
 		-- Tell all clients to update the leaderboard entry for this player
 		TitleUpdated:FireAllClients(player.UserId, player:GetAttribute("Title"))
 	end)
@@ -166,7 +178,9 @@ end)
 
 SetTitleRemote.OnServerEvent:Connect(function(player, title)
 	-- Allow clearing title with empty string
-	if title ~= "" and not DataManager.HasTitle(player, title) then return end
+	if title ~= "" and not DataManager.HasTitle(player, title) then
+		return
+	end
 	DataManager.SetCurrentTitle(player, title)
 	TitleManager.UpdateAura(player, title)
 end)
@@ -175,6 +189,6 @@ RequestTitlesRemote.OnServerInvoke = function(player)
 	DataManager.YieldUntilLoaded(player)
 	return {
 		Unlocked = DataManager.GetUnlockedTitles(player),
-		Current  = DataManager.GetCurrentTitle(player),
+		Current = DataManager.GetCurrentTitle(player),
 	}
 end

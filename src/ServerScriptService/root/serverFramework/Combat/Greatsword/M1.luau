@@ -10,7 +10,9 @@ local WeaponConfig = require(RP.modules.WeaponConfig)
 
 local function groundSlam(char)
 	local tool = char:FindFirstChild("Greatsword")
-	if not tool then return end
+	if not tool then
+		return
+	end
 	local gs = RP.assets.FX.groundSlam.Attachment:Clone()
 	gs.Parent = tool.Greatsword
 	gs.Position = tool.Greatsword.Top.Position

@@ -23,16 +23,16 @@ local CombatRemote = Remotes:WaitForChild("CombatTagUpdate")
 local currentZone = nil
 local currentAudio = nil
 local currentPlaylist = nil
-local isPlaying = true 
+local isPlaying = true
 local inMainMenu = true
-local inCombat = false 
+local inCombat = false
 
 -- The currently running volume tween, tracked so play/pause spam can cancel it before
 -- starting a new one. Two tweens on the same Volume property fight and desync state.
 local activeVolumeTween = nil
 
 local FADE_DURATION = 1.5
-local RAYCAST_INTERVAL = 0.5 
+local RAYCAST_INTERVAL = 0.5
 local timeSinceLastCast = 0
 
 -- GUI references. Resolved by BindGui(); kept as upvalues so this script works whether or
@@ -44,7 +44,7 @@ local SkipBtn = nil
 -- Raycast Parameters
 local zoneRayParams = RaycastParams.new()
 zoneRayParams.FilterType = Enum.RaycastFilterType.Include
-zoneRayParams.FilterDescendantsInstances = {LocationsFolder}
+zoneRayParams.FilterDescendantsInstances = { LocationsFolder }
 
 -- [[ ---------------- HELPERS ---------------- ]] --
 
@@ -57,7 +57,7 @@ end
 
 local function tweenVolume(audio, duration, target)
 	cancelVolumeTween()
-	activeVolumeTween = TweenService:Create(audio, TweenInfo.new(duration), {Volume = target})
+	activeVolumeTween = TweenService:Create(audio, TweenInfo.new(duration), { Volume = target })
 	activeVolumeTween:Play()
 	return activeVolumeTween
 end
@@ -70,15 +70,15 @@ end
 
 -- [[ ---------------- MUSIC LOGIC ---------------- ]] --
 
-local PlayRandomTrackFromFolder 
+local PlayRandomTrackFromFolder
 
 local function PlayTrack(newAudioObject)
-	if currentAudio == newAudioObject then 
+	if currentAudio == newAudioObject then
 		currentAudio.TimePosition = 0
-		if isPlaying and not currentAudio.IsPlaying then 
-			currentAudio:Play() 
+		if isPlaying and not currentAudio.IsPlaying then
+			currentAudio:Play()
 		end
-		return 
+		return
 	end
 
 	local oldAudio = currentAudio
@@ -120,7 +120,7 @@ local function PlayTrack(newAudioObject)
 	if oldAudio then
 		-- Old track gets its own fade-out (separate from the tracked tween, which now
 		-- belongs to the incoming track). Stop once silent.
-		local fadeOut = TweenService:Create(oldAudio, TweenInfo.new(FADE_DURATION), {Volume = 0})
+		local fadeOut = TweenService:Create(oldAudio, TweenInfo.new(FADE_DURATION), { Volume = 0 })
 		fadeOut:Play()
 		fadeOut.Completed:Once(function()
 			if oldAudio ~= currentAudio then
@@ -132,10 +132,14 @@ end
 
 PlayRandomTrackFromFolder = function(folder, isSkip)
 	-- If we are already playing this folder, and we aren't explicitly skipping, do nothing.
-	if folder == currentPlaylist and not isSkip then return end
+	if folder == currentPlaylist and not isSkip then
+		return
+	end
 
 	local tracks = folder:GetChildren()
-	if #tracks == 0 then return end
+	if #tracks == 0 then
+		return
+	end
 
 	currentPlaylist = folder
 
@@ -152,13 +156,19 @@ PlayRandomTrackFromFolder = function(folder, isSkip)
 end
 
 local function CheckZone()
-	if inMainMenu or inCombat then return end
+	if inMainMenu or inCombat then
+		return
+	end
 
 	local char = LocalPlayer.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	local head = char:FindFirstChild("Head")
-	if not head then return end
+	if not head then
+		return
+	end
 
 	local raycastResult = Workspace:Raycast(head.Position, Vector3.new(0, 500, 0), zoneRayParams)
 	local hitZoneName = raycastResult and raycastResult.Instance.Name or "Ambiance"
@@ -185,14 +195,20 @@ local skipDebounce = false
 
 local function BindGui()
 	local musicUi = PlayerGui:WaitForChild("MusicUI", 10)
-	if not musicUi then return end
+	if not musicUi then
+		return
+	end
 
 	ControlFrame = musicUi:WaitForChild("Frame", 10)
-	if not ControlFrame then return end
+	if not ControlFrame then
+		return
+	end
 
 	PlayPauseBtn = ControlFrame:WaitForChild("PlayPause", 10)
 	SkipBtn = ControlFrame:WaitForChild("Skip", 10)
-	if not PlayPauseBtn or not SkipBtn then return end
+	if not PlayPauseBtn or not SkipBtn then
+		return
+	end
 
 	if not inMainMenu then
 		ControlFrame.Visible = true
@@ -200,8 +216,12 @@ local function BindGui()
 	refreshButtonVisual()
 
 	PlayPauseBtn.MouseButton1Click:Connect(function()
-		if playPauseDebounce then return end
-		if not currentAudio then return end
+		if playPauseDebounce then
+			return
+		end
+		if not currentAudio then
+			return
+		end
 		playPauseDebounce = true
 
 		-- Capture this click's intended state up front so a later click can't invalidate
@@ -220,9 +240,11 @@ local function BindGui()
 			fadeOut.Completed:Once(function(state)
 				-- Only pause if the fade actually completed (not cancelled by a newer
 				-- click) and we're still meant to be paused on the same track.
-				if state == Enum.PlaybackState.Completed
+				if
+					state == Enum.PlaybackState.Completed
 					and not isPlaying
-					and currentAudio == audioAtClick then
+					and currentAudio == audioAtClick
+				then
 					currentAudio:Pause()
 				end
 			end)
@@ -244,10 +266,14 @@ end
 
 local function BindMainMenuButton()
 	local mainMenu = PlayerGui:WaitForChild("MainMenu", 10)
-	if not mainMenu then return end
+	if not mainMenu then
+		return
+	end
 
 	local playBtn = mainMenu:WaitForChild("MainFrame", 10)
-	if not playBtn then return end
+	if not playBtn then
+		return
+	end
 	playBtn = playBtn:WaitForChild("Buttons"):WaitForChild("Play"):WaitForChild("TextButton")
 
 	playBtn.MouseButton1Click:Connect(function()
@@ -255,7 +281,7 @@ local function BindMainMenuButton()
 		if ControlFrame then
 			ControlFrame.Visible = true
 		end
-		currentZone = nil 
+		currentZone = nil
 		CheckZone()
 	end)
 end
@@ -263,7 +289,9 @@ end
 -- [[ ---------------- EVENT CONNECTIONS ---------------- ]] --
 
 CombatRemote.OnClientEvent:Connect(function(isInCombat, duration)
-	if inCombat == isInCombat then return end
+	if inCombat == isInCombat then
+		return
+	end
 
 	inCombat = isInCombat
 

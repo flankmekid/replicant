@@ -2,12 +2,12 @@
 -- Location: ServerScriptService (Script)
 -- Listens for QuestItemReward remote and gives the appropriate item.
 
-local Players           = game:GetService("Players")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage     = game:GetService("ServerStorage")
+local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local DataManager     = require(ServerScriptService.modules.dataManager)
+local DataManager = require(ServerScriptService.modules.dataManager)
 local QuestItemReward = ReplicatedStorage.QuestSystem:WaitForChild("QuestItemReward")
 local InventoryManager = require(ServerScriptService.modules:WaitForChild("inventoryManager"))
 
@@ -19,22 +19,20 @@ local ITEM_HANDLERS = {
 		if DataManager.HasItem(player, "Void Spire") then
 			return
 		end
-		
 
 		local inv = InventoryManager.GetInventory(player)
 		if inv then
 			inv:AddItem("Void Spire", 1)
 		end
-		
+
 		print(player.Name .. " received the Void Spire.")
 	end,
-	
+
 	Lantern = function(player)
 		-- Check player doesn't already have one
 		if DataManager.HasItem(player, "Lantern") then
 			return
 		end
-
 
 		local inv = InventoryManager.GetInventory(player)
 		if inv then
@@ -47,7 +45,9 @@ local ITEM_HANDLERS = {
 
 ItemRewardManager.GiveReward = function(player, itemName)
 	local handler = ITEM_HANDLERS[itemName]
-	if handler then handler(player) end
+	if handler then
+		handler(player)
+	end
 end
 
 _G.ItemRewardManager = ItemRewardManager

@@ -11,9 +11,13 @@ local WeaponConfig = require(RP.modules.WeaponConfig)
 
 local function getEquippedTool(plr)
 	local c = plr.Character
-	if not c then return nil end
+	if not c then
+		return nil
+	end
 	local tool = c:FindFirstChildOfClass("Tool")
-	if tool and tool.Parent == c then return tool.Name end
+	if tool and tool.Parent == c then
+		return tool.Name
+	end
 	return nil
 end
 
@@ -22,9 +26,13 @@ end
 -- client-set attributes that never replicate up, so CombatCore reads this instead.
 function module.ServerCheck(plr, data)
 	local weapon = getEquippedTool(plr)
-	if not weapon then return end
+	if not weapon then
+		return
+	end
 	local cfg = WeaponConfig[weapon]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	CombatCore.RunM1(plr, cfg.server.m1, { subType = data and data.SubType })
 end
 

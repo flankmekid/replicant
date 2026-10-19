@@ -11,7 +11,9 @@ local damageCalculator = require(SSS.modules.damageCalculator)
 local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	damageCalculator.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
 	local mana = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("Mana")
-	if mana and mana.Value < 90 then mana.Value += 10 end
+	if mana and mana.Value < 90 then
+		mana.Value += 10
+	end
 end
 
 function module.ServerCheck(plr)

@@ -39,17 +39,17 @@ local Anims = {
 	Backward = loadAnim("BackRoll"),
 	Right = loadAnim("LeftRoll"),
 	Left = loadAnim("RightRoll"),
-	Cancel = loadAnim("CancelAnim")
+	Cancel = loadAnim("CancelAnim"),
 }
 
 --// Configuration (Tweak your dash settings here!)
 local DASH_CONFIG = {
-	Cooldown = 2.5,          -- per-charge cooldown for a SINGLE-charge build
-	MultiCooldown = 3.5,     -- per-charge cooldown when the player has 2 charges
-	                         -- (slightly longer: the "bit higher total cooldown" tradeoff)
-	Duration = 0.3,          -- How long the dash lasts in seconds
-	BaseSpeed = 60,          -- Standardized speed for all directions
-	HealthThreshold = 0.3,   -- Kicks in at 30% HP
+	Cooldown = 2.5, -- per-charge cooldown for a SINGLE-charge build
+	MultiCooldown = 3.5, -- per-charge cooldown when the player has 2 charges
+	-- (slightly longer: the "bit higher total cooldown" tradeoff)
+	Duration = 0.3, -- How long the dash lasts in seconds
+	BaseSpeed = 60, -- Standardized speed for all directions
+	HealthThreshold = 0.3, -- Kicks in at 30% HP
 	HealthMultiplier = 0.65, -- Speed drops to 75%
 }
 
@@ -66,16 +66,18 @@ local isDashing = false
 -- Slots are consumed lowest-ready-first so the labels stay stable.
 
 -- slots[i] = false when ready, or an os.clock() "returnAt" timestamp while on cooldown.
-local slots = nil             -- lazy-init to a table of `maxCharges` ready slots
-local lastDashDir = nil       -- direction (Enum.NormalId) of the previous dash while chaining;
-                              -- a consecutive dash may NOT reuse it. Cleared when ALL slots are ready.
+local slots = nil -- lazy-init to a table of `maxCharges` ready slots
+local lastDashDir = nil -- direction (Enum.NormalId) of the previous dash while chaining;
+-- a consecutive dash may NOT reuse it. Cleared when ALL slots are ready.
 
 local function getMaxCharges()
 	local stam = 0
 	local stats = Player:FindFirstChild("PlayerStats")
 	if stats then
 		local sf = stats:FindFirstChild("Stats")
-		if sf and sf:FindFirstChild("Stamina") then stam = sf.Stamina.Value end
+		if sf and sf:FindFirstChild("Stamina") then
+			stam = sf.Stamina.Value
+		end
 	end
 	return StatScaling.HasSecondDash(stam) and 2 or 1
 end
@@ -98,7 +100,9 @@ end
 -- True if every slot is currently ready (used to clear the no-repeat-direction rule).
 local function allSlotsReady()
 	for i = 1, #slots do
-		if slots[i] ~= false then return false end
+		if slots[i] ~= false then
+			return false
+		end
 	end
 	return true
 end
@@ -107,7 +111,9 @@ end
 local function firstReadySlot()
 	ensureSlots()
 	for i = 1, #slots do
-		if slots[i] == false then return i end
+		if slots[i] == false then
+			return i
+		end
 	end
 	return nil
 end
@@ -213,7 +219,9 @@ end
 local function SpawnAirEffects(emissionDir)
 	local eff = dashEffect2:Clone()
 	for _, effect in pairs(eff:GetChildren()) do
-		local targetParticle = effect:IsA("Attachment") and effect:FindFirstChildWhichIsA("ParticleEmitter") or effect
+		local targetParticle = effect:IsA("Attachment")
+				and effect:FindFirstChildWhichIsA("ParticleEmitter")
+			or effect
 
 		if targetParticle and targetParticle:IsA("ParticleEmitter") then
 			effect.Parent = Char:FindFirstChild("Torso") or Char:FindFirstChild("UpperTorso")
@@ -226,16 +234,24 @@ local function SpawnAirEffects(emissionDir)
 	local left = dashEff:Clone()
 	left.Parent = Char:FindFirstChild("Left Arm")
 	left.Position = Vector3.new(-0.5, -1, 0)
-	if left:FindFirstChild("Trail") then left.Trail.Attachment1 = left.Parent:FindFirstChild("LeftGripAttachment") end
+	if left:FindFirstChild("Trail") then
+		left.Trail.Attachment1 = left.Parent:FindFirstChild("LeftGripAttachment")
+	end
 
 	local right = dashEff:Clone()
 	right.Parent = Char:FindFirstChild("Right Arm")
 	right.Position = Vector3.new(0.5, -1, 0)
-	if right:FindFirstChild("Trail") then right.Trail.Attachment1 = right.Parent:FindFirstChild("RightGripAttachment") end
+	if right:FindFirstChild("Trail") then
+		right.Trail.Attachment1 = right.Parent:FindFirstChild("RightGripAttachment")
+	end
 
 	task.delay(0.5, function()
-		if left then left:Destroy() end
-		if right then right:Destroy() end
+		if left then
+			left:Destroy()
+		end
+		if right then
+			right:Destroy()
+		end
 	end)
 end
 
@@ -253,12 +269,20 @@ local bufferedAt = nil
 -- false if any gate rejected it. Has no knowledge of buffering -- it just answers
 -- "can I dash right this instant, and if so, do it."
 local function tryDash()
-	if not canDashNow() or isDashing then return false end
+	if not canDashNow() or isDashing then
+		return false
+	end
 
 	-- 1. Validate State
-	if HumRP.Anchored or Hum.Health <= 0 or Hum.MoveDirection.Magnitude <= 0 then return false end
-	if Char:GetAttribute("CantAnything") and not Char:GetAttribute("Carrying") then return false end
-	if Char:FindFirstChild("Disabled") then return false end
+	if HumRP.Anchored or Hum.Health <= 0 or Hum.MoveDirection.Magnitude <= 0 then
+		return false
+	end
+	if Char:GetAttribute("CantAnything") and not Char:GetAttribute("Carrying") then
+		return false
+	end
+	if Char:FindFirstChild("Disabled") then
+		return false
+	end
 
 	-- "DashLocked" is a short-lived server-set flag with two writers:
 	--   1. stateHandler.SetStun: set for a brief window AFTER a stun clears, so a
@@ -267,16 +291,30 @@ local function tryDash()
 	--   2. the Null Gaze slow (RacialSkills): held for the slow's duration, because a
 	--      dash uses a LinearVelocity that ignores WalkSpeed, so a WalkSpeed slow alone
 	--      does nothing to a dash. This is what actually stops a slowed target dashing.
-	local blockedStates = {"Blocking", "Stunned", "DashLocked", "Ragdolled", "M1", "M2", "Carried", "Downed", "Sliding"}
+	local blockedStates = {
+		"Blocking",
+		"Stunned",
+		"DashLocked",
+		"Ragdolled",
+		"M1",
+		"M2",
+		"Carried",
+		"Downed",
+		"Sliding",
+	}
 	for _, state in ipairs(blockedStates) do
-		if Char:GetAttribute(state) then return false end
+		if Char:GetAttribute(state) then
+			return false
+		end
 	end
 
 	-- Ragdoll guard: the "Ragdolled" attribute can lag behind (it replicates
 	-- server->client), but the humanoid being in the Physics state is local and
 	-- immediate. Block the dash on either, which closes the replication-gap window
 	-- where you could dash out of a ragdoll.
-	if Hum:GetState() == Enum.HumanoidStateType.Physics then return false end
+	if Hum:GetState() == Enum.HumanoidStateType.Physics then
+		return false
+	end
 
 	-- Get Animation & Direction Data (computed BEFORE consuming a charge so we
 	-- can reject a repeated direction without spending the dash).
@@ -293,7 +331,9 @@ local function tryDash()
 	-- Claim the lowest ready slot. (canDashNow already confirmed one exists, but
 	-- re-check to be safe against any state change between the guard and here.)
 	local slotIndex = firstReadySlot()
-	if not slotIndex then return false end
+	if not slotIndex then
+		return false
+	end
 
 	-- 2. Setup Dash
 	isDashing = true
@@ -303,7 +343,9 @@ local function tryDash()
 
 	-- Health Penalty Logic
 	local hpPercentage = Hum.Health / Hum.MaxHealth
-	local speedMultiplier = (hpPercentage <= DASH_CONFIG.HealthThreshold) and DASH_CONFIG.HealthMultiplier or 1
+	local speedMultiplier = (hpPercentage <= DASH_CONFIG.HealthThreshold)
+			and DASH_CONFIG.HealthMultiplier
+		or 1
 
 	-- 3. Execute Visuals & Audio
 	anim:Play()
@@ -328,7 +370,7 @@ local function tryDash()
 	alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
 	alignOrientation.Attachment0 = attachment
 	-- Lock the orientation to exactly how they are facing when the dash starts
-	alignOrientation.CFrame = HumRP.CFrame 
+	alignOrientation.CFrame = HumRP.CFrame
 	alignOrientation.RigidityEnabled = true
 	-- ======================================================== --
 
@@ -346,8 +388,12 @@ end
 
 --// Main Input Handling
 UserInputService.InputBegan:Connect(function(Input, IsTyping)
-	if IsTyping then return end
-	if Input.KeyCode ~= Enum.KeyCode.Q then return end
+	if IsTyping then
+		return
+	end
+	if Input.KeyCode ~= Enum.KeyCode.Q then
+		return
+	end
 
 	-- Fire immediately if possible; otherwise open a buffer window so the press
 	-- isn't wasted if the gates clear in the next half second.
@@ -359,7 +405,9 @@ end)
 -- Buffer retry: while a press is still within its window, keep attempting the dash.
 -- Consume the buffer the instant one succeeds, or drop it when the window expires.
 RunService.Heartbeat:Connect(function()
-	if not bufferedAt then return end
+	if not bufferedAt then
+		return
+	end
 	if os.clock() - bufferedAt > BUFFER_WINDOW then
 		bufferedAt = nil
 		return

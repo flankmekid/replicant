@@ -2,7 +2,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Ensure the Remote exists
-local AlertRemote = ReplicatedStorage:FindFirstChild("HealthAlertEvent") 
+local AlertRemote = ReplicatedStorage:FindFirstChild("HealthAlertEvent")
 if not AlertRemote then
 	AlertRemote = Instance.new("RemoteEvent")
 	AlertRemote.Name = "HealthAlertEvent"
@@ -12,141 +12,141 @@ end
 -- [[ RACE CONFIGURATION ]] --
 local RaceAlertConfig = {
 	-- [[ COMMON ]] --
-	["Human"] = { 
-		Threshold = 0.2, 
+	["Human"] = {
+		Threshold = 0.2,
 		Messages = {
 			"My resolve... is not yet broken.",
 			"Just a scratch... keep fighting!",
 			"I will not be another forgotten name.",
-			"Push through the pain!"
-		} 
+			"Push through the pain!",
+		},
 	},
-	["Elezen"] = { 
+	["Elezen"] = {
 		Threshold = 0.3,
 		Messages = {
 			"The pages are tearing...",
 			"My concentration wavers!",
 			"Return me to the earth...",
-			"Nature cannot protect me forever."
-		} 
+			"Nature cannot protect me forever.",
+		},
 	},
-	["Grob"] = { 
+	["Grob"] = {
 		Threshold = 0.35,
 		Messages = {
 			"No! My loot! Mine!",
 			"Too broken... run away! Hide!",
 			"Fix it! Someone fix me!",
-			"Not worth the shiny things... retreat!"
-		} 
+			"Not worth the shiny things... retreat!",
+		},
 	},
 
 	-- [[ UNCOMMON ]] --
-	["Verdis"] = { 
-		Threshold = 0.25, 
+	["Verdis"] = {
+		Threshold = 0.25,
 		Messages = {
 			"My roots are bleeding...",
 			"The experiment... is failing.",
 			"I must regrow... retreat...",
-			"The forest mourns my weakness."
-		} 
+			"The forest mourns my weakness.",
+		},
 	},
-	["Arach"] = { 
-		Threshold = 0.2, 
+	["Arach"] = {
+		Threshold = 0.2,
 		Messages = {
 			"The web snaps...",
 			"My venom runs dry.",
 			"Scuttle away... into the shadows...",
-			"Too many eyes... all closing..."
-		} 
+			"Too many eyes... all closing...",
+		},
 	},
 
 	-- [[ RARE ]] --
-	["Cruor"] = { 
-		Threshold = 0.15, 
+	["Cruor"] = {
+		Threshold = 0.15,
 		Messages = {
 			"Need... more... meat...",
 			"The stitches are coming loose.",
 			"This vessel is failing.",
-			"Blood... I need blood..."
-		} 
+			"Blood... I need blood...",
+		},
 	},
-	["Karu"] = { 
+	["Karu"] = {
 		Threshold = 0.15, -- Very sturdy, so warning feels significant
 		Messages = {
 			"Even the mountain crumbles...",
 			"Cracks in the foundation...",
 			"I can still stand... I must stand.",
-			"My horns remain unbroken!"
-		} 
+			"My horns remain unbroken!",
+		},
 	},
-	["Meskar"] = { 
+	["Meskar"] = {
 		Threshold = 0.3, -- Very fragile
 		Messages = {
 			"Bones shatter so easily...",
 			"This form is too weak...",
 			"The ritual is interrupted.",
-			"I fade... like dust."
-		} 
+			"I fade... like dust.",
+		},
 	},
 
 	-- [[ EPIC ]] --
-	["Marasi"] = { 
-		Threshold = 0.2, 
+	["Marasi"] = {
+		Threshold = 0.2,
 		Messages = {
 			"Blood in the water... my blood...",
 			"The tide turns against me.",
 			"Keep swimming... or sink.",
-			"I smell my own fear."
-		} 
+			"I smell my own fear.",
+		},
 	},
-	["Seer"] = { 
-		Threshold = 0.25, 
+	["Seer"] = {
+		Threshold = 0.25,
 		Messages = {
 			"The vision blurs...",
 			"I did not foresee this pain.",
 			"The Eye closes...",
-			"My future... is dark."
-		} 
+			"My future... is dark.",
+		},
 	},
 
 	-- [[ LEGENDARY ]] --
-	["Maw"] = { 
+	["Maw"] = {
 		Threshold = 0.2, -- Berserker
 		Messages = {
 			"THE VOID LEAKS OUT.",
 			"CONSUME... OR FADE AWAY.",
 			"EMPTY... SO EMPTY...",
-			"THE HUNGER... IT HURTS..."
-		} 
+			"THE HUNGER... IT HURTS...",
+		},
 	},
-	["Ancestor"] = { 
-		Threshold = 0.2, 
+	["Ancestor"] = {
+		Threshold = 0.2,
 		Messages = {
 			"Does my lineage end here?",
 			"The halo dims...",
 			"Forgive my weakness...",
-			"Grace has left me."
-		} 
+			"Grace has left me.",
+		},
 	},
-	["Aegir"] = { 
-		Threshold = 0.25, 
+	["Aegir"] = {
+		Threshold = 0.25,
 		Messages = {
 			"My scales are cracking.",
 			"Drowning... on dry land...",
 			"The depths call me back.",
-			"My glory fades..."
-		} 
+			"My glory fades...",
+		},
 	},
 
 	-- [[ FALLBACK ]] --
-	["Default"] = { 
-		Threshold = 0.2, 
+	["Default"] = {
+		Threshold = 0.2,
 		Messages = {
 			"CRITICAL CONDITION.",
 			"SYSTEM FAILURE IMMINENT.",
-			"VITAL SIGNS FAILING."
-		} 
-	}
+			"VITAL SIGNS FAILING.",
+		},
+	},
 }
 
 -- Track state so we don't spam the remote
@@ -154,7 +154,9 @@ local panicState = {} -- [Player] = boolean
 
 local function MonitorCharacter(player, character)
 	local humanoid = character:WaitForChild("Humanoid", 10)
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	local stats = player:WaitForChild("PlayerStats", 10)
 
@@ -182,7 +184,9 @@ local function MonitorCharacter(player, character)
 
 	local function evaluate()
 		local maxHealth = humanoid.MaxHealth
-		if maxHealth <= 0 then return end
+		if maxHealth <= 0 then
+			return
+		end
 
 		local health = humanoid.Health
 		local percentage = health / maxHealth
@@ -196,7 +200,6 @@ local function MonitorCharacter(player, character)
 				-- Send "Start" and the list of messages for the client to use
 				AlertRemote:FireClient(player, "Start", config.Messages)
 			end
-
 		elseif percentage > config.Threshold then
 			-- Exit Panic Mode
 			if panicState[player] then
@@ -207,11 +210,15 @@ local function MonitorCharacter(player, character)
 	end
 
 	local function scheduleEvaluate()
-		if pending then return end
+		if pending then
+			return
+		end
 		pending = true
 		task.defer(function()
 			pending = false
-			if not character.Parent or not humanoid.Parent then return end
+			if not character.Parent or not humanoid.Parent then
+				return
+			end
 			evaluate()
 		end)
 	end

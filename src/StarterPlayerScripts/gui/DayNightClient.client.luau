@@ -21,50 +21,50 @@ local KEYFRAMES = {
 	{ -- midnight (cool, void-blue, still bright)
 		hour = 0,
 		outdoorAmbient = Color3.fromRGB(58, 64, 92),
-		ambient        = Color3.fromRGB(78, 82, 110),
-		ccTint         = Color3.fromRGB(176, 196, 255),
-		ccBrightness   = 0.02,
-		ccContrast     = 0.18,
-		atmosColor     = Color3.fromRGB(96, 110, 150),
-		atmosDensity   = 0.42,
-		atmosHaze      = 1.1,
-		fogColor       = Color3.fromRGB(96, 110, 150),
+		ambient = Color3.fromRGB(78, 82, 110),
+		ccTint = Color3.fromRGB(176, 196, 255),
+		ccBrightness = 0.02,
+		ccContrast = 0.18,
+		atmosColor = Color3.fromRGB(96, 110, 150),
+		atmosDensity = 0.42,
+		atmosHaze = 1.1,
+		fogColor = Color3.fromRGB(96, 110, 150),
 	},
 	{ -- dawn (warm transition)
 		hour = 6,
 		outdoorAmbient = Color3.fromRGB(120, 114, 100),
-		ambient        = Color3.fromRGB(132, 124, 110),
-		ccTint         = Color3.fromRGB(255, 224, 196),
-		ccBrightness   = 0.04,
-		ccContrast     = 0.20,
-		atmosColor     = Color3.fromRGB(168, 140, 130),
-		atmosDensity   = 0.40,
-		atmosHaze      = 0.95,
-		fogColor       = Color3.fromRGB(180, 165, 158),
+		ambient = Color3.fromRGB(132, 124, 110),
+		ccTint = Color3.fromRGB(255, 224, 196),
+		ccBrightness = 0.04,
+		ccContrast = 0.20,
+		atmosColor = Color3.fromRGB(168, 140, 130),
+		atmosDensity = 0.40,
+		atmosHaze = 0.95,
+		fogColor = Color3.fromRGB(180, 165, 158),
 	},
 	{ -- noon (exact current tuned look)
 		hour = 12,
 		outdoorAmbient = Color3.fromRGB(72, 71, 63),
-		ambient        = Color3.fromRGB(118, 117, 107),
-		ccTint         = Color3.fromRGB(255, 245, 228),
-		ccBrightness   = 0.05,
-		ccContrast     = 0.20,
-		atmosColor     = Color3.fromRGB(149, 126, 126),
-		atmosDensity   = 0.393,
-		atmosHaze      = 0.80,
-		fogColor       = Color3.fromRGB(192, 192, 192),
+		ambient = Color3.fromRGB(118, 117, 107),
+		ccTint = Color3.fromRGB(255, 245, 228),
+		ccBrightness = 0.05,
+		ccContrast = 0.20,
+		atmosColor = Color3.fromRGB(149, 126, 126),
+		atmosDensity = 0.393,
+		atmosHaze = 0.80,
+		fogColor = Color3.fromRGB(192, 192, 192),
 	},
 	{ -- dusk (warm transition, mirror of dawn)
 		hour = 18,
 		outdoorAmbient = Color3.fromRGB(72, 71, 63),
-		ambient        = Color3.fromRGB(126, 116, 104),
-		ccTint         = Color3.fromRGB(255, 214, 184),
-		ccBrightness   = 0.04,
-		ccContrast     = 0.20,
-		atmosColor     = Color3.fromRGB(170, 132, 124),
-		atmosDensity   = 0.41,
-		atmosHaze      = 0.95,
-		fogColor       = Color3.fromRGB(182, 158, 150),
+		ambient = Color3.fromRGB(126, 116, 104),
+		ccTint = Color3.fromRGB(255, 214, 184),
+		ccBrightness = 0.04,
+		ccContrast = 0.20,
+		atmosColor = Color3.fromRGB(170, 132, 124),
+		atmosDensity = 0.41,
+		atmosHaze = 0.95,
+		fogColor = Color3.fromRGB(182, 158, 150),
 	},
 }
 -- keyframes loop: hour 24 wraps back to the hour-0 frame.
@@ -85,9 +85,13 @@ local function bracket(hour: number)
 		local b = KEYFRAMES[(i % n) + 1]
 		local aH = a.hour
 		local bH = b.hour
-		if bH <= aH then bH = bH + 24 end -- wrap (e.g. 18 -> 24/0)
+		if bH <= aH then
+			bH = bH + 24
+		end -- wrap (e.g. 18 -> 24/0)
 		local h = hour
-		if h < aH then h = h + 24 end
+		if h < aH then
+			h = h + 24
+		end
 		if h >= aH and h <= bH then
 			local span = bH - aH
 			local t = span > 0 and (h - aH) / span or 0
@@ -112,7 +116,7 @@ RunService.RenderStepped:Connect(function()
 		if phaseIndex == 1 and FULL_MOON_BRIGHTNESS_BONUS > 0 then
 			local nightness = math.clamp(1 - math.abs(((hour + 12) % 24) - 12) / 12, 0, 1)
 			-- nightness peaks at midnight, 0 at noon
-			local darkness = 1 - math.clamp(math.abs(((hour) % 24) - 12) / 12, 0, 1)
+			local darkness = 1 - math.clamp(math.abs((hour % 24) - 12) / 12, 0, 1)
 			brightness = brightness + FULL_MOON_BRIGHTNESS_BONUS * darkness
 		end
 		cc.Brightness = brightness

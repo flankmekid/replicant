@@ -12,7 +12,9 @@ local StatScaling = require(script.Parent.StatScaling)
 local RunService = game:GetService("RunService")
 local _SpeedService
 local function getSpeedService()
-	if not RunService:IsServer() then return nil end
+	if not RunService:IsServer() then
+		return nil
+	end
 	if _SpeedService == nil then
 		_SpeedService = require(game:GetService("ServerScriptService").modules.SpeedService)
 	end
@@ -28,15 +30,23 @@ end
 -- only if it is not already dead.
 local function cancelTimer(char, key)
 	local bucket = activeTimers[char]
-	if not bucket then return end
+	if not bucket then
+		return
+	end
 
 	local thread = bucket[key]
-	if not thread then return end
+	if not thread then
+		return
+	end
 
 	bucket[key] = nil
 
-	if thread == coroutine.running() then return end
-	if coroutine.status(thread) == "dead" then return end
+	if thread == coroutine.running() then
+		return
+	end
+	if coroutine.status(thread) == "dead" then
+		return
+	end
 
 	pcall(task.cancel, thread)
 end
@@ -51,7 +61,9 @@ end
 -- GetAttribute() still saw Downed/CantAnything. That desync is what let downed
 -- players act. The table is now kept alive; only individual keys are cleared.
 local function clearKey(char, key)
-	if not char then return end
+	if not char then
+		return
+	end
 
 	cancelTimer(char, key)
 
@@ -69,11 +81,21 @@ end
 -- Canonical "is this character allowed to act" check. Read this instead of
 -- hand-rolling attribute checks per call site.
 function module.CanAct(char)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	local t = states[char]
-	if not t then return true end
-	if t["Stunned"] or t["Downed"] or t["CantAnything"]
-		or t["Ragdolled"] or t["Carried"] or t["BeingExecuted"] then
+	if not t then
+		return true
+	end
+	if
+		t["Stunned"]
+		or t["Downed"]
+		or t["CantAnything"]
+		or t["Ragdolled"]
+		or t["Carried"]
+		or t["BeingExecuted"]
+	then
 		return false
 	end
 	return true
@@ -88,7 +110,9 @@ end
 -- SetAttribute DOES replicate, so attributes are the only cross-boundary read.
 -- Client code must use these, not GetState.
 function module.GetStateAttr(char, stateKey: string)
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	return char:GetAttribute(stateKey)
 end
 
@@ -97,7 +121,12 @@ end
 -- writes HRP.CFrame every frame (lock-on) must stand down while this is true.
 -- Reads attributes, so it is correct on both server and client.
 local ROOT_OWNED_STATES = {
-	"Downed", "Ragdolled", "Carried", "Carrying", "BeingExecuted", "Executing",
+	"Downed",
+	"Ragdolled",
+	"Carried",
+	"Carrying",
+	"BeingExecuted",
+	"Executing",
 }
 
 -- ignoreRagdoll = true asks the weaker question: "is something OTHER than a plain
@@ -105,10 +134,16 @@ local ROOT_OWNED_STATES = {
 -- CFrame through one), but it is not a reason to DROP a lock-on. LockOn passes true
 -- when it asks "may I keep this lock" and nothing when it asks "may I drive the root".
 function module.IsRootOwned(char, ignoreRagdoll)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	for _, key in ipairs(ROOT_OWNED_STATES) do
-		if ignoreRagdoll and key == "Ragdolled" then continue end
-		if char:GetAttribute(key) then return true end
+		if ignoreRagdoll and key == "Ragdolled" then
+			continue
+		end
+		if char:GetAttribute(key) then
+			return true
+		end
 	end
 	-- A Messatsu grab welds two HumanoidRootParts together (the WeldConstraint is
 	-- parented to the ATTACKER's character, Part0 = attacker HRP, Part1 = victim
@@ -117,7 +152,9 @@ function module.IsRootOwned(char, ignoreRagdoll)
 	-- Scan our own character for a weld we own, and check whether anything is
 	-- welded TO our root from the other side.
 	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return false end
+	if not root then
+		return false
+	end
 
 	-- carry constraints live directly on the victim's root
 	if root:FindFirstChild("CarryPos") or root:FindFirstChild("CarryOri") then
@@ -147,12 +184,22 @@ end
 
 -- Is this character a legal lock-on target? Attribute-based; safe on the client.
 function module.IsValidTarget(char)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	local hum = char:FindFirstChild("Humanoid")
-	if not hum or hum.Health <= 0 then return false end
-	if char:GetAttribute("Downed") then return false end
-	if char:GetAttribute("Carried") then return false end
-	if char:GetAttribute("BeingExecuted") then return false end
+	if not hum or hum.Health <= 0 then
+		return false
+	end
+	if char:GetAttribute("Downed") then
+		return false
+	end
+	if char:GetAttribute("Carried") then
+		return false
+	end
+	if char:GetAttribute("BeingExecuted") then
+		return false
+	end
 	return true
 end
 
@@ -168,10 +215,16 @@ end
 -- every weapon checks the same interrupt condition and it can be expanded
 -- in one place. Currently: Stunned (covers hits, parries, guard-break) or Downed.
 function module.IsInterrupted(char)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	if states[char] then
-		if states[char]["Stunned"] then return true end
-		if states[char]["Downed"] then return true end
+		if states[char]["Stunned"] then
+			return true
+		end
+		if states[char]["Downed"] then
+			return true
+		end
 	end
 	return false
 end
@@ -184,7 +237,9 @@ end
 -- Use this to cancel in-flight dash movers / animations the moment a hit lands,
 -- rather than waiting for the windup to finish.
 function module.WatchInterrupt(char, window, onInterrupt)
-	if not char or type(onInterrupt) ~= "function" then return function() end end
+	if not char or type(onInterrupt) ~= "function" then
+		return function() end
+	end
 
 	local fired = false
 	local conns = {}
@@ -192,7 +247,9 @@ function module.WatchInterrupt(char, window, onInterrupt)
 
 	local function disconnectAll()
 		for _, c in ipairs(conns) do
-			if c.Connected then c:Disconnect() end
+			if c.Connected then
+				c:Disconnect()
+			end
 		end
 		table.clear(conns)
 
@@ -206,7 +263,9 @@ function module.WatchInterrupt(char, window, onInterrupt)
 	end
 
 	local function trigger()
-		if fired then return end
+		if fired then
+			return
+		end
 		fired = true
 		disconnectAll()
 		local ok, err = pcall(onInterrupt)
@@ -222,12 +281,22 @@ function module.WatchInterrupt(char, window, onInterrupt)
 		return disconnectAll
 	end
 
-	table.insert(conns, char:GetAttributeChangedSignal("Stunned"):Connect(function()
-		if char:GetAttribute("Stunned") then trigger() end
-	end))
-	table.insert(conns, char:GetAttributeChangedSignal("Downed"):Connect(function()
-		if char:GetAttribute("Downed") then trigger() end
-	end))
+	table.insert(
+		conns,
+		char:GetAttributeChangedSignal("Stunned"):Connect(function()
+			if char:GetAttribute("Stunned") then
+				trigger()
+			end
+		end)
+	)
+	table.insert(
+		conns,
+		char:GetAttributeChangedSignal("Downed"):Connect(function()
+			if char:GetAttribute("Downed") then
+				trigger()
+			end
+		end)
+	)
 
 	if window and type(window) == "number" and window > 0 then
 		timeoutTask = task.delay(window, disconnectAll)
@@ -238,8 +307,12 @@ function module.WatchInterrupt(char, window, onInterrupt)
 end
 
 function module.SetState(char, stateKey: string, value, duration: number)
-	if not states[char] then states[char] = {} end
-	if not activeTimers[char] then activeTimers[char] = {} end
+	if not states[char] then
+		states[char] = {}
+	end
+	if not activeTimers[char] then
+		activeTimers[char] = {}
+	end
 
 	cancelTimer(char, stateKey)
 
@@ -256,10 +329,16 @@ function module.SetState(char, stateKey: string, value, duration: number)
 end
 
 function module.SetStun(char, value: boolean, duration: number, stunSpeed: number)
-	if not char or not char:FindFirstChild("Humanoid") then return end
+	if not char or not char:FindFirstChild("Humanoid") then
+		return
+	end
 	local humanoid = char.Humanoid
-	if not states[char] then states[char] = {} end
-	if not activeTimers[char] then activeTimers[char] = {} end
+	if not states[char] then
+		states[char] = {}
+	end
+	if not activeTimers[char] then
+		activeTimers[char] = {}
+	end
 
 	if value then -- STUNNING
 		-- HYPERARMOR: an armored attacker/caster absorbs the hit without losing their
@@ -299,14 +378,18 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 		-- Start the new timer
 		if duration and type(duration) == "number" and duration > 0 then
 			activeTimers[char]["Stunned"] = task.delay(duration, function()
-				if not states[char] then return end
+				if not states[char] then
+					return
+				end
 
 				-- Restore speed. Pop the stun modifier and let SpeedService recompute:
 				-- a Downed character keeps their PIN, a still-blocking one settles to block,
 				-- otherwise full base. The Downed guard on the jump-restore is kept so a
 				-- downed player's jump stays disabled (the downed system re-enables it).
 				local SpeedService = getSpeedService()
-				if SpeedService then SpeedService.Pop(char, "Stun") end
+				if SpeedService then
+					SpeedService.Pop(char, "Stun")
+				end
 				if char:FindFirstChild("Humanoid") and not states[char]["Downed"] then
 					char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 				end
@@ -322,12 +405,13 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 				if not states[char]["Downed"] then
 					char:SetAttribute("DashLocked", true)
 					task.delay(0.15, function()
-						if char and char.Parent then char:SetAttribute("DashLocked", nil) end
+						if char and char.Parent then
+							char:SetAttribute("DashLocked", nil)
+						end
 					end)
 				end
 			end)
 		end
-
 	else -- UN-STUNNING (Clearing Stun manually)
 		-- Cancel any pending timer
 		cancelTimer(char, "Stunned")
@@ -335,7 +419,9 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 		if states[char] then
 			-- Restore speed via SpeedService pop (see the timer path above for why).
 			local SpeedService = getSpeedService()
-			if SpeedService then SpeedService.Pop(char, "Stun") end
+			if SpeedService then
+				SpeedService.Pop(char, "Stun")
+			end
 			if char:FindFirstChild("Humanoid") and not states[char]["Downed"] then
 				char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 			end
@@ -346,7 +432,9 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 end
 
 function module.RemoveStates(char, stateKey: string)
-	if not states[char] then return end
+	if not states[char] then
+		return
+	end
 
 	if stateKey then
 		-- SPECIAL CASE: Stunned goes through SetStun so walkspeed is restored.

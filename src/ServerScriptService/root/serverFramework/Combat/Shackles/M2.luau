@@ -18,9 +18,10 @@ local danger = RP.assets.FX.danger
 local TweenService = game:GetService("TweenService")
 
 local hitboxParams = {
-	SizeOrPart = Vector3.new(6,7,6),
-	SpatialOption = ("InBox"),
-	Debug = false, DebounceTime = 0.5,
+	SizeOrPart = Vector3.new(6, 7, 6),
+	SpatialOption = "InBox",
+	Debug = false,
+	DebounceTime = 0.5,
 } :: HitboxTypes.HitboxParams
 
 local DataManager = require(game.ServerScriptService.modules.dataManager)
@@ -45,7 +46,7 @@ local function rightSwing(char)
 			v:Emit(v:GetAttribute("EmitCount"))
 		end
 	end
-	game.Debris:AddItem(attachment,2)
+	game.Debris:AddItem(attachment, 2)
 end
 
 local function leftSwing(char)
@@ -64,10 +65,11 @@ local playerM2Debounces = {} -- PER-PLAYER DEBOUNCE FIX (Critical)
 local aerial = false
 
 function module.ServerCheck(plr)
-	
 	local function getEquippedTool()
 		local currentCharacter = plr.Character
-		if not currentCharacter then return nil end
+		if not currentCharacter then
+			return nil
+		end
 
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
@@ -77,9 +79,11 @@ function module.ServerCheck(plr)
 		end
 		return nil
 	end
-	
+
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 	local decision
 	local isBusy = false
 
@@ -89,27 +93,27 @@ function module.ServerCheck(plr)
 			Type = "Combat",
 			Action = "M2",
 			Func = "ServerResponse",
-			FolderName = getEquippedTool()
+			FolderName = getEquippedTool(),
 		}, plr, decision)
 		return
 	end
-	
-	if (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall) then
+
+	if char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
 		aerial = true
 	end
-	
-	if aerial then 
+
+	if aerial then
 		local effect1 = game.ReplicatedStorage.assets.FX.fists.partic:Clone()
 		local effect2 = game.ReplicatedStorage.assets.FX.fists.paricle:Clone()
 		effect1.Parent = char:WaitForChild("Right Leg")
 		effect2.Parent = char:WaitForChild("Right Leg")
 		effect1.Enabled = true
 		effect2.Enabled = true
-		task.delay(AERIAL_WINDUP, function ()
+		task.delay(AERIAL_WINDUP, function()
 			game:GetService("Debris"):AddItem(effect1, 0.2)
 			game:GetService("Debris"):AddItem(effect2, 0.2)
 		end)
-		dmg /= 2 
+		dmg /= 2
 	else
 		local effect1 = game.ReplicatedStorage.assets.FX.fists.partic:Clone()
 		local effect2 = game.ReplicatedStorage.assets.FX.fists.paricle:Clone()
@@ -117,14 +121,14 @@ function module.ServerCheck(plr)
 		effect2.Parent = char:WaitForChild("Right Arm")
 		effect1.Enabled = true
 		effect2.Enabled = true
-		task.delay(WINDUP_DELAY, function ()
+		task.delay(WINDUP_DELAY, function()
 			game:GetService("Debris"):AddItem(effect1, 0.2)
 			game:GetService("Debris"):AddItem(effect2, 0.2)
 		end)
 	end
-	
+
 	local function dashEff()
-		for _,v in pairs(plr.Character:GetChildren()) do
+		for _, v in pairs(plr.Character:GetChildren()) do
 			if v:IsA("BasePart") then
 				if v.Transparency ~= 1 then
 					local part = Instance.new("Part")
@@ -157,11 +161,11 @@ function module.ServerCheck(plr)
 	-- whether the swing landed, exactly like the standard M2 in CombatCore. Shackles
 	-- is a standalone M2 that never routes through CombatCore, so the same fix has to
 	-- be duplicated here by hand.
-	local M2_ENDLAG_HIT   = 0.1
-	local M2_ENDLAG_WHIFF = 0.65  -- +0.2, matches CombatCore's standard M2 whiff recovery
+	local M2_ENDLAG_HIT = 0.1
+	local M2_ENDLAG_WHIFF = 0.65 -- +0.2, matches CombatCore's standard M2 whiff recovery
 	local didHit = false
 
-	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5) 
+	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5)
 	playerM2Debounces[plr] = true -- Start the per-player debounce
 
 	-- HYPERARMOR: Shackles M2 is a guardbreak, so it is armored. Set the attribute
@@ -172,7 +176,9 @@ function module.ServerCheck(plr)
 	if hyperArmored then
 		char:SetAttribute("HyperArmor", true)
 		task.delay(WINDUP_DELAY + HITBOX_DURATION + 0.3, function()
-			if char then char:SetAttribute("HyperArmor", nil) end
+			if char then
+				char:SetAttribute("HyperArmor", nil)
+			end
 		end)
 	end
 
@@ -180,7 +186,9 @@ function module.ServerCheck(plr)
 	-- (sweep self-applied BodyVelocity on our HRP) and stop the swing animation.
 	-- Armored swings skip this so the interrupt can't cancel them.
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
-		if hyperArmored then return end
+		if hyperArmored then
+			return
+		end
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			for _, mover in ipairs(hrp:GetChildren()) do
@@ -191,10 +199,11 @@ function module.ServerCheck(plr)
 		end
 		AnimationHandler.StopAnim(char, "ALL")
 	end)
-	
+
 	-- FX handling
-local NewShield2 = danger:Clone()
-	game.Debris:AddItem(NewShield2, 1)	local WeldCon = Instance.new("WeldConstraint", NewShield2)
+	local NewShield2 = danger:Clone()
+	game.Debris:AddItem(NewShield2, 1)
+	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = char
 	v[plr] = NewShield2
 	local parrysfx = Instance.new("Sound")
@@ -204,11 +213,15 @@ local NewShield2 = danger:Clone()
 	parrysfx.RollOffMaxDistance = 60
 	parrysfx.RollOffMinDistance = 10
 	parrysfx.RollOffMode = Enum.RollOffMode.Inverse
-	NewShield2.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = char.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
+	TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
 	parrysfx:Play()
 	if not aerial then
 		task.delay(0.75, function()
@@ -230,7 +243,7 @@ local NewShield2 = danger:Clone()
 	Helper.SetSpeed(char, 4, 16)
 
 	-- Windup logic and speed reset
-	
+
 	task.delay(1, function()
 		parrysfx:Destroy()
 		if v[plr] then
@@ -238,7 +251,7 @@ local NewShield2 = danger:Clone()
 			v[plr] = nil
 		end
 	end)
-	
+
 	if aerial then
 		task.delay(AERIAL_WINDUP, function()
 			Helper.ResetSpeed(char)
@@ -247,8 +260,8 @@ local NewShield2 = danger:Clone()
 			ReplicateRemote:FireAllClients({
 				Type = "Combat",
 				Action = "M2", -- FIXED
-				Func = "PunchSound", 
-				FolderName = getEquippedTool()
+				Func = "PunchSound",
+				FolderName = getEquippedTool(),
 			}, char)
 		end)
 		task.wait(AERIAL_WINDUP)
@@ -262,32 +275,35 @@ local NewShield2 = danger:Clone()
 			ReplicateRemote:FireAllClients({
 				Type = "Combat",
 				Action = "M2", -- FIXED
-				Func = "PunchSound", 
-				FolderName = getEquippedTool()
+				Func = "PunchSound",
+				FolderName = getEquippedTool(),
 			}, char)
 		end)
 		task.wait(WINDUP_DELAY) -- Wait for the windup to complete
 
-	-- INTERRUPT CHECK: stunned/downed during windup -> abort before the hitbox.
-	-- Armored (guardbreak) swings ignore this: they commit through a hit.
-	if not hyperArmored and StateHandler.IsInterrupted(char) then
-		stopWatch()
-		playerM2Debounces[plr] = nil
-		Helper.ResetSpeed(char)
-		if v[plr] then v[plr]:Destroy() v[plr] = nil end
-		AnimationHandler.StopAnim(char, "ALL")
-		return
-	end
+		-- INTERRUPT CHECK: stunned/downed during windup -> abort before the hitbox.
+		-- Armored (guardbreak) swings ignore this: they commit through a hit.
+		if not hyperArmored and StateHandler.IsInterrupted(char) then
+			stopWatch()
+			playerM2Debounces[plr] = nil
+			Helper.ResetSpeed(char)
+			if v[plr] then
+				v[plr]:Destroy()
+				v[plr] = nil
+			end
+			AnimationHandler.StopAnim(char, "ALL")
+			return
+		end
 
-	-- swing committed: stop watching so a later unrelated stun can't fire the watcher
-	stopWatch()
+		-- swing committed: stop watching so a later unrelated stun can't fire the watcher
+		stopWatch()
 		leftSwing(char)
 	end
 
 	local humrp = char.HumanoidRootPart
 	local Hitbox, connected = HitboxClass.new(hitboxParams)
 
-	Hitbox:WeldTo(humrp, CFrame.new(1,-1,-3))
+	Hitbox:WeldTo(humrp, CFrame.new(1, -1, -3))
 	Hitbox:Start()
 
 	-- Set M2 state for the duration of the active hitbox
@@ -299,25 +315,36 @@ local NewShield2 = danger:Clone()
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(char, "Stunned") then continue end
+				if StateHandler.GetState(char, "Stunned") then
+					continue
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					print("iframed lawl :p")
-					
+
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
 
@@ -332,7 +359,12 @@ local NewShield2 = danger:Clone()
 
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -351,26 +383,36 @@ local NewShield2 = danger:Clone()
 					Helper.ApplyKnockback(targetChar, direction, knockbackDistance, 0.2)
 					ragdollManager.Ragdoll(targetChar, 1)
 					StateHandler.SetStun(targetChar, true, 1, 0)
-					
+
 					local mana = plr:FindFirstChild("PlayerStats"):FindFirstChild("Mana")
-					if mana.Value < 80 then mana.Value += 20 end
-					
+					if mana.Value < 80 then
+						mana.Value += 20
+					end
+
 					local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 					dmgModule.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
 					didHit = true -- landed: earns the shorter endlag below
-					
+
 					--targetChar:FindFirstChild("Humanoid"):TakeDamage(dmg + extraDmg)
-					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then DataManager.AddWeaponXP(game.Players:GetPlayerFromCharacter(char), "Fists", (dmg + extraDmg) / 2) end
-					
+					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then
+						DataManager.AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(char),
+							"Fists",
+							(dmg + extraDmg) / 2
+						)
+					end
+
 					local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 					highlight.Parent = humanoid.Parent
 					game.Debris:AddItem(highlight, 0.1)
-					
-					local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+
+					local hitEff =
+						game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+							:Clone()
 					hitEff.Parent = targetChar:FindFirstChild("Torso")
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
+						for _, v in pairs(hitEff:GetChildren()) do
 							if v:IsA("ParticleEmitter") then
 								v.Enabled = false
 							end
@@ -382,13 +424,23 @@ local NewShield2 = danger:Clone()
 
 				if StateHandler.GetState(targetChar, "Parrying") then
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = "M2", Func = "Parry", FolderName = getEquippedTool() -- FIXED Action to M2
+						Type = "Combat",
+						Action = "M2",
+						Func = "Parry",
+						FolderName = getEquippedTool(), -- FIXED Action to M2
 					}, char, targetChar)
-					
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = targetChar:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -402,25 +454,35 @@ local NewShield2 = danger:Clone()
 					effect2.Enabled = true
 					clash:Emit(30)
 					game.Debris:AddItem(clash, 0.7)
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					StateHandler.SetStun(char, true, 0.5, 2)
 					StateHandler.SetState(char, "CantAnything", true, 0.5)
 					ParryService.ResetParry(game.Players:GetPlayerFromCharacter(targetChar))
-					
+
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
-				
+
 					AnimationHandler.StopAnim(char, "ALL")
-					AnimationHandler.LoadAnim(char, "Parried", "rbxassetid://74891530644094", nil, false)
-
-				elseif StateHandler.GetState(targetChar, "M1") or StateHandler.GetState(targetChar, "M2") then
+					AnimationHandler.LoadAnim(
+						char,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
+				elseif
+					StateHandler.GetState(targetChar, "M1")
+					or StateHandler.GetState(targetChar, "M2")
+				then
 					Hitbox:Destroy()
-
 				elseif StateHandler.GetState(targetChar, "Blocking") then
 					-- Route through BlockResolver (single chokepoint + guard bar).
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
@@ -440,29 +502,53 @@ local NewShield2 = danger:Clone()
 						if verdict.broke then
 							doAttack(extra, verdict.knockback)
 						else
-							local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
-							dmgModule.CalculateDamage(char, targetChar, dmg, verdict.knockback, false, "Weapon")
+							local dmgModule =
+								require(game.ServerScriptService.modules.damageCalculator)
+							dmgModule.CalculateDamage(
+								char,
+								targetChar,
+								dmg,
+								verdict.knockback,
+								false,
+								"Weapon"
+							)
 						end
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M2", Func = "GB", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M2",
+							Func = "GB",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "Block", Func = "GB", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "Block",
+							Func = "GB",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 					elseif verdict.outcome == "Bypass" then
 						AnimationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 						doAttack(extra, verdict.knockback)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M2", Func = "Hit", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M2",
+							Func = "Hit",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 					else
 						BlockResolver.OnAttackerLandedHit(char)
 						doAttack(extra, verdict.knockback)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M2", Func = "Blocked", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M2",
+							Func = "Blocked",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
-						local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-						local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+						local parryE =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+								:Clone()
+						local effect2 =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+								:Clone()
 						local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 						h1.Parent = char
 						game.Debris:AddItem(h1, 0.1)
@@ -470,13 +556,16 @@ local NewShield2 = danger:Clone()
 						effect2.Parent = char:WaitForChild("Torso")
 						parryE.Enabled = true
 						effect2.Enabled = true
-						game.Debris:AddItem(parryE,0.7)
+						game.Debris:AddItem(parryE, 0.7)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
 					-- Normal Hit
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = "M2", Func = "Hit", FolderName = getEquippedTool() -- FIXED Action to M2
+						Type = "Combat",
+						Action = "M2",
+						Func = "Hit",
+						FolderName = getEquippedTool(), -- FIXED Action to M2
 					}, char, targetChar)
 					doAttack(0, 15)
 				end

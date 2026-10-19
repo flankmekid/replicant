@@ -19,8 +19,8 @@ local SkillFunctions = require(ServerScriptService.modules.SkillFunctions)
 local BurstRemote = ReplicatedStorage.remotes:WaitForChild("Burst")
 
 -- [[ TUNING ]]
-local MANA_FRACTION = 0.5   -- fraction of MaxMana spent per burst
-local COOLDOWN      = 12     -- seconds, server-authoritative
+local MANA_FRACTION = 0.5 -- fraction of MaxMana spent per burst
+local COOLDOWN = 12 -- seconds, server-authoritative
 
 -- os.clock() timestamp per player of when burst is next ready
 local nextReady = setmetatable({}, { __mode = "k" })

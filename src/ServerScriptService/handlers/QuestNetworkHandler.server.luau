@@ -1,23 +1,21 @@
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local QuestManager      = require(ServerScriptService.modules.QuestServer)
-local DataManager       = require(ServerScriptService.modules.dataManager)
-local QuestConfig       = require(ReplicatedStorage.QuestSystem.QuestConfig)
+local QuestManager = require(ServerScriptService.modules.QuestServer)
+local DataManager = require(ServerScriptService.modules.dataManager)
+local QuestConfig = require(ReplicatedStorage.QuestSystem.QuestConfig)
 local QuestActionRemote = ReplicatedStorage:WaitForChild("QuestSystem"):WaitForChild("QuestAction")
-local QuestStateRequest = ReplicatedStorage:WaitForChild("QuestSystem"):WaitForChild("QuestStateRequest")
+local QuestStateRequest = ReplicatedStorage:WaitForChild("QuestSystem")
+	:WaitForChild("QuestStateRequest")
 
 QuestActionRemote.OnServerEvent:Connect(function(player, action, questId)
 	if action == "Start" then
 		QuestManager.AssignQuest(player, questId)
-
 	elseif action == "Complete" then
 		QuestManager.CompleteQuest(player, questId)
-
 	elseif action == "Track" then
 		-- questId may be nil (untrack)
 		QuestManager.SetTracked(player, questId)
-
 	elseif action == "Abandon" then
 		-- Block abandoning class quests
 		local def = QuestConfig.Quests[questId]
@@ -28,7 +26,9 @@ QuestActionRemote.OnServerEvent:Connect(function(player, action, questId)
 		DataManager.ClearActiveQuest(player, questId, false)
 		local QuestUpdateRemote = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
 		QuestUpdateRemote:FireClient(player, "Complete", { Id = questId })
-		QuestUpdateRemote:FireClient(player, "ListUpdate",
+		QuestUpdateRemote:FireClient(
+			player,
+			"ListUpdate",
 			(function()
 				local entries = DataManager.GetAllActiveQuests(player)
 				local list = {}
@@ -50,14 +50,14 @@ QuestStateRequest.OnServerInvoke = function(player, questId)
 		return { active = false, completed = false, progress = 0 }
 	end
 
-	local entry    = DataManager.GetActiveQuestEntry(player, questId)
+	local entry = DataManager.GetActiveQuestEntry(player, questId)
 	local isActive = entry ~= nil
-	local isDone   = table.find(questData.Completed, questId) ~= nil
+	local isDone = table.find(questData.Completed, questId) ~= nil
 
 	return {
-		active    = isActive,
+		active = isActive,
 		completed = isDone,
-		progress  = entry and entry.Progress or 0,
+		progress = entry and entry.Progress or 0,
 	}
 end
 

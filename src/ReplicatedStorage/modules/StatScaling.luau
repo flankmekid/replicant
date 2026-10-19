@@ -43,7 +43,9 @@ local function softCapProgress(points)
 		return knee + (p - knee) * POST_CAP_RATIO
 	end
 	local maxUnits = rawUnits(maxStat)
-	if maxUnits <= 0 then return 0 end
+	if maxUnits <= 0 then
+		return 0
+	end
 	return rawUnits(points) / maxUnits
 end
 StatScaling.SoftCapProgress = softCapProgress
@@ -58,12 +60,57 @@ end
 -- Baked back-heavy cumulative lookup. Index = stat level (1-50).
 -- Level 0 = +0. Lands exactly +100 at level 50. Hand-tunable.
 local VITALITY_HP = {
-	[0]=0,
-	[1]=0,[2]=1,[3]=1,[4]=2,[5]=2,[6]=3,[7]=4,[8]=5,[9]=6,[10]=7,
-	[11]=8,[12]=9,[13]=11,[14]=12,[15]=13,[16]=15,[17]=16,[18]=18,[19]=20,[20]=22,
-	[21]=23,[22]=25,[23]=27,[24]=29,[25]=31,[26]=33,[27]=36,[28]=38,[29]=40,[30]=42,
-	[31]=45,[32]=47,[33]=50,[34]=52,[35]=55,[36]=58,[37]=60,[38]=63,[39]=66,[40]=69,
-	[41]=72,[42]=75,[43]=78,[44]=81,[45]=84,[46]=87,[47]=90,[48]=93,[49]=97,[50]=100,
+	[0] = 0,
+	[1] = 0,
+	[2] = 1,
+	[3] = 1,
+	[4] = 2,
+	[5] = 2,
+	[6] = 3,
+	[7] = 4,
+	[8] = 5,
+	[9] = 6,
+	[10] = 7,
+	[11] = 8,
+	[12] = 9,
+	[13] = 11,
+	[14] = 12,
+	[15] = 13,
+	[16] = 15,
+	[17] = 16,
+	[18] = 18,
+	[19] = 20,
+	[20] = 22,
+	[21] = 23,
+	[22] = 25,
+	[23] = 27,
+	[24] = 29,
+	[25] = 31,
+	[26] = 33,
+	[27] = 36,
+	[28] = 38,
+	[29] = 40,
+	[30] = 42,
+	[31] = 45,
+	[32] = 47,
+	[33] = 50,
+	[34] = 52,
+	[35] = 55,
+	[36] = 58,
+	[37] = 60,
+	[38] = 63,
+	[39] = 66,
+	[40] = 69,
+	[41] = 72,
+	[42] = 75,
+	[43] = 78,
+	[44] = 81,
+	[45] = 84,
+	[46] = 87,
+	[47] = 90,
+	[48] = 93,
+	[49] = 97,
+	[50] = 100,
 }
 StatScaling.VITALITY_HP = VITALITY_HP
 
@@ -110,8 +157,8 @@ end
 -- ── STAMINA ────────────────────────────────────────────────────────
 -- Discrete unlock thresholds
 StatScaling.STAMINA_WALLRUN_UNLOCK = 10 -- 3rd wall run at >=10
-StatScaling.STAMINA_DASH_UNLOCK    = 30 -- 2nd dash at >=30
-StatScaling.STAMINA_VELOCITY_KNEE  = 20 -- velocity-time soft-caps here
+StatScaling.STAMINA_DASH_UNLOCK = 30 -- 2nd dash at >=30
+StatScaling.STAMINA_VELOCITY_KNEE = 20 -- velocity-time soft-caps here
 
 function StatScaling.GetWallRunCount(stamPoints)
 	return ((stamPoints or 0) >= StatScaling.STAMINA_WALLRUN_UNLOCK) and 3 or 2
@@ -138,7 +185,9 @@ function StatScaling.GetBaseWalkSpeed(character)
 	if player then
 		local stats = player:FindFirstChild("PlayerStats")
 		local sf = stats and stats:FindFirstChild("Stats")
-		if sf and sf:FindFirstChild("Stamina") then stam = sf.Stamina.Value end
+		if sf and sf:FindFirstChild("Stamina") then
+			stam = sf.Stamina.Value
+		end
 	end
 	return StatScaling.BASE_WALKSPEED + StatScaling.GetWalkspeedBonus(stam)
 end
@@ -150,7 +199,9 @@ function StatScaling.GetVelocityProgress(stamPoints)
 	stamPoints = math.clamp(stamPoints or 0, 0, StatScaling.MAX_STAT)
 	local knee = StatScaling.STAMINA_VELOCITY_KNEE
 	local function rawUnits(p)
-		if p <= knee then return p end
+		if p <= knee then
+			return p
+		end
 		return knee + (p - knee) * POST_CAP_RATIO
 	end
 	local maxUnits = rawUnits(StatScaling.MAX_STAT)

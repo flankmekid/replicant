@@ -26,7 +26,7 @@ local RollingFrame = MidFrame:WaitForChild("RollingFrame")
 local Labels = {
 	RollingFrame:WaitForChild("Label1"), -- Top
 	RollingFrame:WaitForChild("Label2"), -- Middle
-	RollingFrame:WaitForChild("Label3")  -- Bottom
+	RollingFrame:WaitForChild("Label3"), -- Bottom
 }
 
 -- Viewport Refs
@@ -42,8 +42,10 @@ local StatsList = RightFrame:WaitForChild("StatsList")
 -- [[ CONFIG ]] --
 local SPEED = 700
 local TOTAL_ROLLS = 40
-local LABEL_HEIGHT = Labels[1].Size.Y.Offset 
-if LABEL_HEIGHT == 0 then LABEL_HEIGHT = RollingFrame.AbsoluteSize.Y / 3 end -- Failsafe
+local LABEL_HEIGHT = Labels[1].Size.Y.Offset
+if LABEL_HEIGHT == 0 then
+	LABEL_HEIGHT = RollingFrame.AbsoluteSize.Y / 3
+end -- Failsafe
 local Debounce = false
 
 -- [[ STAT NAMES MAPPING ]] --
@@ -58,13 +60,15 @@ local StatNames = {
 	ESP = "ESP",
 	Hyperarmor = "Hyperarmor",
 	Lifesteal = "Lifesteal",
-	ManaWhenHit = "Regenerate Mana When Hit"
+	ManaWhenHit = "Regenerate Mana When Hit",
 }
 
 -- [[ HELPER: COLOR LOOKUP ]] --
 local function GetRaceColor(raceName)
 	local raceData = RaceConfig.Races[raceName]
-	if not raceData then return Color3.fromRGB(255, 255, 255) end
+	if not raceData then
+		return Color3.fromRGB(255, 255, 255)
+	end
 	for _, rarityInfo in ipairs(RaceConfig.Rarities) do
 		if rarityInfo.Name == raceData.Rarity then
 			return rarityInfo.Color
@@ -84,7 +88,7 @@ local lastMouseX = 0
 
 local function UpdateViewport(character, raceName)
 	-- [[ 1. RESET ROTATION ]] --
-	currentRotation = 180 
+	currentRotation = 180
 
 	WorldModel:ClearAllChildren()
 	character.Archivable = true
@@ -93,7 +97,13 @@ local function UpdateViewport(character, raceName)
 
 	-- [[ 2. CLEANUP CLONE ]] --
 	for _, v in pairs(clone:GetDescendants()) do
-		if v:IsA("Script") or v:IsA("LocalScript") or v:IsA("ForceField") or v:IsA("BillboardGui") or v:IsA("BodyColors") then
+		if
+			v:IsA("Script")
+			or v:IsA("LocalScript")
+			or v:IsA("ForceField")
+			or v:IsA("BillboardGui")
+			or v:IsA("BodyColors")
+		then
 			v:Destroy()
 		end
 	end
@@ -120,9 +130,13 @@ local function UpdateViewport(character, raceName)
 						local handle = acc:FindFirstChild("Handle")
 						if handle then
 							handle.Color = visuals.HairColor
-							if handle:IsA("MeshPart") then handle.TextureID = "" end
+							if handle:IsA("MeshPart") then
+								handle.TextureID = ""
+							end
 							local mesh = handle:FindFirstChildOfClass("SpecialMesh")
-							if mesh then mesh.TextureId = "" end
+							if mesh then
+								mesh.TextureId = ""
+							end
 						end
 					end
 				end
@@ -133,7 +147,7 @@ local function UpdateViewport(character, raceName)
 	-- [[ 4. CAMERA SETUP ]] --
 	local root = clone:WaitForChild("HumanoidRootPart")
 	root.Anchored = true
-	root.CFrame = CFrame.new(Vector3.new(0,0,0)) 
+	root.CFrame = CFrame.new(Vector3.new(0, 0, 0))
 
 	local cameraDist = 6
 	viewportCam.CFrame = CFrame.new(Vector3.new(0, 1, cameraDist), root.Position)
@@ -171,7 +185,9 @@ end)
 -- [[ UI UPDATE LOGIC ]] --
 local function UpdateUI(raceName)
 	local data = RaceConfig.Races[raceName]
-	if not data then return end
+	if not data then
+		return
+	end
 
 	-- Left Frame
 	RaceNameLbl.Text = raceName
@@ -189,9 +205,11 @@ local function UpdateUI(raceName)
 	-- List Number/Value Stats
 	for statKey, val in pairs(data.Stats) do
 		local displayVal = val
-		local displayName = StatNames[statKey] or statKey 
+		local displayName = StatNames[statKey] or statKey
 
-		if val == true then displayVal = "Active" end
+		if val == true then
+			displayVal = "Active"
+		end
 
 		local lbl = Instance.new("TextLabel")
 		lbl.Size = UDim2.new(1, 0, 0, 25)
@@ -202,11 +220,17 @@ local function UpdateUI(raceName)
 		lbl.TextSize = 20
 
 		-- Custom formatting
-		if type(val) == "number" and (string.find(statKey, "Boost") or string.find(statKey, "Multiplier")) and not (string.find(statKey, "HPBoost")) then
-			if val == 1 then continue end 
+		if
+			type(val) == "number"
+			and (string.find(statKey, "Boost") or string.find(statKey, "Multiplier"))
+			and not (string.find(statKey, "HPBoost"))
+		then
+			if val == 1 then
+				continue
+			end
 			lbl.Text = string.format("%s: x%.2f", displayName, val)
 		elseif type(val) == "boolean" and val == true then
-			lbl.Text = displayName 
+			lbl.Text = displayName
 			lbl.TextColor3 = Color3.fromRGB(255, 51, 54)
 		else
 			lbl.Text = string.format("%s: %s", displayName, tostring(val))
@@ -237,8 +261,11 @@ local function AnimateRoll(finalRace)
 		local move = SPEED * dt
 
 		if counter > TOTAL_ROLLS * 0.7 then
-			move = move * (1 - ((counter - (TOTAL_ROLLS*0.7))/(TOTAL_ROLLS - (TOTAL_ROLLS*0.7))))
-			if move < 5 then move = 5 end
+			move = move
+				* (1 - ((counter - (TOTAL_ROLLS * 0.7)) / (TOTAL_ROLLS - (TOTAL_ROLLS * 0.7))))
+			if move < 5 then
+				move = 5
+			end
 		end
 
 		offset += move
@@ -271,15 +298,17 @@ local function AnimateRoll(finalRace)
 			-- Final State
 			Labels[1].TextTransparency = 1
 			Labels[3].TextTransparency = 1
-			Labels[2].Text = finalRace 
+			Labels[2].Text = finalRace
 			Labels[2].TextColor3 = GetRaceColor(finalRace)
 
 			if RaceConfig.Races[finalRace].Rarity == "Legendary" then
-				if script:FindFirstChild("Win") then script.Win:Play() end
+				if script:FindFirstChild("Win") then
+					script.Win:Play()
+				end
 			end
 
 			UpdateUI(finalRace)
-			
+
 			UpdateViewport(player.Character, finalRace) -- Sync the 3D model
 
 			Debounce = false
@@ -289,7 +318,7 @@ end
 
 -- [[ INITIALIZATION ]] --
 local function Init()
-	task.wait(1) 
+	task.wait(1)
 	local pStats = player:WaitForChild("PlayerStats")
 	local currentRace = pStats:WaitForChild("Race").Value
 
@@ -314,7 +343,9 @@ local function Init()
 end
 
 RollButton.MouseButton1Click:Connect(function()
-	if Debounce then return end
+	if Debounce then
+		return
+	end
 	Debounce = true
 
 	local result = RollRaceFunction:InvokeServer()
@@ -323,7 +354,9 @@ RollButton.MouseButton1Click:Connect(function()
 		Debounce = false
 	else
 		AnimateRoll(result)
-		if script:FindFirstChild("Roll") then script.Roll:Play() end
+		if script:FindFirstChild("Roll") then
+			script.Roll:Play()
+		end
 	end
 end)
 

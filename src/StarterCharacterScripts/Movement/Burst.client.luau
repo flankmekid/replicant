@@ -21,18 +21,28 @@ local Char = Player.Character or Player.CharacterAdded:Wait()
 local localReadyAt = 0
 
 local function onInput(_, inputState)
-	if inputState ~= Enum.UserInputState.Begin then return end
+	if inputState ~= Enum.UserInputState.Begin then
+		return
+	end
 	local char = Player.Character
-	if not char then return end
+	if not char then
+		return
+	end
 	-- Do not even attempt while Downed. Stunned is intentionally NOT blocked here:
 	-- bursting out of a combo (while Stunned) is the whole purpose.
-	if char:GetAttribute("Downed") then return end
-	if os.clock() < localReadyAt then return end
+	if char:GetAttribute("Downed") then
+		return
+	end
+	if os.clock() < localReadyAt then
+		return
+	end
 	BurstRemote:FireServer()
 end
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
+	if gpe then
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.T then
 		onInput(nil, Enum.UserInputState.Begin)
 	end
@@ -40,7 +50,9 @@ end)
 
 -- Server reply: arm the cooldown HUD only when the cast was actually committed.
 BurstRemote.OnClientEvent:Connect(function(payload)
-	if type(payload) ~= "table" or payload.Func ~= "BurstResponse" then return end
+	if type(payload) ~= "table" or payload.Func ~= "BurstResponse" then
+		return
+	end
 	if payload.Decision == "Accepted" and payload.Cooldown then
 		localReadyAt = os.clock() + payload.Cooldown
 		CooldownTracker.Register("Burst", "Burst", payload.Cooldown)

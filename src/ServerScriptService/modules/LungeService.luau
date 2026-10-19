@@ -36,7 +36,7 @@
 -- still has to land.
 
 local RunService = game:GetService("RunService")
-local Workspace  = game:GetService("Workspace")
+local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DashConfig = require(ReplicatedStorage.modules.DashConfig)
@@ -46,10 +46,10 @@ local LungeService = {}
 local TARGET_FOLDER = Workspace:WaitForChild("plrManager"):WaitForChild("alive")
 
 -- [[ TUNING ]] --
-local MAX_ACQUIRE_DIST  = 60    -- lock-on allows 100, but a lunge across 100 studs is
-                                -- a teleport
-local ACQUIRE_CONE_DEG  = 60    -- how far off your facing a target can sit and still
-                                -- be picked up when NOT locked on
+local MAX_ACQUIRE_DIST = 60 -- lock-on allows 100, but a lunge across 100 studs is
+-- a teleport
+local ACQUIRE_CONE_DEG = 60 -- how far off your facing a target can sit and still
+-- be picked up when NOT locked on
 
 -- The burst length: the step-in, which fires whether or not anyone is there. It lives
 -- in DashConfig with every other weapon dash. Passing no weapon returns the M1Lunge
@@ -58,8 +58,8 @@ local ACQUIRE_CONE_DEG  = 60    -- how far off your facing a target can sit and 
 -- The old BURST_MULT of 1.35 is gone. DashConfig holds the final lunge speeds now, so
 -- there is nothing left to scale here. Tune M1Lunge in that table instead.
 local _, BOOST_TIME = DashConfig.Get("M1Lunge")
-BOOST_TIME = BOOST_TIME or 0.3  -- only reachable if M1Lunge is ever disabled outright,
-                                -- in which case CombatCore never calls Start anyway
+BOOST_TIME = BOOST_TIME or 0.3 -- only reachable if M1Lunge is ever disabled outright,
+-- in which case CombatCore never calls Start anyway
 
 -- [[ WHAT COUNTS AS "RUNNING AWAY" ]] --
 -- Two independent tests, either one is enough:
@@ -67,49 +67,65 @@ BOOST_TIME = BOOST_TIME or 0.3  -- only reachable if M1Lunge is ever disabled ou
 --   2. MOVING: they are physically travelling away from us.
 -- A player backpedalling while facing us is NOT fleeing (they are spacing, which is
 -- legitimate defence). A player sprinting away with their back turned is.
-local FLEE_FACING_DOT   = -0.15 -- their lookVector vs the direction from them to us.
-                                -- Below this they are turned away from us.
-local FLEE_SPEED_MIN    = 8     -- studs/sec of AWAY-from-us velocity before we call
-                                -- it fleeing. Filters out strafing and jitter.
+local FLEE_FACING_DOT = -0.15 -- their lookVector vs the direction from them to us.
+-- Below this they are turned away from us.
+local FLEE_SPEED_MIN = 8 -- studs/sec of AWAY-from-us velocity before we call
+-- it fleeing. Filters out strafing and jitter.
 
 -- [[ THE CHASE ]] --
-local SPRINT_MULT       = 1.75  -- mirrors Movement.Running: sprint = walkspeed * this
-local BASE_SPRINT       = 16 * SPRINT_MULT
-local CHASE_SPRINT_MULT = 1.35  -- how much faster than THEIR sprint we close. Keyed
-                                -- to the target, not to the boost speed: the 35-speed
-                                -- weapons would otherwise "chase" at 19 against a
-                                -- 28 sprint, i.e. slower than running away. Raised from
-                                -- 1.15 so the follow actually welds to a fleeing target
-                                -- (author: "stuck behind the one running away") instead
-                                -- of trailing a step behind. Still capped by the boost
-                                -- velocity below, so it cannot exceed the weapon's reach.
-local MAX_TURN_RATE_DEG = 280   -- deg/sec of steering. THE SKILL DIAL: high = homing
-                                -- missile, low = trivially juked. Raised from 220 so a
-                                -- runner cutting angles is tracked harder; a HARD cut
-                                -- across the attacker's facing still breaks it.
-local STOP_DIST         = 5     -- stop driving inside this, so you land NEXT to them
-                                -- rather than clipping through
-local MIN_FLAT_DIST     = 1.5   -- below this the XZ vector is degenerate and .Unit
-                                -- returns NaN (the trap the lock-on camera hit)
+local SPRINT_MULT = 1.75 -- mirrors Movement.Running: sprint = walkspeed * this
+local BASE_SPRINT = 16 * SPRINT_MULT
+local CHASE_SPRINT_MULT = 1.35 -- how much faster than THEIR sprint we close. Keyed
+-- to the target, not to the boost speed: the 35-speed
+-- weapons would otherwise "chase" at 19 against a
+-- 28 sprint, i.e. slower than running away. Raised from
+-- 1.15 so the follow actually welds to a fleeing target
+-- (author: "stuck behind the one running away") instead
+-- of trailing a step behind. Still capped by the boost
+-- velocity below, so it cannot exceed the weapon's reach.
+local MAX_TURN_RATE_DEG = 280 -- deg/sec of steering. THE SKILL DIAL: high = homing
+-- missile, low = trivially juked. Raised from 220 so a
+-- runner cutting angles is tracked harder; a HARD cut
+-- across the attacker's facing still breaks it.
+local STOP_DIST = 5 -- stop driving inside this, so you land NEXT to them
+-- rather than clipping through
+local MIN_FLAT_DIST = 1.5 -- below this the XZ vector is degenerate and .Unit
+-- returns NaN (the trap the lock-on camera hit)
 
 -- [[ VALIDITY (mirrors LockOn.isValidTarget) ]] --
 local function isValidTarget(enemy, attacker)
-	if not enemy or not enemy.Parent then return false end
-	if enemy == attacker then return false end
+	if not enemy or not enemy.Parent then
+		return false
+	end
+	if enemy == attacker then
+		return false
+	end
 
 	local hum = enemy:FindFirstChild("Humanoid")
-	if not hum or hum.Health <= 3 then return false end
-	if not enemy:FindFirstChild("HumanoidRootPart") then return false end
+	if not hum or hum.Health <= 3 then
+		return false
+	end
+	if not enemy:FindFirstChild("HumanoidRootPart") then
+		return false
+	end
 
-	if enemy:GetAttribute("Downed") then return false end
-	if enemy:GetAttribute("Carried") then return false end
-	if enemy:GetAttribute("BeingExecuted") then return false end
+	if enemy:GetAttribute("Downed") then
+		return false
+	end
+	if enemy:GetAttribute("Carried") then
+		return false
+	end
+	if enemy:GetAttribute("BeingExecuted") then
+		return false
+	end
 
 	return true
 end
 
 local function isFiniteVector(v)
-	return v.X == v.X and v.Y == v.Y and v.Z == v.Z
+	return v.X == v.X
+		and v.Y == v.Y
+		and v.Z == v.Z
 		and math.abs(v.X) ~= math.huge
 		and math.abs(v.Y) ~= math.huge
 		and math.abs(v.Z) ~= math.huge
@@ -118,9 +134,13 @@ end
 local function flatDir(fromPos, toPos)
 	local d = Vector3.new(toPos.X - fromPos.X, 0, toPos.Z - fromPos.Z)
 	local mag = d.Magnitude
-	if mag < MIN_FLAT_DIST then return nil, nil end
+	if mag < MIN_FLAT_DIST then
+		return nil, nil
+	end
 	local u = d.Unit
-	if not isFiniteVector(u) then return nil, nil end
+	if not isFiniteVector(u) then
+		return nil, nil
+	end
 	return u, mag
 end
 
@@ -129,17 +149,20 @@ end
 -- standing still, and someone backpedalling to make space while still facing us.
 local function isFleeing(target, myRoot)
 	local tRoot = target:FindFirstChild("HumanoidRootPart")
-	if not tRoot then return false end
+	if not tRoot then
+		return false
+	end
 
 	-- Direction from THEM to US, flattened.
-	local toUs = Vector3.new(
-		myRoot.Position.X - tRoot.Position.X,
-		0,
-		myRoot.Position.Z - tRoot.Position.Z
-	)
-	if toUs.Magnitude < MIN_FLAT_DIST then return false end
+	local toUs =
+		Vector3.new(myRoot.Position.X - tRoot.Position.X, 0, myRoot.Position.Z - tRoot.Position.Z)
+	if toUs.Magnitude < MIN_FLAT_DIST then
+		return false
+	end
 	toUs = toUs.Unit
-	if not isFiniteVector(toUs) then return false end
+	if not isFiniteVector(toUs) then
+		return false
+	end
 
 	-- 1. FACING: is their back to us?
 	local look = tRoot.CFrame.LookVector
@@ -158,7 +181,7 @@ local function isFleeing(target, myRoot)
 	-- nothing; only genuine retreat does.
 	local vel = tRoot.AssemblyLinearVelocity
 	local flatVel = Vector3.new(vel.X, 0, vel.Z)
-	local awaySpeed = flatVel:Dot(-toUs)  -- positive = moving away from us
+	local awaySpeed = flatVel:Dot(-toUs) -- positive = moving away from us
 	if awaySpeed >= FLEE_SPEED_MIN then
 		return true
 	end
@@ -169,14 +192,22 @@ end
 -- [[ ACQUISITION ]] --
 local function getLockedTarget(char)
 	local name = char:GetAttribute("LockTarget")
-	if type(name) ~= "string" then return nil end
+	if type(name) ~= "string" then
+		return nil
+	end
 
 	local enemy = TARGET_FOLDER:FindFirstChild(name)
-	if not enemy or not enemy:IsA("Model") then return nil end
-	if not isValidTarget(enemy, char) then return nil end
+	if not enemy or not enemy:IsA("Model") then
+		return nil
+	end
+	if not isValidTarget(enemy, char) then
+		return nil
+	end
 
 	local myRoot = char:FindFirstChild("HumanoidRootPart")
-	if not myRoot then return nil end
+	if not myRoot then
+		return nil
+	end
 
 	-- Range gate. A forged attribute naming someone across the map gets nothing.
 	if (enemy.HumanoidRootPart.Position - myRoot.Position).Magnitude > MAX_ACQUIRE_DIST then
@@ -188,12 +219,16 @@ end
 
 local function getConeTarget(char)
 	local myRoot = char:FindFirstChild("HumanoidRootPart")
-	if not myRoot then return nil end
+	if not myRoot then
+		return nil
+	end
 
-	local myPos  = myRoot.Position
+	local myPos = myRoot.Position
 	local facing = myRoot.CFrame.LookVector
 	local flatFacing = Vector3.new(facing.X, 0, facing.Z)
-	if flatFacing.Magnitude < 0.01 then return nil end
+	if flatFacing.Magnitude < 0.01 then
+		return nil
+	end
 	flatFacing = flatFacing.Unit
 
 	local cosLimit = math.cos(math.rad(ACQUIRE_CONE_DEG))
@@ -215,26 +250,30 @@ local function getConeTarget(char)
 end
 
 function LungeService.AcquireTarget(char)
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	return getLockedTarget(char) or getConeTarget(char)
 end
 
 -- Rotate `current` toward `desired` by at most `maxStep` radians, in the XZ plane.
 local function steer(current, desired, maxStep)
-	local dot   = math.clamp(current:Dot(desired), -1, 1)
+	local dot = math.clamp(current:Dot(desired), -1, 1)
 	local angle = math.acos(dot)
 
 	if angle <= maxStep or angle < 1e-4 then
 		return desired
 	end
 
-	local cross   = current:Cross(desired)
-	local sign    = (cross.Y >= 0) and 1 or -1
+	local cross = current:Cross(desired)
+	local sign = (cross.Y >= 0) and 1 or -1
 	local rotated = CFrame.fromAxisAngle(Vector3.new(0, 1, 0), sign * maxStep) * current
-	local flat    = Vector3.new(rotated.X, 0, rotated.Z)
+	local flat = Vector3.new(rotated.X, 0, rotated.Z)
 	if flat.Magnitude > 0.01 then
 		local u = flat.Unit
-		if isFiniteVector(u) then return u end
+		if isFiniteVector(u) then
+			return u
+		end
 	end
 	return current
 end
@@ -248,16 +287,24 @@ end
 --   token      : CombatCore's attack token. A parry or stun kills the lunge instead
 --                of dragging the attacker onward.
 function LungeService.Start(char, speed, chaseUntil, token)
-	if not char then return end
+	if not char then
+		return
+	end
 	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+	if not root then
+		return
+	end
 
 	local old = root:FindFirstChild("LungeVelocity")
-	if old then old:Destroy() end
+	if old then
+		old:Destroy()
+	end
 
 	local facing = root.CFrame.LookVector
 	local currentDir = Vector3.new(facing.X, 0, facing.Z)
-	if currentDir.Magnitude < 0.01 then return end
+	if currentDir.Magnitude < 0.01 then
+		return
+	end
 	currentDir = currentDir.Unit
 
 	-- THE BOOST ALWAYS FIRES. No target required, no conditions. This is the move.
@@ -279,11 +326,16 @@ function LungeService.Start(char, speed, chaseUntil, token)
 			elapsed += dt
 
 			local function stop()
-				if conn then conn:Disconnect() end
-				if BV.Parent then BV:Destroy() end
+				if conn then
+					conn:Disconnect()
+				end
+				if BV.Parent then
+					BV:Destroy()
+				end
 			end
 
-			if (token and token.cancelled)
+			if
+				(token and token.cancelled)
 				or not char.Parent
 				or not root.Parent
 				or not BV.Parent
@@ -356,7 +408,9 @@ end
 function LungeService.Stop(char)
 	local root = char and char:FindFirstChild("HumanoidRootPart")
 	local BV = root and root:FindFirstChild("LungeVelocity")
-	if BV then BV:Destroy() end
+	if BV then
+		BV:Destroy()
+	end
 end
 
 return LungeService

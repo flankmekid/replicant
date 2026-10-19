@@ -12,7 +12,9 @@ local WINDUP = WeaponConfig.Caestus.server.e.windup
 
 local function FX(char, bodypart)
 	local part = char:FindFirstChild(bodypart)
-	if not part then return end
+	if not part then
+		return
+	end
 	local effect1 = RP.assets.FX.fistsWhite.partic:Clone()
 	local effect2 = RP.assets.FX.fistsWhite.paricle:Clone()
 	effect1.Parent = part
@@ -32,7 +34,9 @@ end
 local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	damageCalculator.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
 	local mana = plr:FindFirstChild("PlayerStats") and plr.PlayerStats:FindFirstChild("Mana")
-	if mana and mana.Value < 90 then mana.Value += 10 end
+	if mana and mana.Value < 90 then
+		mana.Value += 10
+	end
 end
 
 function module.ServerCheck(plr)

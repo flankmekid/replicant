@@ -9,7 +9,9 @@ local SPIN_COST = 1000
 
 BuySpinsRemote.OnServerEvent:Connect(function(player, amount)
 	-- 1. Validate Amount (Prevent exploiting)
-	if amount ~= 1 and amount ~= 10 then return end
+	if amount ~= 1 and amount ~= 10 then
+		return
+	end
 
 	local totalCost = amount * SPIN_COST
 

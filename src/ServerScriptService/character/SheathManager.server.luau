@@ -3,15 +3,15 @@
 -- Equipping anything else (spells, quest items, etc.) leaves the current sheath untouched.
 -- To give a weapon a sheath, add its name to SHEATH_MAP below.
 
-local Players       = game:GetService("Players")
+local Players = game:GetService("Players")
 local ServerStorage = game:GetService("ServerStorage")
-local assets        = game:GetService("ReplicatedStorage"):WaitForChild("assets")
+local assets = game:GetService("ReplicatedStorage"):WaitForChild("assets")
 
 -- ── Configuration ─────────────────────────────────────────────────────────────
 -- Key: exact Tool name. Value: Model name inside ReplicatedStorage.assets.
 -- Weapons with no entry get their sheath removed on equip, but nothing is added.
 local SHEATH_MAP = {
-	["Katana"]     = "Sheath",
+	["Katana"] = "Sheath",
 	["Vermillion"] = "SheathKensei",
 }
 -- ──────────────────────────────────────────────────────────────────────────────
@@ -38,7 +38,9 @@ local function removeSheath(char)
 end
 
 local function attachSheath(char, assetName)
-	if char:FindFirstChild(assetName) then return end
+	if char:FindFirstChild(assetName) then
+		return
+	end
 
 	local template = assets:FindFirstChild(assetName)
 	if not template then
@@ -71,8 +73,12 @@ local function watchCharacter(char)
 
 	char.ChildAdded:Connect(function(child)
 		-- Ignore anything that isn't a registered weapon
-		if not child:IsA("Tool") then return end
-		if not WEAPON_NAMES[child.Name] then return end
+		if not child:IsA("Tool") then
+			return
+		end
+		if not WEAPON_NAMES[child.Name] then
+			return
+		end
 		onWeaponEquipped(char, child)
 	end)
 

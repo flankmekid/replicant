@@ -43,93 +43,169 @@ local function UpdateDirectionalMovement(DeltaTime)
 
 		local MoveDirection = HumanoidRootPart.CFrame:VectorToObjectSpace(Humanoid.MoveDirection)
 
-		if MoveDirection:Dot(Vector3.new(1,0,-1).Unit) > dotThreshold then
+		if MoveDirection:Dot(Vector3.new(1, 0, -1).Unit) > dotThreshold then
 			-- print("Forwards-Right")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 15), DefaultLerpAlpha)
+			NeckTilt = NeckTilt:Lerp(
+				CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 15),
+				DefaultLerpAlpha
+			)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(1,0,1).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(1, 0, 1).Unit) > dotThreshold then
 			-- print("Backwards-Right")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25), DefaultLerpAlpha)
+			NeckTilt = NeckTilt:Lerp(
+				CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(-1,0,1).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(-1, 0, 1).Unit) > dotThreshold then
 			-- print("Backwards-Left")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25), DefaultLerpAlpha)
+			NeckTilt = NeckTilt:Lerp(
+				CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(-1,0,-1).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(-1, 0, -1).Unit) > dotThreshold then
 			-- print("Forwards-Left")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 5, 0, math.rad(-MoveDirection.X) * 25),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 15), DefaultLerpAlpha)
+			NeckTilt = NeckTilt:Lerp(
+				CFrame.Angles(math.rad(MoveDirection.Z) * 5, 0, math.rad(MoveDirection.X) * 15),
+				DefaultLerpAlpha
+			)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 10, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(0,0,-1).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(0, 0, -1).Unit) > dotThreshold then
 			-- print("Forwards")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
+			NeckTilt =
+				NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
 			Neck.C0 = NeckC0 * NeckTilt
 
 			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
@@ -143,33 +219,53 @@ local function UpdateDirectionalMovement(DeltaTime)
 
 			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(1,0,0).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(1, 0, 0).Unit) > dotThreshold then
 			-- print("Right")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(0, 0, math.rad(MoveDirection.X) * 35), DefaultLerpAlpha)
+			NeckTilt =
+				NeckTilt:Lerp(CFrame.Angles(0, 0, math.rad(MoveDirection.X) * 35), DefaultLerpAlpha)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(0,0,1).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(0, 0, 1).Unit) > dotThreshold then
 			-- print("Backwards")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(math.rad(-MoveDirection.Z) * 10, 0, 0),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
+			NeckTilt =
+				NeckTilt:Lerp(CFrame.Angles(math.rad(MoveDirection.Z) * 10, 0, 0), DefaultLerpAlpha)
 			Neck.C0 = NeckC0 * NeckTilt
 
 			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
@@ -183,25 +279,41 @@ local function UpdateDirectionalMovement(DeltaTime)
 
 			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
-		elseif MoveDirection:Dot(Vector3.new(-1,0,0).Unit) > dotThreshold then
+		elseif MoveDirection:Dot(Vector3.new(-1, 0, 0).Unit) > dotThreshold then
 			-- print("Left")
 
-			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35), DefaultLerpAlpha)
+			RootJointTilt = RootJointTilt:Lerp(
+				CFrame.Angles(0, 0, math.rad(-MoveDirection.X) * 35),
+				DefaultLerpAlpha
+			)
 			RootJoint.C0 = RootJointC0 * RootJointTilt
 
-			NeckTilt = NeckTilt:Lerp(CFrame.Angles(0, 0, math.rad(MoveDirection.X) * 35), DefaultLerpAlpha)
+			NeckTilt =
+				NeckTilt:Lerp(CFrame.Angles(0, 0, math.rad(MoveDirection.X) * 35), DefaultLerpAlpha)
 			Neck.C0 = NeckC0 * NeckTilt
 
-			RightShoulderTilt = RightShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			RightShoulderTilt = RightShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			RightShoulder.C0 = RightShoulderC0 * RightShoulderTilt
 
-			LeftShoulderTilt = LeftShoulderTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			LeftShoulderTilt = LeftShoulderTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			LeftShoulder.C0 = LeftShoulderC0 * LeftShoulderTilt
 
-			RightHipTilt = RightHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			RightHipTilt = RightHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			RightHip.C0 = RightHipC0 * RightHipTilt
 
-			LeftHipTilt = LeftHipTilt:Lerp(CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0), DefaultLerpAlpha)
+			LeftHipTilt = LeftHipTilt:Lerp(
+				CFrame.Angles(0, math.rad(-MoveDirection.X) * 15, 0),
+				DefaultLerpAlpha
+			)
 			LeftHip.C0 = LeftHipC0 * LeftHipTilt
 		elseif MoveDirection == Vector3.new(0, 0, 0) or script:GetAttribute("Toggle") == false then
 			RootJointTilt = RootJointTilt:Lerp(CFrame.Angles(0, 0, 0), DefaultLerpAlpha)

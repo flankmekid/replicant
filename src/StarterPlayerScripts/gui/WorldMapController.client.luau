@@ -187,10 +187,7 @@ local function clampPan(offset: Vector2, scaledSize: Vector2): Vector2
 	local vpAbs = viewport.AbsoluteSize
 	local maxX = math.max(0, (scaledSize.X - vpAbs.X) / 2)
 	local maxY = math.max(0, (scaledSize.Y - vpAbs.Y) / 2)
-	return Vector2.new(
-		math.clamp(offset.X, -maxX, maxX),
-		math.clamp(offset.Y, -maxY, maxY)
-	)
+	return Vector2.new(math.clamp(offset.X, -maxX, maxX), math.clamp(offset.Y, -maxY, maxY))
 end
 
 local function applyTransform()
@@ -211,9 +208,13 @@ end
 -- ---------------------------------------------------------------------------
 local function getRootPart(): BasePart?
 	local char = player.Character
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if hrp and hrp:IsA("BasePart") then return hrp end
+	if hrp and hrp:IsA("BasePart") then
+		return hrp
+	end
 	return nil
 end
 
@@ -260,8 +261,12 @@ local function lockCameraZoom()
 end
 
 local function restoreCameraZoom()
-	if savedMinZoom then player.CameraMinZoomDistance = savedMinZoom end
-	if savedMaxZoom then player.CameraMaxZoomDistance = savedMaxZoom end
+	if savedMinZoom then
+		player.CameraMinZoomDistance = savedMinZoom
+	end
+	if savedMaxZoom then
+		player.CameraMaxZoomDistance = savedMaxZoom
+	end
 	savedMinZoom = nil
 	savedMaxZoom = nil
 end
@@ -270,7 +275,9 @@ end
 -- Open / close
 -- ---------------------------------------------------------------------------
 local function openMap()
-	if isOpen then return end
+	if isOpen then
+		return
+	end
 	isOpen = true
 	screenGui.Enabled = true
 	lockCameraZoom()
@@ -298,7 +305,9 @@ local function openMap()
 end
 
 local function closeMap()
-	if not isOpen then return end
+	if not isOpen then
+		return
+	end
 	isOpen = false
 	dragging = false
 	lastDragPos = nil
@@ -321,7 +330,11 @@ local function closeMap()
 end
 
 local function toggleMap()
-	if isOpen then closeMap() else openMap() end
+	if isOpen then
+		closeMap()
+	else
+		openMap()
+	end
 end
 
 -- ---------------------------------------------------------------------------
@@ -334,7 +347,9 @@ local function isInsideViewport(pos: Vector2): boolean
 end
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
+	if gameProcessed then
+		return
+	end
 	if input.KeyCode == TOGGLE_KEY then
 		toggleMap()
 		return
@@ -343,9 +358,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		return
 	end
 
-	if not isOpen then return end
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+	if not isOpen then
+		return
+	end
+	if
+		input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+	then
 		local p = Vector2.new(input.Position.X, input.Position.Y)
 		if isInsideViewport(p) then
 			dragging = true
@@ -355,10 +374,17 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 end)
 
 UserInputService.InputChanged:Connect(function(input, gameProcessed)
-	if not isOpen then return end
+	if not isOpen then
+		return
+	end
 
-	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement
-		or input.UserInputType == Enum.UserInputType.Touch) then
+	if
+		dragging
+		and (
+			input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch
+		)
+	then
 		local p = Vector2.new(input.Position.X, input.Position.Y)
 		if lastDragPos then
 			local delta = p - lastDragPos
@@ -371,14 +397,20 @@ UserInputService.InputChanged:Connect(function(input, gameProcessed)
 	if input.UserInputType == Enum.UserInputType.MouseWheel then
 		local p = Vector2.new(input.Position.X, input.Position.Y)
 		if isInsideViewport(p) then
-			targetZoom = math.clamp(targetZoom + input.Position.Z * ZOOM_STEP * targetZoom, MIN_ZOOM, MAX_ZOOM)
+			targetZoom = math.clamp(
+				targetZoom + input.Position.Z * ZOOM_STEP * targetZoom,
+				MIN_ZOOM,
+				MAX_ZOOM
+			)
 		end
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1
-		or input.UserInputType == Enum.UserInputType.Touch then
+	if
+		input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch
+	then
 		dragging = false
 		lastDragPos = nil
 	end
@@ -388,7 +420,9 @@ end)
 -- Per-frame: smooth zoom, live marker, resize safety
 -- ---------------------------------------------------------------------------
 RunService.RenderStepped:Connect(function()
-	if not isOpen then return end
+	if not isOpen then
+		return
+	end
 	if math.abs(currentZoom - targetZoom) > 0.001 then
 		currentZoom = currentZoom + (targetZoom - currentZoom) * ZOOM_LERP
 		applyTransform()
@@ -397,7 +431,9 @@ RunService.RenderStepped:Connect(function()
 end)
 
 viewport:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-	if isOpen then applyTransform() end
+	if isOpen then
+		applyTransform()
+	end
 end)
 
 player.CharacterRemoving:Connect(function()

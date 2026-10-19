@@ -12,7 +12,8 @@ function overWriteCharacter(chr)
 end
 
 game.Players.PlayerAdded:Connect(function(player)
-	Appearanceconnections[player.UserId] = player.CharacterAppearanceLoaded:Connect(overWriteCharacter)
+	Appearanceconnections[player.UserId] =
+		player.CharacterAppearanceLoaded:Connect(overWriteCharacter)
 end)
 game.Players.PlayerRemoving:Connect(function(player)
 	Appearanceconnections[player.UserId]:Disconnect()

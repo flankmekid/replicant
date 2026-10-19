@@ -11,13 +11,24 @@ local damageCalculator = require(SSS.modules.damageCalculator)
 
 local BuffService = require(SSS.modules.BuffService)
 local WINDUP = WeaponConfig.Caestus.server.m1.windup
-local FX_PARTS = { "Left Arm", "Right Arm", "Left Arm", "Left Leg", "Left Arm", "Right Arm", "Right Leg", "Right Arm" }
+local FX_PARTS = {
+	"Left Arm",
+	"Right Arm",
+	"Left Arm",
+	"Left Leg",
+	"Left Arm",
+	"Right Arm",
+	"Right Leg",
+	"Right Arm",
+}
 -- Buff (Monastic Stance) is now centralized in BuffService and activated from
 -- SkillHandler on cast; state + aura FX live there, not here.
 
 local function FX(char, bodypart)
 	local part = char:FindFirstChild(bodypart)
-	if not part then return end
+	if not part then
+		return
+	end
 	local effect1 = RP.assets.FX.fists.partic:Clone()
 	local effect2 = RP.assets.FX.fists.paricle:Clone()
 	effect1.Parent = part
@@ -32,7 +43,9 @@ end
 
 local function onWindupStart(char, movePattern)
 	local bp = FX_PARTS[movePattern]
-	if bp then FX(char, bp) end
+	if bp then
+		FX(char, bp)
+	end
 end
 
 local function onDamage(plr, char, targetChar, dmg, extraDmg)

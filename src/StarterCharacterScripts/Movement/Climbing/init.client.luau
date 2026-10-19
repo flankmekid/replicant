@@ -19,12 +19,14 @@ local head = character:WaitForChild("Head")
 -- modules
 -- shared single-owner camera shaker (replaces this script's old private CameraShaker
 -- instance, so we don't run two render-step binds fighting over camera.CFrame)
-local ClientCameraShake = require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("ClientCameraShake"))
-local CooldownTracker = require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("CooldownTracker"))
+local ClientCameraShake =
+	require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("ClientCameraShake"))
+local CooldownTracker =
+	require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("CooldownTracker"))
 
 -- vaulting/climbing variables
 local raycastParams = RaycastParams.new()
-raycastParams.FilterDescendantsInstances = {character}
+raycastParams.FilterDescendantsInstances = { character }
 raycastParams.FilterType = Enum.RaycastFilterType.Exclude
 
 local canVault = true
@@ -65,7 +67,7 @@ local CLIMB_COOLDOWN = 1.25 -- matches the task.wait below; surfaced on the cool
 
 -- [[ LEDGE SURFACE VALIDATION ]]
 -- Tunables for what counts as a grabbable ledge surface.
-local MIN_LEDGE_THICKNESS = 0.5  -- smallest part dimension (studs) allowed; rejects railings, decals-on-thin-parts, blades
+local MIN_LEDGE_THICKNESS = 0.5 -- smallest part dimension (studs) allowed; rejects railings, decals-on-thin-parts, blades
 local MAX_LEDGE_TRANSPARENCY = 0.5 -- anything more see-through than this is treated as non-grabbable
 
 -- ANIMATIONS
@@ -79,7 +81,7 @@ local grabSounds = script:WaitForChild("Sounds"):GetChildren()
 local function playSound()
 	local sound = grabSounds[math.random(1, #grabSounds)]:Clone()
 	sound.Parent = rootPart
-	sound.Volume = .35
+	sound.Volume = 0.35
 	sound:Play()
 	Debris:AddItem(sound, 2)
 end
@@ -90,34 +92,47 @@ end
 -- non-collidable parts, and surfaces thinner than MIN_LEDGE_THICKNESS (railings, blades,
 -- decal-thin geometry).
 local function isValidLedgeSurface(part)
-	if not part or not part:IsA("BasePart") then return false end
+	if not part or not part:IsA("BasePart") then
+		return false
+	end
 
 	-- Anything under a model that has a Humanoid is a creature (player/NPC) or its gear.
 	local model = part:FindFirstAncestorWhichIsA("Model")
 	while model do
-		if model:FindFirstChildWhichIsA("Humanoid") then return false end
+		if model:FindFirstChildWhichIsA("Humanoid") then
+			return false
+		end
 		model = model:FindFirstAncestorWhichIsA("Model")
 	end
 
 	-- Loose tools sitting in the world (not parented to a character) are still gear.
-	if part:FindFirstAncestorWhichIsA("Tool") then return false end
+	if part:FindFirstAncestorWhichIsA("Tool") then
+		return false
+	end
 
 	-- Visibility / solidity.
-	if part.Transparency > MAX_LEDGE_TRANSPARENCY then return false end
-	if not part.CanCollide then return false end
+	if part.Transparency > MAX_LEDGE_TRANSPARENCY then
+		return false
+	end
+	if not part.CanCollide then
+		return false
+	end
 
 	-- Thickness: reject if the SMALLEST dimension is below the threshold. A thin wall is
 	-- fine (it's only thin on one axis but tall/wide on others) -- this targets parts that
 	-- are thin enough to be a railing bar, blade, or sliver of geometry on their grab face.
 	local sz = part.Size
-	if math.min(sz.X, sz.Y, sz.Z) < MIN_LEDGE_THICKNESS then return false end
+	if math.min(sz.X, sz.Y, sz.Z) < MIN_LEDGE_THICKNESS then
+		return false
+	end
 
 	return true
 end
 
 -- check if part is above when tryin to vault or move
 local function partCheck(ledge)
-	local vaultPartCheck = workspace:Raycast(ledge.Position + ledge.LookVector * 1, ledge.UpVector * 3, raycastParams)
+	local vaultPartCheck =
+		workspace:Raycast(ledge.Position + ledge.LookVector * 1, ledge.UpVector * 3, raycastParams)
 	return vaultPartCheck == nil
 end
 
@@ -132,18 +147,38 @@ local function detectLedge(bypassChecks)
 		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 		grabAnim:Stop()
 		game:GetService("ReplicatedStorage").remotes.stateRepl:FireServer("VaultOff")
-		if vaultConnection then vaultConnection:Disconnect() end
-		if ledgePart then ledgePart:Destroy() end
-		return true 
+		if vaultConnection then
+			vaultConnection:Disconnect()
+		end
+		if ledgePart then
+			ledgePart:Destroy()
+		end
+		return true
 	end
 
-	if canVault and (bypassChecks or humanoid:GetState() == Enum.HumanoidStateType.Freefall or humanoid:GetState() == Enum.HumanoidStateType.Jumping) then
-
-		if character:GetAttribute("Stunned") then return end
-		if character:GetAttribute("Carried") then return end
-		if character:GetAttribute("Downed") then return end
-		if character:GetAttribute("Carrying") then return end
-		if not bypassChecks and character:GetAttribute("CantAnything") then return end
+	if
+		canVault
+		and (
+			bypassChecks
+			or humanoid:GetState() == Enum.HumanoidStateType.Freefall
+			or humanoid:GetState() == Enum.HumanoidStateType.Jumping
+		)
+	then
+		if character:GetAttribute("Stunned") then
+			return
+		end
+		if character:GetAttribute("Carried") then
+			return
+		end
+		if character:GetAttribute("Downed") then
+			return
+		end
+		if character:GetAttribute("Carrying") then
+			return
+		end
+		if not bypassChecks and character:GetAttribute("CantAnything") then
+			return
+		end
 
 		-- Cast forward at three heights -- head level plus/minus 1 stud of leeway -- so a
 		-- ledge slightly above or below your head still registers. First ray that hits a
@@ -162,16 +197,17 @@ local function detectLedge(bypassChecks)
 
 		if vaultCheck and vaultCheck.Instance then
 			local hit = vaultCheck.Instance
-			
+
 			local localPos = vaultCheck.Instance.CFrame:PointToObjectSpace(vaultCheck.Position)
-			local localLedgePos = Vector3.new(localPos.X, vaultCheck.Instance.Size.Y/2, localPos.Z)
+			local localLedgePos =
+				Vector3.new(localPos.X, vaultCheck.Instance.Size.Y / 2, localPos.Z)
 			local ledgePos = vaultCheck.Instance.CFrame:PointToWorldSpace(localLedgePos)
 
 			local flatNormal = Vector3.new(vaultCheck.Normal.X, 0, vaultCheck.Normal.Z)
-			local lookDir = -flatNormal 
+			local lookDir = -flatNormal
 
 			if lookDir:Dot(head.CFrame.LookVector) < 0 or lookDir.Magnitude < 0.001 then
-				lookDir = head.CFrame.LookVector * Vector3.new(1,0,1)
+				lookDir = head.CFrame.LookVector * Vector3.new(1, 0, 1)
 			end
 
 			local ledgeOffset = CFrame.lookAt(ledgePos, ledgePos + lookDir.Unit)
@@ -186,10 +222,12 @@ local function detectLedge(bypassChecks)
 				ledgePart.Name = "LedgeAnchor"
 				ledgePart.Parent = workspace
 				ledgePart.Anchored = true
-				ledgePart.CFrame = ledgeOffset + Vector3.new(0, -2, 0) + (ledgeOffset.LookVector * -1)
+				ledgePart.CFrame = ledgeOffset
+					+ Vector3.new(0, -2, 0)
+					+ (ledgeOffset.LookVector * -1)
 				ledgePart.Transparency = 1
 				ledgePart.CanQuery, ledgePart.CanCollide, ledgePart.CanTouch = false, false, false
-				
+
 				local animM = require(game:GetService("ReplicatedStorage").modules.animationHandler)
 				animM.StopAnim(character, "ALL")
 
@@ -199,9 +237,10 @@ local function detectLedge(bypassChecks)
 
 				vaultConnection = RunService.RenderStepped:Connect(function()
 					rootPart.Anchored = true
-					humanoid.AutoRotate = false 
+					humanoid.AutoRotate = false
 					local lookTarget = (ledgePart.CFrame * CFrame.new(0, 0, -5)).Position
-					rootPart.CFrame = rootPart.CFrame:Lerp(CFrame.lookAt(ledgePart.Position, lookTarget), .25)
+					rootPart.CFrame =
+						rootPart.CFrame:Lerp(CFrame.lookAt(ledgePart.Position, lookTarget), 0.25)
 					humanoid:ChangeState(Enum.HumanoidStateType.Seated)
 				end)
 				return true
@@ -237,7 +276,9 @@ local actionRunning = false
 -- you're airborne and armed.
 local function handleJumpAction()
 	-- Only one climb attempt in flight at a time (this function yields).
-	if actionRunning then return false end
+	if actionRunning then
+		return false
+	end
 
 	-- RELEASE CASE FIRST: if we're currently hanging, a press just lets go (with the
 	-- script's built-in up/forward hop). Letting go is NOT a climb, so it must run
@@ -251,9 +292,13 @@ local function handleJumpAction()
 	-- ARMED GATE: a climb requires being airborne AND armed. A wall run can supply the
 	-- arm on demand (consume it here). If not armed, this press does nothing climb-wise
 	-- (the default jump still happens via the Humanoid as normal).
-	if not isAirborne() then return false end
+	if not isAirborne() then
+		return false
+	end
 	consumeWallRunArm()
-	if not armed then return false end
+	if not armed then
+		return false
+	end
 
 	actionRunning = true
 
@@ -268,19 +313,36 @@ local function handleJumpAction()
 
 	-- 2. If no ledge, try Wall Climb Sequence
 	if not ledgeFound and canVault then
-		if humanoid:GetState() == Enum.HumanoidStateType.Freefall or humanoid:GetState() == Enum.HumanoidStateType.Jumping then
+		if
+			humanoid:GetState() == Enum.HumanoidStateType.Freefall
+			or humanoid:GetState() == Enum.HumanoidStateType.Jumping
+		then
+			if climbDebounce then
+				actionRunning = false
+				return false
+			end
 
-			if climbDebounce then actionRunning = false return false end
-			
-			if character:GetAttribute("Stunned") then actionRunning = false return false end
-			if character:GetAttribute("Carried") then actionRunning = false return false end
-			if character:GetAttribute("Downed") then actionRunning = false return false end
-			if character:GetAttribute("Carrying") then actionRunning = false return false end
+			if character:GetAttribute("Stunned") then
+				actionRunning = false
+				return false
+			end
+			if character:GetAttribute("Carried") then
+				actionRunning = false
+				return false
+			end
+			if character:GetAttribute("Downed") then
+				actionRunning = false
+				return false
+			end
+			if character:GetAttribute("Carrying") then
+				actionRunning = false
+				return false
+			end
 
 			-- === STEP 1 CHECK ===
 			local wallCheck1 = checkWall()
 
-			local x = math.random(1,2)
+			local x = math.random(1, 2)
 
 			if wallCheck1 and wallCheck1.Instance.CanCollide then
 				climbDebounce = true
@@ -292,19 +354,22 @@ local function handleJumpAction()
 				script.RemoteEvent:FireServer(wallCheck1.Position, wallCheck1.Normal, "Step1", x)
 
 				playSound()
-				if script:FindFirstChild("Effect") then script.Effect:FireServer() end
-				
+				if script:FindFirstChild("Effect") then
+					script.Effect:FireServer()
+				end
+
 				local dashEffect2 = game.ReplicatedStorage.assets.dashEff2:Clone()
 
 				local eff = dashEffect2:Clone()
-				for _,effect in pairs(eff:GetChildren()) do
+				for _, effect in pairs(eff:GetChildren()) do
 					if effect:IsA("ParticleEmitter") then
 						effect.Parent = character.Torso
 						effect.EmissionDirection = Enum.NormalId.Bottom
 						effect:Emit(9)
 					elseif effect:IsA("Attachment") then
 						effect.Parent = character.Torso
-						effect:FindFirstChildWhichIsA("ParticleEmitter").EmissionDirection = Enum.NormalId.Bottom
+						effect:FindFirstChildWhichIsA("ParticleEmitter").EmissionDirection =
+							Enum.NormalId.Bottom
 						effect:FindFirstChildWhichIsA("ParticleEmitter"):Emit(9)
 					end
 				end
@@ -319,11 +384,11 @@ local function handleJumpAction()
 					-- because the server sets that attribute during the climb
 					if detectLedge(true) then
 						grabbedLedge = true
-						break 
+						break
 					end
 				end
 
-				-- If we grabbed a ledge during the rise, we stop here. 
+				-- If we grabbed a ledge during the rise, we stop here.
 				-- We do NOT proceed to Step 2.
 				if grabbedLedge then
 					climbDebounce = false
@@ -338,7 +403,12 @@ local function handleJumpAction()
 				if wallCheck2 and wallCheck2.Instance.CanCollide then
 					-- Fire Step 2
 					playSound()
-					script.RemoteEvent:FireServer(wallCheck2.Position, wallCheck2.Normal, "Step2", x)
+					script.RemoteEvent:FireServer(
+						wallCheck2.Position,
+						wallCheck2.Normal,
+						"Step2",
+						x
+					)
 
 					-- Optional: Check for ledge one last time during Step 2 rise
 					task.delay(0.1, function()
@@ -365,8 +435,10 @@ end
 
 -- PC/Console Support
 UserInputService.InputBegan:Connect(function(input, gp)
-	if gp then return end
-	if (input.KeyCode == Enum.KeyCode.ButtonA or input.KeyCode == Enum.KeyCode.Space) then
+	if gp then
+		return
+	end
+	if input.KeyCode == Enum.KeyCode.ButtonA or input.KeyCode == Enum.KeyCode.Space then
 		-- ARM ON AIRBORNE PRESS: if this fresh press happens while airborne, it's the
 		-- "second tap" (or the post-wall-run tap) -- arm so the climb attempt can fire.
 		-- A grounded press leaves armed false, so it stays a pure jump. (Releasing a
@@ -404,12 +476,16 @@ end)
 -- Buffer retry: while a press is fresh AND no climb attempt is mid-flight, retry it.
 -- Consume the buffer the instant one starts an action, or drop it when the window expires.
 RunService.Heartbeat:Connect(function()
-	if not bufferedAt then return end
+	if not bufferedAt then
+		return
+	end
 	if os.clock() - bufferedAt > BUFFER_WINDOW then
 		bufferedAt = nil
 		return
 	end
-	if actionRunning then return end -- don't stack attempts while one is yielding
+	if actionRunning then
+		return
+	end -- don't stack attempts while one is yielding
 	if handleJumpAction() then
 		bufferedAt = nil
 	end
@@ -428,31 +504,53 @@ local HOLD_KEYS = { [Enum.KeyCode.Space] = true, [Enum.KeyCode.ButtonA] = true }
 
 local function isHoldingCatch()
 	for key in pairs(HOLD_KEYS) do
-		if UserInputService:IsKeyDown(key) then return true end
+		if UserInputService:IsKeyDown(key) then
+			return true
+		end
 	end
 	return false
 end
 
 RunService.RenderStepped:Connect(function()
 	-- Not while hanging (would toggle release), not mid wall-climb, not on cooldown.
-	if not canVault then return end
-	if actionRunning or climbDebounce then return end
-	if not isHoldingCatch() then return end
+	if not canVault then
+		return
+	end
+	if actionRunning or climbDebounce then
+		return
+	end
+	if not isHoldingCatch() then
+		return
+	end
 
 	-- Same airborne gate the manual grab uses.
-	if not isAirborne() then return end
+	if not isAirborne() then
+		return
+	end
 
 	-- A wall run can arm us; pull that in. Then require armed -- no catch off a ground hold.
 	consumeWallRunArm()
-	if not armed then return end
+	if not armed then
+		return
+	end
 
 	-- Transient blocks: don't try to catch while disabled. detectLedge re-checks these too,
 	-- but bailing here avoids spamming it every frame.
-	if character:GetAttribute("Stunned") then return end
-	if character:GetAttribute("Carried") then return end
-	if character:GetAttribute("Downed") then return end
-	if character:GetAttribute("Carrying") then return end
-	if character:GetAttribute("CantAnything") then return end
+	if character:GetAttribute("Stunned") then
+		return
+	end
+	if character:GetAttribute("Carried") then
+		return
+	end
+	if character:GetAttribute("Downed") then
+		return
+	end
+	if character:GetAttribute("Carrying") then
+		return
+	end
+	if character:GetAttribute("CantAnything") then
+		return
+	end
 
 	-- detectLedge does all the surface validation + grab. canVault is here true, so this
 	-- can only ever GRAB, never release.

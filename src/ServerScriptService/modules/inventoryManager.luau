@@ -19,7 +19,7 @@ function InventoryManager.new(player, savedData)
 	local self = setmetatable({}, InventoryManager)
 	self.Player = player
 
-	savedData = savedData or {Items = {}, Hotbar = {}, Equipment = {}}
+	savedData = savedData or { Items = {}, Hotbar = {}, Equipment = {} }
 	self.Inventory = savedData.Items or {}
 
 	self.Hotbar = {}
@@ -37,13 +37,17 @@ function InventoryManager.new(player, savedData)
 		self.Hotbar[1] = {
 			Id = game:GetService("HttpService"):GenerateGUID(false),
 			Name = "Fists",
-			Amount = 1
+			Amount = 1,
 		}
 	end
 
-	self.Equipment = savedData.Equipment or {
-		Head = nil, Torso = nil, Legs = nil, Back = nil
-	}
+	self.Equipment = savedData.Equipment
+		or {
+			Head = nil,
+			Torso = nil,
+			Legs = nil,
+			Back = nil,
+		}
 
 	-- When true, the Backpack ChildAdded hook ignores additions.
 	-- Set during a weapon swap so a deferred UnequipTools() dropping the
@@ -61,10 +65,12 @@ end
 
 function InventoryManager:AddItem(toolName, amount)
 	amount = amount or 1
-	local toolPrefab = ServerStorage.Weapons:FindFirstChild(toolName) 
+	local toolPrefab = ServerStorage.Weapons:FindFirstChild(toolName)
 		or ServerStorage:FindFirstChild("Equipment"):FindFirstChild(toolName)
 
-	if not toolPrefab then return false end
+	if not toolPrefab then
+		return false
+	end
 
 	local isStackable = toolPrefab:GetAttribute("IsStackable")
 	local maxStack = toolPrefab:GetAttribute("MaxStack")
@@ -93,7 +99,7 @@ function InventoryManager:AddItem(toolName, amount)
 		local newItemData = {
 			Name = toolName,
 			Amount = stackAmount,
-			Id = game:GetService("HttpService"):GenerateGUID(false) -- Unique ID
+			Id = game:GetService("HttpService"):GenerateGUID(false), -- Unique ID
 		}
 
 		-- Prioritize Hotbar
@@ -115,7 +121,7 @@ function InventoryManager:AddItem(toolName, amount)
 	end
 
 	-- [[ 2. HYBRID LOGIC: GIVE THE PHYSICAL TOOL ]] --
-	-- Now that the data is saved, we safely grant the physical tool. 
+	-- Now that the data is saved, we safely grant the physical tool.
 	-- We check if they already physically have it so we don't spam the Backpack with duplicates of stackable items.
 	local backpack = self.Player:FindFirstChild("Backpack")
 	local starterGear = self.Player:FindFirstChild("StarterGear")
@@ -138,7 +144,7 @@ function InventoryManager:SaveState()
 	DataManager.SaveInventoryData(self.Player, {
 		Items = self.Inventory,
 		Hotbar = self.Hotbar,
-		Equipment = self.Equipment
+		Equipment = self.Equipment,
 	})
 
 	self:Sync()
@@ -147,7 +153,9 @@ end
 -- // Equip Item to Hotbar or Equipment Slot
 function InventoryManager:Equip(itemId, slotType, slotIndex)
 	local itemIndex, itemData = self:GetItemById(itemId)
-	if not itemData then return false end
+	if not itemData then
+		return false
+	end
 
 	local toolPrefab = ServerStorage.Weapons:FindFirstChild(itemData.Name)
 	local itemCategory = toolPrefab:GetAttribute("ItemType")
@@ -165,7 +173,9 @@ end
 -- // Equip a Spell to the Hotbar
 function InventoryManager:EquipSpell(spellName, slotIndex)
 	local playerStats = self.Player:FindFirstChild("PlayerStats")
-	if not playerStats then return false end
+	if not playerStats then
+		return false
+	end
 
 	local skillsFolder = playerStats:FindFirstChild("UnlockedSkills")
 	if not skillsFolder or not skillsFolder:FindFirstChild(spellName) then
@@ -178,7 +188,7 @@ function InventoryManager:EquipSpell(spellName, slotIndex)
 		Name = spellName,
 		Amount = 1, -- Spells don't deplete in quantity
 		Id = "Spell_" .. spellName, -- Unique ID pattern for spells
-		IsSpell = true -- Tells the Client UI this is a spell, not a physical Tool
+		IsSpell = true, -- Tells the Client UI this is a spell, not a physical Tool
 	}
 
 	-- Assign to the target hotbar slot (1 through 9)
@@ -192,23 +202,37 @@ end
 -- // Hook onto the current Backpack (Call this whenever the player respawns)
 function InventoryManager:HookBackpack()
 	local backpack = self.Player:WaitForChild("Backpack", 10)
-	if not backpack then return end
+	if not backpack then
+		return
+	end
 
 	-- Disconnect old connection if it exists to prevent memory leaks
-	if self.BackpackConnection then 
-		self.BackpackConnection:Disconnect() 
+	if self.BackpackConnection then
+		self.BackpackConnection:Disconnect()
 	end
 
 	-- Listen to the NEW Backpack
 	self.BackpackConnection = backpack.ChildAdded:Connect(function(child)
 		-- Ignore tools re-parented into the Backpack mid weapon-swap
 		-- (deferred UnequipTools dropping the old tool back in).
-		if self.IsSwapping then return end
+		if self.IsSwapping then
+			return
+		end
 
 		if child:IsA("Tool") then
 			local isInData = false
-			for _, item in ipairs(self.Inventory) do if item.Name == child.Name then isInData = true break end end
-			for _, item in pairs(self.Hotbar) do if item and item.Name == child.Name then isInData = true break end end
+			for _, item in ipairs(self.Inventory) do
+				if item.Name == child.Name then
+					isInData = true
+					break
+				end
+			end
+			for _, item in pairs(self.Hotbar) do
+				if item and item.Name == child.Name then
+					isInData = true
+					break
+				end
+			end
 
 			if not isInData then
 				self:AddItem(child.Name, 1)
@@ -220,7 +244,9 @@ end
 -- // Wipes all Weapons (Preserves Spells and non-weapon Items)
 function InventoryManager:ClearWeapons()
 	local weaponsFolder = game:GetService("ServerStorage"):FindFirstChild("Weapons")
-	if not weaponsFolder then return end
+	if not weaponsFolder then
+		return
+	end
 
 	-- Helper function to check if an item is strictly a weapon
 	local function isWeapon(itemName)
@@ -249,7 +275,9 @@ function InventoryManager:ClearWeapons()
 	local char = self.Player.Character
 
 	local function clearPhysicalTools(parent)
-		if not parent then return end
+		if not parent then
+			return
+		end
 		for _, child in ipairs(parent:GetChildren()) do
 			if child:IsA("Tool") and isWeapon(child.Name) then
 				child:Destroy()
@@ -259,7 +287,9 @@ function InventoryManager:ClearWeapons()
 
 	clearPhysicalTools(backpack)
 	clearPhysicalTools(starterGear)
-	if char then clearPhysicalTools(char) end -- Catches the weapon if they are currently holding it
+	if char then
+		clearPhysicalTools(char)
+	end -- Catches the weapon if they are currently holding it
 
 	-- Save the newly wiped data state
 	self:SaveState()
@@ -275,11 +305,15 @@ end
 -- call redundantly. Does not touch spells or non-weapon equipment.
 function InventoryManager:ReconcileWeapons(keepName)
 	local weaponsFolder = game:GetService("ServerStorage"):FindFirstChild("Weapons")
-	if not weaponsFolder then return end
+	if not weaponsFolder then
+		return
+	end
 
 	-- A newer swap is mid-flight; let its own reconcile settle the end-state instead.
 	-- Prevents a stale reconcile from purging the weapon a later swap just granted.
-	if self.IsSwapping then return end
+	if self.IsSwapping then
+		return
+	end
 
 	local function isWeapon(itemName)
 		return weaponsFolder:FindFirstChild(itemName) ~= nil
@@ -308,7 +342,9 @@ function InventoryManager:ReconcileWeapons(keepName)
 
 	-- Physical: purge stray weapon tools from every location.
 	local function purge(parent)
-		if not parent then return end
+		if not parent then
+			return
+		end
 		for _, child in ipairs(parent:GetChildren()) do
 			if child:IsA("Tool") and isWeapon(child.Name) and child.Name ~= keepName then
 				child:Destroy()
@@ -333,10 +369,10 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 	-- [[ 1. LOCATE AND VERIFY THE ITEM ]] --
 	if sourceType == "Inventory" then
 		for i, item in ipairs(self.Inventory) do
-			if item.Id == itemId then 
+			if item.Id == itemId then
 				itemData = item
 				invIndex = i
-				break 
+				break
 			end
 		end
 	elseif sourceType == "Hotbar" and self.Hotbar[tonumber(sourceIndex)] then
@@ -349,19 +385,25 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		end
 	end
 
-	if not itemData then return false end 
+	if not itemData then
+		return false
+	end
 
 	-- [[ 2. VALIDATE TARGET (Equipment Only) ]] --
 	if targetType == "Equipment" then
-		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(itemData.Name) 
-			or game:GetService("ServerStorage"):FindFirstChild("Equipment"):FindFirstChild(itemData.Name)
+		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(itemData.Name)
+			or game:GetService("ServerStorage")
+				:FindFirstChild("Equipment")
+				:FindFirstChild(itemData.Name)
 
-		if not toolPrefab then return false end
+		if not toolPrefab then
+			return false
+		end
 
-		local itemCategory = toolPrefab:GetAttribute("ItemType") 
-		if itemCategory ~= targetIndex then 
-			self:Sync() 
-			return false 
+		local itemCategory = toolPrefab:GetAttribute("ItemType")
+		if itemCategory ~= targetIndex then
+			self:Sync()
+			return false
 		end
 	end
 
@@ -380,14 +422,16 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 
 	if targetType == "Hotbar" then
 		local numTarget = tonumber(targetIndex)
-		if self.Hotbar[numTarget] ~= nil then swappedItem = self.Hotbar[numTarget] end
+		if self.Hotbar[numTarget] ~= nil then
+			swappedItem = self.Hotbar[numTarget]
+		end
 		self.Hotbar[numTarget] = itemData
-
 	elseif targetType == "Equipment" then
-		if self.Equipment[targetIndex] ~= nil then swappedItem = self.Equipment[targetIndex] end
+		if self.Equipment[targetIndex] ~= nil then
+			swappedItem = self.Equipment[targetIndex]
+		end
 		self.Equipment[targetIndex] = itemData
-		self:ApplyCharacterVisuals(itemData.Name, targetIndex) 
-
+		self:ApplyCharacterVisuals(itemData.Name, targetIndex)
 	elseif targetType == "Inventory" then
 		table.insert(self.Inventory, itemData)
 	end
@@ -407,7 +451,7 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 	-- Now that the data is 100% secure in its new location, we handle the physical objects
 
 	local function GrantPhysicalTool(name)
-		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(name) 
+		local toolPrefab = game:GetService("ServerStorage").Weapons:FindFirstChild(name)
 			or game:GetService("ServerStorage"):FindFirstChild("Equipment"):FindFirstChild(name)
 		if toolPrefab then
 			if not self.Player:FindFirstChild("Backpack"):FindFirstChild(name) then
@@ -425,11 +469,17 @@ function InventoryManager:MoveItem(itemId, sourceType, sourceIndex, targetType, 
 		local char = self.Player.Character
 
 		-- Destroy from inventory
-		if backpack and backpack:FindFirstChild(name) then backpack[name]:Destroy() end
-		if starterGear and starterGear:FindFirstChild(name) then starterGear[name]:Destroy() end
+		if backpack and backpack:FindFirstChild(name) then
+			backpack[name]:Destroy()
+		end
+		if starterGear and starterGear:FindFirstChild(name) then
+			starterGear[name]:Destroy()
+		end
 
 		-- [[ CRITICAL FIX: Destroy right out of the player's hands to prevent the crash ]]
-		if char and char:FindFirstChild(name) then char[name]:Destroy() end
+		if char and char:FindFirstChild(name) then
+			char[name]:Destroy()
+		end
 
 		-- Erase "currently holding" status from database
 		local DataManager = require(game.ServerScriptService.modules:WaitForChild("dataManager"))
@@ -479,7 +529,9 @@ end
 -- // Utility: Find item by unique ID
 function InventoryManager:GetItemById(itemId)
 	for i, item in ipairs(self.Inventory) do
-		if item.Id == itemId then return i, item end
+		if item.Id == itemId then
+			return i, item
+		end
 	end
 	return nil, nil
 end
@@ -492,9 +544,9 @@ function InventoryManager:BuildFromBackpack()
 	-- Check if the player already has a saved hotbar layout
 	local hasSavedHotbar = false
 	for i = 1, 9 do
-		if self.Hotbar[tostring(i)] ~= nil or self.Hotbar[i] ~= nil then 
-			hasSavedHotbar = true 
-			break 
+		if self.Hotbar[tostring(i)] ~= nil or self.Hotbar[i] ~= nil then
+			hasSavedHotbar = true
+			break
 		end
 	end
 
@@ -503,12 +555,14 @@ function InventoryManager:BuildFromBackpack()
 		self.Inventory = {} -- Clear existing just in case
 
 		for index, tool in ipairs(tools) do
-			if not tool:IsA("Tool") then continue end
+			if not tool:IsA("Tool") then
+				continue
+			end
 
 			local itemData = {
 				Id = game:GetService("HttpService"):GenerateGUID(false),
 				Name = tool.Name,
-				Amount = 1 -- Assuming tools don't stack natively in your current setup
+				Amount = 1, -- Assuming tools don't stack natively in your current setup
 			}
 
 			if index <= 9 then
@@ -531,23 +585,31 @@ end
 -- // Utility: Clean up hotbar/equipment if item is dropped/removed
 function InventoryManager:ClearFromQuickSlots(itemId)
 	for i, v in pairs(self.Hotbar) do
-		if v and v.Id == itemId then self.Hotbar[i] = nil end
+		if v and v.Id == itemId then
+			self.Hotbar[i] = nil
+		end
 	end
 	for k, v in pairs(self.Equipment) do
-		if v and v.Id == itemId then self.Equipment[k] = nil end
+		if v and v.Id == itemId then
+			self.Equipment[k] = nil
+		end
 	end
 end
 
 -- // Remove Visual 3D Equipment
 function InventoryManager:RemoveCharacterVisuals(category)
 	local char = self.Player.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	-- 1. Check for manual welds (like the Lantern) in the visual folder
 	local visFolder = char:FindFirstChild("VisualEquipment")
 	if visFolder then
 		local existingVisual = visFolder:FindFirstChild(category)
-		if existingVisual then existingVisual:Destroy() end
+		if existingVisual then
+			existingVisual:Destroy()
+		end
 	end
 
 	-- 2. [[ FIXED: Loop to destroy ALL segmented accessories for this slot ]]
@@ -565,7 +627,9 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 
 	local char = self.Player.Character
 	local humanoid = char and char:FindFirstChild("Humanoid")
-	if not char or not humanoid then return end
+	if not char or not humanoid then
+		return
+	end
 
 	-- [[ ACCESSORY PATH: Equipments/<category>/<itemName> ]]
 	-- Handles Head, Torso, Legs, or any future accessory-based slot generically.
@@ -596,8 +660,11 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 
 	-- [[ WELD PATH: For non-accessory items (Back, Lanterns, etc.) ]]
 	local weldPrefab = ServerStorage.Weapons:FindFirstChild(itemName)
-		or ServerStorage:FindFirstChild("Equipment") and ServerStorage.Equipment:FindFirstChild(itemName)
-	if not weldPrefab then return end
+		or ServerStorage:FindFirstChild("Equipment")
+			and ServerStorage.Equipment:FindFirstChild(itemName)
+	if not weldPrefab then
+		return
+	end
 
 	local visFolder = char:FindFirstChild("VisualEquipment") or Instance.new("Folder")
 	visFolder.Name = "VisualEquipment"
@@ -623,7 +690,9 @@ function InventoryManager:ApplyCharacterVisuals(itemName, category)
 	local root = char:FindFirstChild("LowerTorso") or char:FindFirstChild("Torso")
 	if root and visualModel.PrimaryPart then
 		if category == "Back" then
-			visualModel:PivotTo(root.CFrame * CFrame.new(1.3, -1.5, 0) * CFrame.Angles(0, 0, math.rad(30)))
+			visualModel:PivotTo(
+				root.CFrame * CFrame.new(1.3, -1.5, 0) * CFrame.Angles(0, 0, math.rad(30))
+			)
 		end
 
 		local weld = Instance.new("WeldConstraint")
@@ -657,16 +726,21 @@ end
 
 -- Shallow-copy an item and attach its Category without mutating stored data.
 local function DecorateItem(item)
-	if not item then return nil end
+	if not item then
+		return nil
+	end
 	local copy = {}
-	for k, v in pairs(item) do copy[k] = v end
+	for k, v in pairs(item) do
+		copy[k] = v
+	end
 	copy.Category = GetItemCategory(item.Name)
 	return copy
 end
 
 -- // Sync Data to Client UI
 function InventoryManager:Sync()
-	local UpdateUIEvent = game:GetService("ReplicatedStorage"):WaitForChild("remotes"):WaitForChild("UpdateUI")
+	local UpdateUIEvent =
+		game:GetService("ReplicatedStorage"):WaitForChild("remotes"):WaitForChild("UpdateUI")
 
 	local decoratedItems = {}
 	for i, item in ipairs(self.Inventory) do
@@ -686,7 +760,7 @@ function InventoryManager:Sync()
 	UpdateUIEvent:FireClient(self.Player, {
 		Items = decoratedItems,
 		Hotbar = decoratedHotbar,
-		Equipment = decoratedEquipment
+		Equipment = decoratedEquipment,
 	})
 end
 

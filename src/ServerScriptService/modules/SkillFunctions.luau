@@ -21,7 +21,10 @@ local module = {}
 
 local function playSound(char, soundIdOrObj)
 	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then wait("No HRP found!") return end
+	if not root then
+		wait("No HRP found!")
+		return
+	end
 
 	local s
 	if typeof(soundIdOrObj) == "string" then
@@ -53,7 +56,7 @@ local function applyDashEffect(char)
 			if v:FindFirstChildOfClass("SpecialMesh") then
 				v:FindFirstChildOfClass("SpecialMesh"):Clone().Parent = part
 			end
-			TweenService:Create(part, TweenInfo.new(0.6), {Transparency = 1}):Play()
+			TweenService:Create(part, TweenInfo.new(0.6), { Transparency = 1 }):Play()
 			Debris:AddItem(part, 0.5)
 		end
 	end
@@ -74,9 +77,11 @@ local function createAfterImage(character)
 			clone.Name = "AfterImageFX"
 
 			local mesh = part:FindFirstChildOfClass("SpecialMesh")
-			if mesh then mesh:Clone().Parent = clone end
+			if mesh then
+				mesh:Clone().Parent = clone
+			end
 
-			TweenService:Create(clone, TweenInfo.new(0.6), {Transparency = 1}):Play()
+			TweenService:Create(clone, TweenInfo.new(0.6), { Transparency = 1 }):Play()
 			Debris:AddItem(clone, 0.6)
 		end
 	end
@@ -84,32 +89,55 @@ end
 
 -- [[ CORE HIT HANDLER ]] --
 -- This function handles all hit logic (Damage, Stun, XP, Blocking, Dodging)
-local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damage, weaponType, knockbackDist, stunTime, ragdollTime, originPart, extraVar)
+local function processHit(
+	player,
+	attackerChar,
+	hitCharsTable,
+	alreadyHit,
+	damage,
+	weaponType,
+	knockbackDist,
+	stunTime,
+	ragdollTime,
+	originPart,
+	extraVar
+)
 	local attackerHRP = attackerChar:FindFirstChild("HumanoidRootPart")
 	-- If no specific origin part (like a fireball) is passed, use the attacker's RootPart
-	local originPosition = originPart and originPart.Position or (attackerHRP and attackerHRP.Position)
-	
+	local originPosition = originPart and originPart.Position
+		or (attackerHRP and attackerHRP.Position)
+
 	local var = nil
 	if extraVar then
 		var = tostring(extraVar)
 		print(var)
 	end
 
-	if not attackerHRP or not originPosition then return end
-	if StateHandler.IsInterrupted(attackerChar) then return end
+	if not attackerHRP or not originPosition then
+		return
+	end
+	if StateHandler.IsInterrupted(attackerChar) then
+		return
+	end
 
 	for _, hit in pairs(hitCharsTable) do
 		local humanoid = hit:FindFirstChild("Humanoid")
 		local targetChar = humanoid and humanoid.Parent
-		if not targetChar or (targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")) then continue end
+		if
+			not targetChar
+			or (targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid"))
+		then
+			continue
+		end
 
 		local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
 		-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 		if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
-
 			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-			if not targetHRP then return end
+			if not targetHRP then
+				return
+			end
 
 			-- 1. DODGE CHECK
 			if StateHandler.GetState(targetChar, "Dodging") then
@@ -123,12 +151,21 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				game.Debris:AddItem(effect, 0.3)
 
 				-- Visual transparency effect for dodge
-				if targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso") then
+				if
+					targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+				then
 					for _, part in pairs(targetChar:GetChildren()) do
-						if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+						if
+							part:IsA("BasePart")
+							and part ~= targetHRP
+							and part.Name ~= "Head"
+							and part.Name ~= "Left Arm"
+						then
 							local oldTrans = part.Transparency
 							part.Transparency = 0.7
-							task.delay(0.3, function() part.Transparency = oldTrans end)
+							task.delay(0.3, function()
+								part.Transparency = oldTrans
+							end)
 						end
 					end
 				end
@@ -139,7 +176,8 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 			local function doAttack(extraDmg, finalKnockback)
 				local direction = (targetHRP.Position - originPosition).Unit
 
-				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+					or "rbxassetid://111089735892609"
 				animationHandler.LoadAnim(targetChar, "Hit", animID, nil, false)
 
 				helperModule.ApplyKnockback(targetChar, direction, finalKnockback, 0.2)
@@ -148,14 +186,21 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 					ragdollManager.Ragdoll(targetChar, ragdollTime)
 				end
 
-				dmgCalculator.CalculateDamage(attackerChar, targetChar, damage, extraDmg, false, "Skill")
-				
+				dmgCalculator.CalculateDamage(
+					attackerChar,
+					targetChar,
+					damage,
+					extraDmg,
+					false,
+					"Skill"
+				)
+
 				if var and var == "LifeRegen" then
 					attackerChar.Humanoid.Health += damage
 				end
 
-				if targetChar.Humanoid.Health > 0 then 
-					dataManager.AddWeaponXP(player, weaponType, damage + extraDmg) 
+				if targetChar.Humanoid.Health > 0 then
+					dataManager.AddWeaponXP(player, weaponType, damage + extraDmg)
 				end
 
 				local s = ReplicatedStorage.assets.sounds.PunchHit:Clone()
@@ -168,17 +213,23 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				highlight.Enabled = true
 				game.Debris:AddItem(highlight, 0.2)
 
-				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
-				local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+					:Clone()
+				local torso = targetChar:FindFirstChild("Torso")
+					or targetChar:FindFirstChild("UpperTorso")
 				if torso then
 					hitEff.Parent = torso
-					for _,v in pairs(hitEff:GetChildren()) do
-						if v:IsA("ParticleEmitter") then v.Enabled = true end
+					for _, v in pairs(hitEff:GetChildren()) do
+						if v:IsA("ParticleEmitter") then
+							v.Enabled = true
+						end
 					end
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
-							if v:IsA("ParticleEmitter") then v.Enabled = false end
+						for _, v in pairs(hitEff:GetChildren()) do
+							if v:IsA("ParticleEmitter") then
+								v.Enabled = false
+							end
 						end
 					end)
 				end
@@ -213,7 +264,8 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 					-- BLOCKED (chip + frame advantage already applied by resolver)
 					BlockResolver.OnAttackerLandedHit(attackerChar)
 					local parryE = ReplicatedStorage.assets.FX["parry/blocked"].parry:Clone()
-					local torso = targetChar:FindFirstChild("Torso") or targetChar:FindFirstChild("UpperTorso")
+					local torso = targetChar:FindFirstChild("Torso")
+						or targetChar:FindFirstChild("UpperTorso")
 					if torso then
 						parryE.Parent = torso
 						parryE.Enabled = true
@@ -223,9 +275,12 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				end
 				-- 3. PARRY STATE (If you have a separate parry state, add logic here)
 			elseif StateHandler.GetState(targetChar, "Parrying") then
-				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-				local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-				local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+					:Clone()
+				local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+					:Clone()
+				local clash = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+					:Clone()
 				local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 				h1.Parent = attackerChar
 				game.Debris:AddItem(h1, 0.1)
@@ -233,11 +288,12 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				effect2.Parent = attackerChar:WaitForChild("Torso")
 				clash.Parent = attackerChar:WaitForChild("Right Arm")
 
-				local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+				local clash2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+					:Clone()
 				clash2.Parent = targetChar:WaitForChild("Right Arm")
 				clash2:Emit(30)
 				game.Debris:AddItem(clash2, 0.7)
-				
+
 				local s = game:GetService("ReplicatedStorage").assets.sounds.ParrySound:Clone()
 				s.Parent = targetHRP
 				s:Play()
@@ -247,7 +303,7 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				effect2.Enabled = true
 				clash:Emit(30)
 				game.Debris:AddItem(clash, 0.7)
-				game.Debris:AddItem(parryE,0.7)
+				game.Debris:AddItem(parryE, 0.7)
 				game.Debris:AddItem(effect2, 0.7)
 
 				-- Parry beats hyperarmor: clear it so this punish stun actually lands.
@@ -256,11 +312,32 @@ local function processHit(player, attackerChar, hitCharsTable, alreadyHit, damag
 				StateHandler.SetState(attackerChar, "CantAnything", true, 0.5)
 				ParryService.ResetParry(game.Players:GetPlayerFromCharacter(targetChar))
 				require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(targetChar)
-				if game.Players:GetPlayerFromCharacter(targetChar) then ReplicatedStorage.remotes.replicate:FireClient(game.Players:GetPlayerFromCharacter(targetChar), {Type = "Combat", Action = "M1", Func = "Parry", FolderName = (targetChar:FindFirstChildOfClass("Tool") and targetChar:FindFirstChildOfClass("Tool").Name) or "Katana"}, attackerChar, targetChar) end
+				if game.Players:GetPlayerFromCharacter(targetChar) then
+					ReplicatedStorage.remotes.replicate:FireClient(
+						game.Players:GetPlayerFromCharacter(targetChar),
+						{
+							Type = "Combat",
+							Action = "M1",
+							Func = "Parry",
+							FolderName = (
+								targetChar:FindFirstChildOfClass("Tool")
+								and targetChar:FindFirstChildOfClass("Tool").Name
+							) or "Katana",
+						},
+						attackerChar,
+						targetChar
+					)
+				end
 
 				animationHandler.StopAnim(attackerChar, "ALL")
-				animationHandler.LoadAnim(attackerChar, "Parried", "rbxassetid://116383775729821", nil, false)
-				return 
+				animationHandler.LoadAnim(
+					attackerChar,
+					"Parried",
+					"rbxassetid://116383775729821",
+					nil,
+					false
+				)
+				return
 			else
 				-- NORMAL HIT
 				doAttack(0, knockbackDist)
@@ -288,14 +365,16 @@ function module.AbyssalScream(player)
 	-- Visuals
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	NewShield2.Parent = character
-	NewShield2.CFrame = root.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = root.CFrame * CFrame.new(0, 5, 0)
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	WeldCon.Part0 = root
 	WeldCon.Part1 = NewShield2
 	WeldCon.Parent = NewShield2
 
 	local InfoTween = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut)
-	TweenService:Create(NewShield2, InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0)}):Play()
+	TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
 
 	playSound(character, "rbxassetid://7100154577")
 	Debris:AddItem(NewShield2, 2)
@@ -305,7 +384,9 @@ function module.AbyssalScream(player)
 	local gsAura = ReplicatedStorage.assets.FX.dragonSlayer.gsAuraPart
 
 	local function applyAura(targetPart, duration)
-		if not targetPart then return end
+		if not targetPart then
+			return
+		end
 
 		for _, item in pairs(gsAura:GetChildren()) do
 			if item:IsA("ParticleEmitter") then
@@ -332,7 +413,7 @@ function module.AbyssalScream(player)
 
 	local hitboxParams = { SizeOrPart = 7, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(root, CFrame.new(0,2,0))
+	Hitbox:WeldTo(root, CFrame.new(0, 2, 0))
 	Hitbox:Start()
 
 	StateHandler.SetState(character, "M1", true, 0.3)
@@ -368,20 +449,24 @@ end
 -- regardless, so bursting on nothing costs you ~1s of vulnerability afterwards (the
 -- i-frames have already lapsed) and you can be punished. No damage is dealt, so there
 -- is no processHit / CalculateDamage call at all: just knockback + ragdoll.
-local BURST_ACTIVE          = 0.15  -- i-frame + hitbox window (0.1-0.2s per design)
-local BURST_WHIFF_RECOVERY  = 1.0   -- total CantAnything lock (the punish on a whiff)
-local BURST_ROOT_HIT        = 0.5   -- WalkSpeed root length when the burst catches a target
-local BURST_ROOT_WHIFF      = 1.0   -- WalkSpeed root length on a clean whiff
-local BURST_RADIUS          = 8     -- knockback radius around the user
-local BURST_KNOCKBACK       = 30    -- how far enemies are shoved
-local BURST_RAGDOLL         = 1.0   -- seconds enemies stay ragdolled
+local BURST_ACTIVE = 0.15 -- i-frame + hitbox window (0.1-0.2s per design)
+local BURST_WHIFF_RECOVERY = 1.0 -- total CantAnything lock (the punish on a whiff)
+local BURST_ROOT_HIT = 0.5 -- WalkSpeed root length when the burst catches a target
+local BURST_ROOT_WHIFF = 1.0 -- WalkSpeed root length on a clean whiff
+local BURST_RADIUS = 8 -- knockback radius around the user
+local BURST_KNOCKBACK = 30 -- how far enemies are shoved
+local BURST_RAGDOLL = 1.0 -- seconds enemies stay ragdolled
 
 function module.Burst(player)
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 	local hum = character:FindFirstChild("Humanoid")
 	local root = character:FindFirstChild("HumanoidRootPart")
-	if not hum or not root or hum.Health <= 0 then return end
+	if not hum or not root or hum.Health <= 0 then
+		return
+	end
 
 	-- Break whatever the user is stuck in FIRST, so a combo-victim can actually
 	-- burst out: clear their Stunned so the i-frames + lock we set below stick.
@@ -410,7 +495,9 @@ function module.Burst(player)
 		rootToken += 1
 		local myToken = rootToken
 		task.delay(after, function()
-			if myToken ~= rootToken then return end
+			if myToken ~= rootToken then
+				return
+			end
 			helperModule.ResetSpeed(character)
 		end)
 	end
@@ -427,11 +514,12 @@ function module.Burst(player)
 	weld.Part0 = root
 	weld.Part1 = shield
 	weld.Parent = shield
-	TweenService:Create(shield, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), {Transparency = 1}):Play()
+	TweenService:Create(shield, TweenInfo.new(0.15, Enum.EasingStyle.Cubic), { Transparency = 1 })
+		:Play()
 	Debris:AddItem(shield, 1)
 
 	playSound(character, "rbxassetid://133937210261198")
-	
+
 	local emitAttach = ReplicatedStorage.assets.FX.skills.AbyssalScreamEmits:Clone()
 	emitAttach.Parent = root
 	for _, eff in pairs(emitAttach:GetChildren()) do
@@ -441,7 +529,8 @@ function module.Burst(player)
 	end
 
 	-- Radius hitbox. No damage: for each enemy caught, knockback + short ragdoll only.
-	local Hitbox = hitboxClass.new({ SizeOrPart = BURST_RADIUS, SpatialOption = "InRadius", DebounceTime = 1 })
+	local Hitbox =
+		hitboxClass.new({ SizeOrPart = BURST_RADIUS, SpatialOption = "InRadius", DebounceTime = 1 })
 	Hitbox:WeldTo(root, CFrame.new(0, 0, 0))
 	Hitbox:Start()
 
@@ -451,13 +540,19 @@ function module.Burst(player)
 		for _, hit in pairs(hitCharsTable) do
 			local targetHum = hit:FindFirstChild("Humanoid")
 			local targetChar = targetHum and targetHum.Parent
-			if not targetChar then continue end
+			if not targetChar then
+				continue
+			end
 			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-			if not targetHRP or alreadyHit[targetChar] then continue end
+			if not targetHRP or alreadyHit[targetChar] then
+				continue
+			end
 
 			-- never self; never friendly-fire the caster
 			local hitPlr = game.Players:GetPlayerFromCharacter(targetChar)
-			if targetChar == character or (hitPlr and hitPlr == player) then continue end
+			if targetChar == character or (hitPlr and hitPlr == player) then
+				continue
+			end
 
 			alreadyHit[targetChar] = true
 
@@ -492,7 +587,9 @@ function module.Whirlwind(player)
 	playSound(character, ReplicatedStorage.assets.sounds.greatsword.woosh)
 
 	task.delay(0.5, function()
-		if not character or not root then return end
+		if not character or not root then
+			return
+		end
 		local airborneVelocity = Instance.new("BodyVelocity")
 		airborneVelocity.Parent = root
 		airborneVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
@@ -500,17 +597,19 @@ function module.Whirlwind(player)
 		Debris:AddItem(airborneVelocity, 0.4)
 
 		applyDashEffect(character)
-		task.delay(0.5, function ()
+		task.delay(0.5, function()
 			applyDashEffect(character)
 		end)
 	end)
 
 	task.wait(1.6)
 	playSound(character, ReplicatedStorage.assets.sounds.greatsword.GroundImpact)
-	
+
 	local function getEquippedTool()
 		local currentCharacter = player.Character
-		if not currentCharacter then return nil end
+		if not currentCharacter then
+			return nil
+		end
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 		if tool and tool.Parent == currentCharacter then
 			return tool.Name
@@ -519,12 +618,13 @@ function module.Whirlwind(player)
 	end
 
 	if getEquippedTool() then
-		local tool = character:FindFirstChild("Dragon Slayer") or character:FindFirstChild("Greatsword")
+		local tool = character:FindFirstChild("Dragon Slayer")
+			or character:FindFirstChild("Greatsword")
 		local groundSlam = game.ReplicatedStorage.assets.FX.groundSlam.Attachment:Clone()
 		groundSlam.Parent = tool.Greatsword
 		groundSlam.Position = tool.Greatsword.Top.Position
-		groundSlam.Orientation = Vector3.new(0,0,50)
-		for _,eff in pairs(groundSlam:GetChildren()) do
+		groundSlam.Orientation = Vector3.new(0, 0, 50)
+		for _, eff in pairs(groundSlam:GetChildren()) do
 			if eff:IsA("ParticleEmitter") then
 				eff:Emit(eff:GetAttribute("EmitCount"))
 			end
@@ -533,7 +633,7 @@ function module.Whirlwind(player)
 
 	local hitboxParams = { SizeOrPart = 8, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(root, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(root, CFrame.new(0, 0, -4))
 	Hitbox:Start()
 
 	local alreadyHit = {}
@@ -552,10 +652,10 @@ end
 function module.BerserkerArmor(player)
 	local char = player.Character
 	local hum = char.Humanoid
-	
+
 	local RaceConfig = require(ReplicatedStorage.modules.RaceConfig)
 	local raceValue = player:FindFirstChild("PlayerStats"):FindFirstChild("Race")
-	
+
 	local raceData = RaceConfig.Races[raceValue.Value]
 	local visuals = raceData.Visuals
 
@@ -563,7 +663,7 @@ function module.BerserkerArmor(player)
 	local ArmorPantsTemplate = "http://www.roblox.com/asset/?id=1182925117"
 
 	animationHandler.LoadAnim(char, "Activate", "rbxassetid://81970199114583", nil, false)
-	
+
 	hum.Health += hum.MaxHealth / 4
 
 	local oldShirtObj = char:FindFirstChildOfClass("Shirt")
@@ -579,7 +679,9 @@ function module.BerserkerArmor(player)
 	local gsAura = game.ReplicatedStorage.assets.FX.dragonSlayer.gsAuraPart
 
 	local function applyAura(targetPart, duration)
-		if not targetPart then return end
+		if not targetPart then
+			return
+		end
 
 		for _, item in pairs(gsAura:GetChildren()) do
 			if item:IsA("ParticleEmitter") then
@@ -592,20 +694,20 @@ function module.BerserkerArmor(player)
 
 	applyAura(char:FindFirstChild("Torso"), 30)
 	applyAura(char:FindFirstChild("Head"), 30)
-	
-	
+
 	for i, v in pairs(char:GetChildren()) do
 		if v:IsA("Accessory") then
 			local handle = v:FindFirstChild("Handle")
-			if handle then handle.Transparency = 1 end
+			if handle then
+				handle.Transparency = 1
+			end
 		end
 	end
-
 
 	local oldHeadColor = char.Head.Color
 	char.Head.Color = Color3.fromRGB(0, 0, 0)
 
-	char.HumanoidRootPart.Anchored = false 
+	char.HumanoidRootPart.Anchored = false
 
 	playSound(char, ReplicatedStorage.assets.sounds.greatsword.Scream1)
 	playSound(char, ReplicatedStorage.assets.sounds.greatsword.Scream2)
@@ -628,7 +730,9 @@ function module.BerserkerArmor(player)
 
 	task.spawn(function()
 		for i = 1, 6 do
-			if not char or hum.Health <= 10 then break end
+			if not char or hum.Health <= 10 then
+				break
+			end
 			hum:TakeDamage(10)
 			task.wait(5)
 		end
@@ -641,27 +745,43 @@ function module.BerserkerArmor(player)
 				for i, v in pairs(char:GetChildren()) do
 					if v:IsA("Accessory") and v.AccessoryType ~= Enum.AccessoryType.Hair then
 						local handle = v:FindFirstChild("Handle")
-						if handle then handle.Transparency = 0 end
+						if handle then
+							handle.Transparency = 0
+						end
 					end
 				end
 			else
 				for i, v in pairs(char:GetChildren()) do
 					if v:IsA("Accessory") then
 						local handle = v:FindFirstChild("Handle")
-						if handle then handle.Transparency = 0 end
+						if handle then
+							handle.Transparency = 0
+						end
 					end
 				end
 			end
 		end
 
-		if helmet then helmet:Destroy() end
-		if cape then cape:Destroy() end
+		if helmet then
+			helmet:Destroy()
+		end
+		if cape then
+			cape:Destroy()
+		end
 
 		if Shirt and Shirt.Parent then
-			if oldShirt ~= "" then Shirt.ShirtTemplate = oldShirt else Shirt:Destroy() end
+			if oldShirt ~= "" then
+				Shirt.ShirtTemplate = oldShirt
+			else
+				Shirt:Destroy()
+			end
 		end
 		if Pants and Pants.Parent then
-			if oldPants ~= "" then Pants.PantsTemplate = oldPants else Pants:Destroy() end
+			if oldPants ~= "" then
+				Pants.PantsTemplate = oldPants
+			else
+				Pants:Destroy()
+			end
 		end
 	end)
 end
@@ -673,7 +793,7 @@ end
 function module.AirWave(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
-	
+
 	helperModule.SetSpeed(character, 0, 16)
 
 	StateHandler.SetState(character, "CantAnything", true, 1.5)
@@ -693,7 +813,9 @@ function module.AirWave(player)
 	local explosion = ReplicatedStorage.assets.FX.skills.ExcSkill2:Clone()
 	explosion.CFrame = position
 	explosion.Parent = workspace
-	for _,v in pairs(explosion.Explosion:GetChildren()) do v:Emit(v:GetAttribute("EmitCount")) end
+	for _, v in pairs(explosion.Explosion:GetChildren()) do
+		v:Emit(v:GetAttribute("EmitCount"))
+	end
 
 	local hitboxParams = { SizeOrPart = 10, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
@@ -707,7 +829,7 @@ function module.AirWave(player)
 		processHit(player, character, hitCharsTable, alreadyHit, 12, "Sword", 15, 0.5, 1, explosion)
 	end)
 
-	task.delay(0.2, function() 
+	task.delay(0.2, function()
 		Hitbox:Destroy()
 		helperModule.ResetSpeed(character)
 	end)
@@ -716,7 +838,6 @@ end
 
 function module.ElfinDance(player)
 	local character = player.Character
-	
 
 	StateHandler.SetState(character, "Dodging", true, 0.3)
 	StateHandler.SetState(character, "CantAnything", true, 1.3)
@@ -742,16 +863,29 @@ function module.ElfinDance(player)
 
 	local hitboxParams = { SizeOrPart = 5, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 0, -4))
 	Hitbox:Start()
 
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 10, "Sword", 5, 0.5, 0, character.HumanoidRootPart)
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			10,
+			"Sword",
+			5,
+			0.5,
+			0,
+			character.HumanoidRootPart
+		)
 	end)
 
-	task.delay(0.2, function() Hitbox:Destroy() end)
+	task.delay(0.2, function()
+		Hitbox:Destroy()
+	end)
 end
 
 function module.Morgan(player)
@@ -762,14 +896,16 @@ function module.Morgan(player)
 	local soundFolder = ReplicatedStorage.assets.sounds.magic.excUlt
 	playSound(character, soundFolder.UltStart)
 
-	local ExcaliburAnim = character.Humanoid.Animator:LoadAnimation(ReplicatedStorage.assets.animations.Ult)
+	local ExcaliburAnim =
+		character.Humanoid.Animator:LoadAnimation(ReplicatedStorage.assets.animations.Ult)
 	ExcaliburAnim:Play()
 
-	local hitboxParams = { SizeOrPart = Vector3.new(25,10,100), SpatialOption = "InBox", DebounceTime = 10 }
+	local hitboxParams =
+		{ SizeOrPart = Vector3.new(25, 10, 100), SpatialOption = "InBox", DebounceTime = 10 }
 	local Hitbox = hitboxClass.new(hitboxParams)
 
 	ExcaliburAnim.KeyframeReached:Connect(function(kf)
-		if kf == "StartGlowing" then		
+		if kf == "StartGlowing" then
 			playSound(character, soundFolder.Swing)
 
 			playSound(character, soundFolder.Rise)
@@ -780,14 +916,14 @@ function module.Morgan(player)
 			tool.Uchigatana.Bottom.Flare.Enabled = true
 			tool.Uchigatana.Bottom.Glow.Enabled = true
 		elseif kf == "EnableUpDraftParticle" then
-
 			--local upBeamEff = game.ReplicatedStorage.assets.FX.skills.EffectsExc.ExcUltBeam.BeamUP:Clone()
 			--upBeamEff.Parent = character.HumanoidRootPart
 			--game.Debris:AddItem(upBeamEff, 4)
 
 			helperModule.SetSpeed(character, 0, 16)
 
-			local UpDraftEffect = game.ReplicatedStorage.assets.FX.skills.EffectsExc.UpDraftParticle:Clone()
+			local UpDraftEffect =
+				game.ReplicatedStorage.assets.FX.skills.EffectsExc.UpDraftParticle:Clone()
 			UpDraftEffect.Parent = workspace.plrManager.projectiles
 			UpDraftEffect.CFrame = character.HumanoidRootPart.CFrame
 			game.Debris:AddItem(UpDraftEffect, 9)
@@ -795,25 +931,32 @@ function module.Morgan(player)
 			local upBeam = tool.Uchigatana.Bottom.Beam55
 			upBeam.Enabled = true
 
-			game:GetService("TweenService"):Create(UpDraftEffect.PointLight, TweenInfo.new(1), {Brightness = 1}):Play()
+			game:GetService("TweenService")
+				:Create(UpDraftEffect.PointLight, TweenInfo.new(1), { Brightness = 1 })
+				:Play()
 
-			for i,v in pairs(UpDraftEffect.Attachment:GetChildren()) do
+			for i, v in pairs(UpDraftEffect.Attachment:GetChildren()) do
 				v.Enabled = true
-				task.delay(4,function() v.Enabled = false end)
+				task.delay(4, function()
+					v.Enabled = false
+				end)
 			end
 
-			for i,v in pairs(UpDraftEffect.Attachment2:GetChildren()) do
+			for i, v in pairs(UpDraftEffect.Attachment2:GetChildren()) do
 				v.Enabled = true
-				task.delay(4.5,function() v.Enabled = false end)
+				task.delay(4.5, function()
+					v.Enabled = false
+				end)
 			end
 
-			task.delay(4,function()
+			task.delay(4, function()
 				upBeam.Enabled = false
-				game:GetService("TweenService"):Create(UpDraftEffect.PointLight, TweenInfo.new(1), {Brightness = 0}):Play()
+				game:GetService("TweenService")
+					:Create(UpDraftEffect.PointLight, TweenInfo.new(1), { Brightness = 0 })
+					:Play()
 				task.wait(1)
-				UpDraftEffect.PointLight.Enabled = false 
+				UpDraftEffect.PointLight.Enabled = false
 			end)
-
 		elseif kf == "Hit" then
 			tool.Uchigatana.Bottom.Fire.Enabled = false
 			tool.Uchigatana.Bottom.Flare.Enabled = false
@@ -824,7 +967,7 @@ function module.Morgan(player)
 			local FloorSlash = game.ReplicatedStorage.assets.FX.skills.EffectsExc.FloorSlash:Clone()
 			FloorSlash.Parent = workspace.plrManager.projectiles
 			FloorSlash.CFrame = character.HumanoidRootPart.CFrame
-			FloorSlash.Position = FloorSlash.Position + Vector3.new(.5,-3,0)
+			FloorSlash.Position = FloorSlash.Position + Vector3.new(0.5, -3, 0)
 			task.delay(0.5, function()
 				for _, v in pairs(FloorSlash:GetDescendants()) do
 					if v:IsA("ParticleEmitter") then
@@ -834,30 +977,52 @@ function module.Morgan(player)
 			end)
 			game.Debris:AddItem(FloorSlash, 5)
 
-			game:GetService("TweenService"):Create(FloorSlash,TweenInfo.new(.5),{Size = Vector3.new(38, 0.001, 100)}):Play()	
-			game:GetService("TweenService"):Create(FloorSlash,TweenInfo.new(.5),{CFrame = FloorSlash.CFrame * CFrame.new(0,0,-50)}):Play()	
-			task.delay(1,function() game:GetService("TweenService"):Create(FloorSlash.Decal,TweenInfo.new(1),{Transparency = 1}):Play() end)
+			game:GetService("TweenService")
+				:Create(FloorSlash, TweenInfo.new(0.5), { Size = Vector3.new(38, 0.001, 100) })
+				:Play()
+			game:GetService("TweenService")
+				:Create(
+					FloorSlash,
+					TweenInfo.new(0.5),
+					{ CFrame = FloorSlash.CFrame * CFrame.new(0, 0, -50) }
+				)
+				:Play()
+			task.delay(1, function()
+				game:GetService("TweenService")
+					:Create(FloorSlash.Decal, TweenInfo.new(1), { Transparency = 1 })
+					:Play()
+			end)
 
 			--
-			local function createSliceVFX(positionOffset,EndPos)
+			local function createSliceVFX(positionOffset, EndPos)
 				local sliceVFX = game.ReplicatedStorage.assets.FX.skills.EffectsExc.Slice:Clone()
 				sliceVFX.Parent = workspace.plrManager.projectiles
 				sliceVFX.CFrame = character.HumanoidRootPart.CFrame
 				sliceVFX.Position = sliceVFX.Position - positionOffset
 				game.Debris:AddItem(sliceVFX, 3)
 
-				game:GetService("TweenService"):Create(sliceVFX, TweenInfo.new(.5), {Size = Vector3.new(10, 15, 100) }):Play()
-				game:GetService("TweenService"):Create(sliceVFX, TweenInfo.new(.5), {CFrame = character.HumanoidRootPart.CFrame * EndPos}):Play()
-				task.delay(2, function() 
-					game:GetService("TweenService"):Create(sliceVFX, TweenInfo.new(.5), { Transparency = 1 }):Play() 
+				game:GetService("TweenService")
+					:Create(sliceVFX, TweenInfo.new(0.5), { Size = Vector3.new(10, 15, 100) })
+					:Play()
+				game:GetService("TweenService")
+					:Create(
+						sliceVFX,
+						TweenInfo.new(0.5),
+						{ CFrame = character.HumanoidRootPart.CFrame * EndPos }
+					)
+					:Play()
+				task.delay(2, function()
+					game:GetService("TweenService")
+						:Create(sliceVFX, TweenInfo.new(0.5), { Transparency = 1 })
+						:Play()
 				end)
 			end
 
-			createSliceVFX(Vector3.new(-10,3,0),CFrame.new(10, 5, -50))
-			createSliceVFX(Vector3.new(10,3,0),CFrame.new(-10, 5, -50))
-			Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,3,-50))
+			createSliceVFX(Vector3.new(-10, 3, 0), CFrame.new(10, 5, -50))
+			createSliceVFX(Vector3.new(10, 3, 0), CFrame.new(-10, 5, -50))
+			Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 3, -50))
 			Hitbox:Start()
-			task.delay(.3,function()
+			task.delay(0.3, function()
 				Hitbox:Stop()
 				helperModule.ResetSpeed(character)
 			end)
@@ -867,10 +1032,21 @@ function module.Morgan(player)
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 35, "Sword", 0, 0.5, 2, character.HumanoidRootPart)
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			35,
+			"Sword",
+			0,
+			0.5,
+			2,
+			character.HumanoidRootPart
+		)
 	end)
 
-	task.delay(5.3, function() 
+	task.delay(5.3, function()
 		Hitbox:Destroy()
 	end)
 end
@@ -881,9 +1057,9 @@ end
 
 function module.MantraPalm(player)
 	StateHandler.SetState(player.Character, "CantAnything", true, 0.75)
-	
+
 	animationHandler.LoadAnim(player.Character, "Shoot", "rbxassetid://101837266978570", nil, false)
-	
+
 	local hitboxParams = {
 		SizeOrPart = 3,
 		SpatialOption = "InRadius",
@@ -904,12 +1080,12 @@ function module.MantraPalm(player)
 	SpeedService.Push(HRP.Parent, "SkillSlow", 0, SpeedService.Priority.SKILL)
 
 	print(mana.Value)
-	
+
 	animationHandler.LoadAnim(player.Character, "rbxassetid://101837266978570", nil, false)
 
 	task.wait(0.75)
-	
-	local fireball  = game:GetService("ReplicatedStorage").Magic.FireballMonk
+
+	local fireball = game:GetService("ReplicatedStorage").Magic.FireballMonk
 
 	local fireballClone = fireball:Clone()
 	fireballClone.Parent = game.Workspace
@@ -919,7 +1095,9 @@ function module.MantraPalm(player)
 	Hitbox:Start()
 
 	Glow1:Destroy()
-	fireballClone.BodyVelocity.Velocity = (player.Character.HumanoidRootPart.CFrame.LookVector*125)
+	fireballClone.BodyVelocity.Velocity = (
+		player.Character.HumanoidRootPart.CFrame.LookVector * 125
+	)
 
 	local hitsomeone = false
 
@@ -927,18 +1105,32 @@ function module.MantraPalm(player)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:WaitForChild("Humanoid")
 
-			local isParrying =  StateHandler:GetState(humanoid.Parent, "Parrying")
-			local isDodging =  StateHandler:GetState(humanoid.Parent, "Dodging")
+			local isParrying = StateHandler:GetState(humanoid.Parent, "Parrying")
+			local isDodging = StateHandler:GetState(humanoid.Parent, "Dodging")
 			local isBlocking = StateHandler:GetState(humanoid.Parent, "Blocking")
 
 			if humanoid then
-				if StateHandler.GetState(player.Character, "Stunned") then return end
+				if StateHandler.GetState(player.Character, "Stunned") then
+					return
+				end
 
-				if humanoid.Parent.Name ~= player.Name and isParrying and not isDodging and not isBlocking then
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+				if
+					humanoid.Parent.Name ~= player.Name
+					and isParrying
+					and not isDodging
+					and not isBlocking
+				then
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = humanoid.Parent:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -952,7 +1144,7 @@ function module.MantraPalm(player)
 					effect2.Enabled = true
 					clash:Emit(30)
 					game.Debris:AddItem(clash, 0.7)
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					-- Parry beats hyperarmor: clear it so this punish stun actually lands.
@@ -960,17 +1152,56 @@ function module.MantraPalm(player)
 					StateHandler.SetStun(player.Character, true, 0.5, 2)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
 					ParryService.ResetParry(game.Players:GetPlayerFromCharacter(humanoid.Parent))
-					require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(humanoid.Parent)
-					if game.Players:GetPlayerFromCharacter(humanoid.Parent) then ReplicatedStorage.remotes.replicate:FireClient(game.Players:GetPlayerFromCharacter(humanoid.Parent), {Type = "Combat", Action = "M1", Func = "Parry", FolderName = (humanoid.Parent:FindFirstChildOfClass("Tool") and humanoid.Parent:FindFirstChildOfClass("Tool").Name) or "Katana"}, player.Character, humanoid.Parent) end
+					require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(
+						humanoid.Parent
+					)
+					if game.Players:GetPlayerFromCharacter(humanoid.Parent) then
+						ReplicatedStorage.remotes.replicate:FireClient(
+							game.Players:GetPlayerFromCharacter(humanoid.Parent),
+							{
+								Type = "Combat",
+								Action = "M1",
+								Func = "Parry",
+								FolderName = (
+									humanoid.Parent:FindFirstChildOfClass("Tool")
+									and humanoid.Parent:FindFirstChildOfClass("Tool").Name
+								) or "Katana",
+							},
+							player.Character,
+							humanoid.Parent
+						)
+					end
 
 					animationHandler.StopAnim(player.Character, "ALL")
-					animationHandler.LoadAnim(player.Character, "Parried", "rbxassetid://74891530644094", nil, false)
-				elseif humanoid.Parent.Name ~= player.Name and not isDodging and not isParrying and isBlocking then
-					dmgCalculator.CalculateDamage(player.Character, humanoid.Parent, 5, 0, false, "Skill")
+					animationHandler.LoadAnim(
+						player.Character,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
+				elseif
+					humanoid.Parent.Name ~= player.Name
+					and not isDodging
+					and not isParrying
+					and isBlocking
+				then
+					dmgCalculator.CalculateDamage(
+						player.Character,
+						humanoid.Parent,
+						5,
+						0,
+						false,
+						"Skill"
+					)
 					hitsomeone = true
 
-					if humanoid.Parent.Humanoid.Health > 0 then 
-						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 5) 
+					if humanoid.Parent.Humanoid.Health > 0 then
+						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(player.Character),
+							"Fists",
+							5
+						)
 					end
 
 					local sound = ReplicatedStorage.assets.sounds.BlockingHit2:Clone()
@@ -978,8 +1209,11 @@ function module.MantraPalm(player)
 					sound:Play()
 					game.Debris:AddItem(sound, 1)
 
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
 					local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 					h1.Parent = humanoid.Parent
 					game.Debris:AddItem(h1, 0.1)
@@ -987,25 +1221,42 @@ function module.MantraPalm(player)
 					effect2.Parent = humanoid.Parent:WaitForChild("Torso")
 					parryE.Enabled = true
 					effect2.Enabled = true
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
-
-				elseif humanoid.Parent.Name ~= player.Name and not isDodging and not isParrying and not isBlocking then
+				elseif
+					humanoid.Parent.Name ~= player.Name
+					and not isDodging
+					and not isParrying
+					and not isBlocking
+				then
 					playSound(humanoid.Parent, ReplicatedStorage.assets.sounds.magic.Explosion)
-					dmgCalculator.CalculateDamage(player.Character, humanoid.Parent, 10, 0, false, "Skill")
+					dmgCalculator.CalculateDamage(
+						player.Character,
+						humanoid.Parent,
+						10,
+						0,
+						false,
+						"Skill"
+					)
 					hitsomeone = true
-					
-					if humanoid.Parent.Humanoid.Health > 0 then 
-						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 10) 
+
+					if humanoid.Parent.Humanoid.Health > 0 then
+						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(player.Character),
+							"Fists",
+							10
+						)
 					end
 
 					local kb = Instance.new("BodyVelocity")
 					local ballClone = game:GetService("ReplicatedStorage").Magic.Ball:Clone()
-					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire:Clone()
-					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround:Clone()
+					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire
+						:Clone()
+					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround
+						:Clone()
 
 					kb.P = math.huge
-					kb.MaxForce = Vector3.new(math.huge,math.huge,math.huge)
+					kb.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 					kb.Velocity = fireballClone.CFrame.LookVector * 25
 					kb.Parent = humanoid.Parent.Torso
 
@@ -1016,21 +1267,47 @@ function module.MantraPalm(player)
 					game.Debris:AddItem(swirlClone, 5)
 					ballClone.Position = humanoid.Parent.Torso.Position
 					swirlClone.Position = humanoid.Parent.Torso.Position
-					groundClone.Position = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y -  5.5, humanoid.Parent.Torso.Position.Z)
+					groundClone.Position = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 5.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
-					local destination1 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 3.5, humanoid.Parent.Torso.Position.Z)
-					local destination2 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 6.5, humanoid.Parent.Torso.Position.Z)
+					local destination1 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 3.5,
+						humanoid.Parent.Torso.Position.Z
+					)
+					local destination2 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 6.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
-					local Settings1 = {Position = destination1}
-					
+					local Settings1 = { Position = destination1 }
+
 					local TweenService = game:GetService("TweenService")
-					local tweenInfo1 = TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-					local tweenInfo2 = TweenInfo.new(2,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-					
-					local Tween1 = TweenService:Create(groundClone,tweenInfo1,Settings1)
+					local tweenInfo1 = TweenInfo.new(
+						0.5,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
+					local tweenInfo2 = TweenInfo.new(
+						2,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
 
-					local Settings2 = {Position = destination2}
-					local Tween2 = TweenService:Create(groundClone,tweenInfo2,Settings2)
+					local Tween1 = TweenService:Create(groundClone, tweenInfo1, Settings1)
+
+					local Settings2 = { Position = destination2 }
+					local Tween2 = TweenService:Create(groundClone, tweenInfo2, Settings2)
 
 					game.Debris:AddItem(fireballClone)
 					game.Debris:AddItem(kb, 0.5)
@@ -1041,8 +1318,12 @@ function module.MantraPalm(player)
 					task.wait(5)
 
 					Tween2:Play()
-
-				elseif humanoid.Parent.Name ~= player.Name and isDodging and not isParrying and not isBlocking then
+				elseif
+					humanoid.Parent.Name ~= player.Name
+					and isDodging
+					and not isParrying
+					and not isBlocking
+				then
 					local sound = ReplicatedStorage.assets.sounds.Dodged:Clone()
 					sound.Parent = humanoid.Parent
 					sound:Play()
@@ -1054,7 +1335,10 @@ function module.MantraPalm(player)
 
 					if humanoid.Parent.Torso then
 						for _, part in pairs(humanoid.Parent:GetChildren()) do
-							if part:IsA("BasePart") and part ~= humanoid.Parent.HumanoidRootPart then
+							if
+								part:IsA("BasePart")
+								and part ~= humanoid.Parent.HumanoidRootPart
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -1068,7 +1352,7 @@ function module.MantraPalm(player)
 		end
 	end)
 
-	task.delay(2,function()
+	task.delay(2, function()
 		game.Debris:AddItem(fireballClone)
 		Hitbox:Destroy()
 	end)
@@ -1079,7 +1363,7 @@ end
 
 function module.MonasticStance(player)
 	local char = player.Character
-	
+
 	animationHandler.LoadAnim(char, "Activate", "rbxassetid://97964685841149", nil, false)
 end
 
@@ -1107,35 +1391,42 @@ function module.RisingDragon(player)
 	else
 		Glow1:Destroy() -- Cleanup if leg doesn't exist
 	end
-	
+
 	local InfoTween = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut)
 
 	local NewShield2 = game.ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
+	game.TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
 	game.Debris:AddItem(NewShield2, 2)
 
 	playSound(character, ReplicatedStorage.assets.sounds.DANGER)
 
 	task.wait(0.85)
 
-	local hitboxParams = { SizeOrPart = 6, SpatialOption = "InRadius", Debug = false, DebounceTime = 0.4 }
+	local hitboxParams =
+		{ SizeOrPart = 6, SpatialOption = "InRadius", Debug = false, DebounceTime = 0.4 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(root, CFrame.new(0,0,-5))
+	Hitbox:WeldTo(root, CFrame.new(0, 0, -5))
 	Hitbox:Start()
-	
+
 	local thirdhit = false
-	
+
 	StateHandler.SetState(character, "M1", true, 0.9)
 
 	task.spawn(function()
 		for i = 1, 3 do
-			if not character or not root then break end
+			if not character or not root then
+				break
+			end
 			local curVel = root.AssemblyLinearVelocity
 			root.AssemblyLinearVelocity = Vector3.new(curVel.X, 60, curVel.Z)
 
@@ -1146,7 +1437,7 @@ function module.RisingDragon(player)
 
 			createAfterImage(character)
 
-			if i == 3 then 
+			if i == 3 then
 				thirdhit = true
 			end
 			task.wait(0.4)
@@ -1157,21 +1448,29 @@ function module.RisingDragon(player)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = character:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
 				-- Standardize syntax (Assume Colon based on your first usage)
 				local isDodging = StateHandler:GetState(targetChar, "Dodging")
 
-				if StateHandler:GetState(character, "Stunned") then return end
+				if StateHandler:GetState(character, "Stunned") then
+					return
+				end
 
 				if isDodging then
 					-- (Dodging logic kept same)
@@ -1188,9 +1487,13 @@ function module.RisingDragon(player)
 
 				StateHandler.SetStun(targetChar, true, 1, 0)
 				dmgCalculator.CalculateDamage(character, targetChar, 7, 0, false, "Skill")
-				
-				if targetChar.Humanoid.Health > 0 then 
-					require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 7) 
+
+				if targetChar.Humanoid.Health > 0 then
+					require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+						game.Players:GetPlayerFromCharacter(player.Character),
+						"Fists",
+						7
+					)
 				end
 
 				local sound = game.ReplicatedStorage.assets.sounds.PunchHit:Clone()
@@ -1202,11 +1505,12 @@ function module.RisingDragon(player)
 				highlight.Parent = humanoid.Parent
 				game.Debris:AddItem(highlight, 0.1)
 
-				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+					:Clone()
 				hitEff.Parent = targetChar:FindFirstChild("Torso")
 				game:GetService("Debris"):AddItem(hitEff, 1)
 				task.delay(0.5, function()
-					for _,v in pairs(hitEff:GetChildren()) do
+					for _, v in pairs(hitEff:GetChildren()) do
 						if v:IsA("ParticleEmitter") then
 							v.Enabled = false
 						end
@@ -1216,7 +1520,8 @@ function module.RisingDragon(player)
 				task.spawn(function()
 					local currentTargetVel = targetHRP.AssemblyLinearVelocity
 
-					targetHRP.AssemblyLinearVelocity = Vector3.new(currentTargetVel.X, 60, currentTargetVel.Z)
+					targetHRP.AssemblyLinearVelocity =
+						Vector3.new(currentTargetVel.X, 60, currentTargetVel.Z)
 
 					task.wait(0.4)
 				end)
@@ -1235,7 +1540,9 @@ function module.RisingDragon(player)
 
 	task.delay(1, function()
 		helperModule.ResetSpeed(character)
-		if Hitbox then Hitbox:Destroy() end
+		if Hitbox then
+			Hitbox:Destroy()
+		end
 	end)
 end
 
@@ -1245,7 +1552,7 @@ end
 
 function module.Gohadoken(player)
 	StateHandler.SetState(player.Character, "CantAnything", true, 0.75)
-	
+
 	local hitboxParams = {
 		SizeOrPart = 8,
 		SpatialOption = "InRadius",
@@ -1264,9 +1571,9 @@ function module.Gohadoken(player)
 
 	HRP.Parent.Humanoid.JumpHeight = 0
 	SpeedService.Push(HRP.Parent, "SkillSlow", 0, SpeedService.Priority.SKILL)
-	
+
 	playSound(player.Character, game:GetService("ReplicatedStorage").assets.sounds.magic.Fire)
-	
+
 	animationHandler.LoadAnim(player.Character, "Shoot", "rbxassetid://97583385902594", nil, false)
 
 	print(mana.Value)
@@ -1276,12 +1583,13 @@ function module.Gohadoken(player)
 	local fireballClone = game:GetService("ReplicatedStorage").Magic.Fireball:Clone()
 	fireballClone.Parent = game.Workspace
 	--fireballClone.Position = player.Character.HumanoidRootPart.Position
-	fireballClone.CFrame = player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(90), 0)
+	fireballClone.CFrame = player.Character.HumanoidRootPart.CFrame
+		* CFrame.Angles(0, math.rad(90), 0)
 	Hitbox:WeldTo(fireballClone)
 	Hitbox:Start()
 
 	Glow1:Destroy()
-	fireballClone.BodyVelocity.Velocity = (player.Character.HumanoidRootPart.CFrame.LookVector*75)
+	fireballClone.BodyVelocity.Velocity = (player.Character.HumanoidRootPart.CFrame.LookVector * 75)
 
 	game.Debris:AddItem(fireballClone, 3)
 	local alreadyHit = {}
@@ -1290,23 +1598,32 @@ function module.Gohadoken(player)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = player.Character:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(player.Character, "Stunned") then return end
+				if StateHandler.GetState(player.Character, "Stunned") then
+					return
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					print("iframed lawl :p")
-					
-					local targetPlrData = game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
+
+					local targetPlrData =
+						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
 						targetPlrData.Mana.Value += 8
 					end
@@ -1322,7 +1639,12 @@ function module.Gohadoken(player)
 
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -1341,29 +1663,48 @@ function module.Gohadoken(player)
 					Hitbox:Destroy()
 					game.Debris:AddItem(fireballClone, 0.2)
 
-					local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+					local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+						or "rbxassetid://111089735892609"
 					animationHandler.LoadAnim(targetChar, "Hit", animID, nil, false)
-					require(game.ServerScriptService.modules.helperModule).ApplyKnockback(targetChar, direction, knockbackDistance * 5, 0.2)
+					require(game.ServerScriptService.modules.helperModule).ApplyKnockback(
+						targetChar,
+						direction,
+						knockbackDistance * 5,
+						0.2
+					)
 					StateHandler.SetStun(targetChar, true, 1, 2)
 					require(game.ServerScriptService.modules.ragdollManager).Ragdoll(targetChar, 1)
 
-					dmgCalculator.CalculateDamage(player.Character, targetChar, 12, extraDmg, false, "Skill")
+					dmgCalculator.CalculateDamage(
+						player.Character,
+						targetChar,
+						12,
+						extraDmg,
+						false,
+						"Skill"
+					)
 
 					playSound(targetChar, game.ReplicatedStorage.assets.sounds.magic.Explosion)
 
-					if targetChar.Humanoid.Health > 0 then 
-						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 25 + extraDmg) 
+					if targetChar.Humanoid.Health > 0 then
+						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(player.Character),
+							"Fists",
+							25 + extraDmg
+						)
 					end
 
 					local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 					highlight.Parent = humanoid.Parent
 					game.Debris:AddItem(highlight, 0.1)
 
-					local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+					local hitEff =
+						game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+							:Clone()
 					hitEff.Parent = targetChar:FindFirstChild("Torso")
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
+						for _, v in pairs(hitEff:GetChildren()) do
 							if v:IsA("ParticleEmitter") then
 								v.Enabled = false
 							end
@@ -1371,28 +1712,56 @@ function module.Gohadoken(player)
 					end)
 
 					local ballClone = game:GetService("ReplicatedStorage").Magic.Ball:Clone()
-					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire:Clone()
-					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround:Clone()
+					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire
+						:Clone()
+					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround
+						:Clone()
 
 					groundClone.Parent = game.Workspace
 					ballClone.Parent = game.Workspace
 					swirlClone.Parent = game.Workspace
 					ballClone.Position = humanoid.Parent.Torso.Position
 					swirlClone.Position = humanoid.Parent.Torso.Position
-					groundClone.Position = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y -  5.5, humanoid.Parent.Torso.Position.Z)
+					groundClone.Position = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 5.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
-					local destination1 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 3.5, humanoid.Parent.Torso.Position.Z)
-					local destination2 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 6.5, humanoid.Parent.Torso.Position.Z)
+					local destination1 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 3.5,
+						humanoid.Parent.Torso.Position.Z
+					)
+					local destination2 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 6.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
 					local TweenService = game:GetService("TweenService")
-					local tweenInfo1 = TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-					local tweenInfo2 = TweenInfo.new(2,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-					
-					local Settings1 = {Position = destination1}
-					local Tween1 = TweenService:Create(groundClone,tweenInfo1,Settings1)
+					local tweenInfo1 = TweenInfo.new(
+						0.5,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
+					local tweenInfo2 = TweenInfo.new(
+						2,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
 
-					local Settings2 = {Position = destination2}
-					local Tween2 = TweenService:Create(groundClone,tweenInfo2,Settings2)
+					local Settings1 = { Position = destination1 }
+					local Tween1 = TweenService:Create(groundClone, tweenInfo1, Settings1)
+
+					local Settings2 = { Position = destination2 }
+					local Tween2 = TweenService:Create(groundClone, tweenInfo2, Settings2)
 
 					Tween1:Play()
 					wait(5)
@@ -1405,10 +1774,17 @@ function module.Gohadoken(player)
 				end
 
 				if StateHandler.GetState(targetChar, "Parrying") then
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = targetChar:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -1422,7 +1798,7 @@ function module.Gohadoken(player)
 					effect2.Enabled = true
 					clash:Emit(30)
 					game.Debris:AddItem(clash, 0.7)
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					playSound(player.Character, ReplicatedStorage.assets.sounds.ParrySound)
@@ -1432,16 +1808,41 @@ function module.Gohadoken(player)
 					StateHandler.SetStun(player.Character, true, 0.5, 2)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
 					ParryService.ResetParry(game.Players:GetPlayerFromCharacter(targetChar))
-					require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(targetChar)
-					if game.Players:GetPlayerFromCharacter(targetChar) then ReplicatedStorage.remotes.replicate:FireClient(game.Players:GetPlayerFromCharacter(targetChar), {Type = "Combat", Action = "M1", Func = "Parry", FolderName = (targetChar:FindFirstChildOfClass("Tool") and targetChar:FindFirstChildOfClass("Tool").Name) or "Katana"}, player.Character, targetChar) end
+					require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(
+						targetChar
+					)
+					if game.Players:GetPlayerFromCharacter(targetChar) then
+						ReplicatedStorage.remotes.replicate:FireClient(
+							game.Players:GetPlayerFromCharacter(targetChar),
+							{
+								Type = "Combat",
+								Action = "M1",
+								Func = "Parry",
+								FolderName = (
+									targetChar:FindFirstChildOfClass("Tool")
+									and targetChar:FindFirstChildOfClass("Tool").Name
+								) or "Katana",
+							},
+							player.Character,
+							targetChar
+						)
+					end
 
 					animationHandler.StopAnim(player.Character, "ALL")
-					animationHandler.LoadAnim(player.Character, "Parried", "rbxassetid://74891530644094", nil, false)
+					animationHandler.LoadAnim(
+						player.Character,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
 
 					Hitbox:Destroy()
 					game.Debris:AddItem(fireballClone, 0.2)
-
-				elseif StateHandler.GetState(targetChar, "M1") or StateHandler.GetState(targetChar, "M2") then
+				elseif
+					StateHandler.GetState(targetChar, "M1")
+					or StateHandler.GetState(targetChar, "M2")
+				then
 					Hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
@@ -1469,8 +1870,12 @@ function module.Gohadoken(player)
 						BlockResolver.OnAttackerLandedHit(player.Character)
 						doAttack(-4, 5)
 						playSound(targetChar, ReplicatedStorage.assets.sounds.BlockingHit2)
-						local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-						local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+						local parryE =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+								:Clone()
+						local effect2 =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+								:Clone()
 						local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 						h1.Parent = targetChar
 						game.Debris:AddItem(h1, 0.1)
@@ -1478,7 +1883,7 @@ function module.Gohadoken(player)
 						effect2.Parent = targetChar:WaitForChild("Torso")
 						parryE.Enabled = true
 						effect2.Enabled = true
-						game.Debris:AddItem(parryE,0.7)
+						game.Debris:AddItem(parryE, 0.7)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
@@ -1489,10 +1894,10 @@ function module.Gohadoken(player)
 		end
 	end)
 
-	task.delay(3,function()
+	task.delay(3, function()
 		Hitbox:Destroy()
 	end)
-	
+
 	HRP.Parent.Humanoid.JumpHeight = 7.2
 	SpeedService.Pop(HRP.Parent, "SkillSlow")
 end
@@ -1503,11 +1908,11 @@ function module.AsuraGlide(player)
 
 	StateHandler.SetState(char, "Dodging", true, 0.3)
 	StateHandler.SetState(char, "CantAnything", true, 0.3)
-	
+
 	playSound(char, ReplicatedStorage.assets.sounds.OniDash)
 
 	animationHandler.LoadAnim(char, "Glide", "rbxassetid://84494630442432", nil, false)
-	
+
 	task.delay(0.4, function()
 		animationHandler.StopAnim(char, "Glide", "rbxassetid://84494630442432")
 	end)
@@ -1532,20 +1937,28 @@ function module.Messatsu(player)
 	StateHandler.SetState(character, "Dodging", true, 1.8)
 
 	animationHandler.LoadAnim(character, "Windup", "rbxassetid://108425878268854", nil, false)
-	
+
 	playSound(character, ReplicatedStorage.assets.sounds.DANGER)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	TweenService:Create(
+		NewShield2,
+		TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+		{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+	):Play()
+	TweenService:Create(
+		NewShield2,
+		TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+		{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+	):Play()
 	game.Debris:AddItem(NewShield2, 1.5)
 
-	task.wait(1.5) 
-	
+	task.wait(1.5)
+
 	playSound(character, ReplicatedStorage.assets.sounds.OniDash)
 
 	animationHandler.LoadAnim(character, "Dash", "rbxassetid://89337388294441", nil, false)
@@ -1555,9 +1968,10 @@ function module.Messatsu(player)
 	bv.Parent = root
 	Debris:AddItem(bv, 0.4)
 
-	local hitboxParams = { SizeOrPart = Vector3.new(6,6,6), SpatialOption = "InBox", DebounceTime = 0.5 }
+	local hitboxParams =
+		{ SizeOrPart = Vector3.new(6, 6, 6), SpatialOption = "InBox", DebounceTime = 0.5 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(root, CFrame.new(1,-1,-4))
+	Hitbox:WeldTo(root, CFrame.new(1, -1, -4))
 	Hitbox:Start()
 
 	local hitSomeone = false
@@ -1567,23 +1981,32 @@ function module.Messatsu(player)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = character:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(character, "Stunned") then return end
+				if StateHandler.GetState(character, "Stunned") then
+					return
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					print("iframed lawl :p")
-					
-					local targetPlrData = game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
+
+					local targetPlrData =
+						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
 						targetPlrData.Mana.Value += 8
 					end
@@ -1599,7 +2022,12 @@ function module.Messatsu(player)
 
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -1620,7 +2048,7 @@ function module.Messatsu(player)
 				animationHandler.StopAnim(targetChar, "ALL")
 
 				helperModule.SetSpeed(character, 0, 16)
-				helperModule.SetSpeed(targetChar, 0 , 16)
+				helperModule.SetSpeed(targetChar, 0, 16)
 
 				local ff = Instance.new("ForceField")
 				ff.Parent = character
@@ -1639,22 +2067,27 @@ function module.Messatsu(player)
 				-- 2. NEW: ANCHOR THE CHARACTER (Guarantees no rotation)
 				--character.HumanoidRootPart.Anchored = true
 				-- Optional: Anchor target too if you want them frozen relative to attacker
-				--targetChar.HumanoidRootPart.Anchored = true 
+				--targetChar.HumanoidRootPart.Anchored = true
 
 				-- 3. UPDATED LOOP: Destroy Rotation Movers too
-				for _,v in pairs(character.HumanoidRootPart:GetChildren()) do
+				for _, v in pairs(character.HumanoidRootPart:GetChildren()) do
 					-- Check for Velocity AND Rotation movers (Gyro, AlignOrientation, etc)
-					if v:IsA("BodyVelocity") or v:IsA("BodyGyro") or v:IsA("AlignOrientation") or v:IsA("BodyAngularVelocity") then
+					if
+						v:IsA("BodyVelocity")
+						or v:IsA("BodyGyro")
+						or v:IsA("AlignOrientation")
+						or v:IsA("BodyAngularVelocity")
+					then
 						v:Destroy()
 					end
 				end
 
-				for i,v in pairs(character:GetChildren()) do
+				for i, v in pairs(character:GetChildren()) do
 					if v:IsA("BasePart") then
 						v.CanCollide = false
 					end
 				end
-				for i,v in pairs(targetChar:GetChildren()) do
+				for i, v in pairs(targetChar:GetChildren()) do
 					if v:IsA("BasePart") then
 						v.CanCollide = false
 					end
@@ -1670,8 +2103,20 @@ function module.Messatsu(player)
 				StateHandler.SetStun(targetChar, true, 2)
 				StateHandler.SetState(targetChar, "CantAnything", true, 2)
 
-				animationHandler.LoadAnim(character, "UltHitAttacker", "rbxassetid://101513335589823", nil, false)
-				animationHandler.LoadAnim(targetChar, "UltHitDefender", "rbxassetid://73915210544765", nil, false)
+				animationHandler.LoadAnim(
+					character,
+					"UltHitAttacker",
+					"rbxassetid://101513335589823",
+					nil,
+					false
+				)
+				animationHandler.LoadAnim(
+					targetChar,
+					"UltHitDefender",
+					"rbxassetid://73915210544765",
+					nil,
+					false
+				)
 
 				local Glow1 = game.ReplicatedStorage.Magic.PurpleGlow.Glow:Clone()
 
@@ -1688,13 +2133,13 @@ function module.Messatsu(player)
 				if #allSounds > 0 then
 					local randomSound = allSounds[math.random(1, #allSounds)]
 					local soundClone = randomSound:Clone()
-					soundClone.Parent = character.HumanoidRootPart 
+					soundClone.Parent = character.HumanoidRootPart
 					soundClone:Play()
 					game.Debris:AddItem(soundClone, soundClone.TimeLength)
 				end
 
 				task.wait(2)
-				
+
 				dmgCalculator.CalculateDamage(character, targetChar, 40, 0, true, "Skill")
 
 				playSound(character, ReplicatedStorage.assets.sounds.DeadSound)
@@ -1703,12 +2148,12 @@ function module.Messatsu(player)
 					weld:Destroy()
 					weld = nil
 				end
-				for i,v in pairs(character:GetChildren()) do
+				for i, v in pairs(character:GetChildren()) do
 					if v:IsA("Part") then
 						v.CanCollide = true
 					end
 				end
-				for i,v in pairs(targetChar:GetChildren()) do
+				for i, v in pairs(targetChar:GetChildren()) do
 					if v:IsA("Part") then
 						v.CanCollide = true
 					end
@@ -1728,20 +2173,24 @@ function module.Messatsu(player)
 				BV.Velocity = targetChar.HumanoidRootPart.CFrame.lookVector * 50
 				game.Debris:AddItem(BV, 0.3)
 
-
 				local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 				highlight.Parent = humanoid.Parent
 				game.Debris:AddItem(highlight, 0.1)
-				
-				if targetChar.Humanoid.Health > 0 then 
-					require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 40) 
+
+				if targetChar.Humanoid.Health > 0 then
+					require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+						game.Players:GetPlayerFromCharacter(player.Character),
+						"Fists",
+						40
+					)
 				end
 
-				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+					:Clone()
 				hitEff.Parent = targetChar:FindFirstChild("Torso")
 				game:GetService("Debris"):AddItem(hitEff, 1)
 				task.delay(0.5, function()
-					for _,v in pairs(hitEff:GetChildren()) do
+					for _, v in pairs(hitEff:GetChildren()) do
 						if v:IsA("ParticleEmitter") then
 							v.Enabled = false
 						end
@@ -1758,8 +2207,8 @@ function module.Messatsu(player)
 		end
 	end)
 
-	task.delay(0.4, function() 
-		Hitbox:Destroy() 
+	task.delay(0.4, function()
+		Hitbox:Destroy()
 		if not hitSomeone then
 			helperModule.ResetSpeed(character)
 		end
@@ -1783,7 +2232,7 @@ function module.Zanshin(player)
 	rootPart.Anchored = true
 	helperModule.SetSpeed(character, 2, 16)
 	task.wait(0.4)
-	
+
 	playSound(character, ReplicatedStorage.assets.sounds.vermillion.UltSlash)
 
 	local vfxPart = ReplicatedStorage.assets.FX.skills.judgementCutVFX:Clone()
@@ -1794,16 +2243,28 @@ function module.Zanshin(player)
 
 	local hitboxParams = { SizeOrPart = 8, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(rootPart, CFrame.new(0,0,-9))
+	Hitbox:WeldTo(rootPart, CFrame.new(0, 0, -9))
 	Hitbox:Start()
 
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 10, "Katana", 5, 0.5, 1, character.HumanoidRootPart, "LifeRegen")
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			10,
+			"Katana",
+			5,
+			0.5,
+			1,
+			character.HumanoidRootPart,
+			"LifeRegen"
+		)
 	end)
 
-	task.delay(0.2, function() 
+	task.delay(0.2, function()
 		Hitbox:Destroy()
 		helperModule.ResetSpeed(character)
 		hum.AutoRotate = true
@@ -1820,15 +2281,18 @@ function module.Kurai(player)
 	StateHandler.SetState(char, "CantAnything", true, 0.5)
 
 	animationHandler.LoadAnim(char, "LeanBack", "rbxassetid://139345216330283", nil, false)
-	
+
 	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {char}
+	rayParams.FilterDescendantsInstances = { char }
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
-	local isAirborne = (char.Humanoid:GetState() == Enum.HumanoidStateType.Jumping or char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall)
-	
+	local isAirborne = (
+		char.Humanoid:GetState() == Enum.HumanoidStateType.Jumping
+		or char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall
+	)
+
 	applyDashEffect(char)
-	
+
 	playSound(char, ReplicatedStorage.assets.sounds.vermillion.dash)
 
 	-- Backward Velocity
@@ -1836,7 +2300,7 @@ function module.Kurai(player)
 	BV.MaxForce = Vector3.new(25000, 0, 25000)
 	BV.Velocity = root.CFrame.lookVector * -40
 	Debris:AddItem(BV, 0.3)
-	
+
 	local TELEPORT_DISTANCE = 20 -- How far forward to teleport
 	local AIR_HEIGHT = 10 -- How high to go if starting from Ground
 
@@ -1844,7 +2308,9 @@ function module.Kurai(player)
 	local targetPosition
 
 	if not isAirborne then
-		targetPosition = root.Position + (forwardDir * TELEPORT_DISTANCE) + Vector3.new(0, AIR_HEIGHT, 0)
+		targetPosition = root.Position
+			+ (forwardDir * TELEPORT_DISTANCE)
+			+ Vector3.new(0, AIR_HEIGHT, 0)
 	else
 		local airForwardPos = root.Position + (forwardDir * TELEPORT_DISTANCE)
 
@@ -1857,14 +2323,15 @@ function module.Kurai(player)
 		end
 
 		local eff = game.ReplicatedStorage.assets.dashEff2:Clone()
-		for _,effect in pairs(eff:GetChildren()) do
+		for _, effect in pairs(eff:GetChildren()) do
 			if effect:IsA("ParticleEmitter") then
 				effect.Parent = char.Torso
 				effect.EmissionDirection = Enum.NormalId.Front
 				effect:Emit(9)
 			elseif effect:IsA("Attachment") then
 				effect.Parent = char.Torso
-				effect:FindFirstChildWhichIsA("ParticleEmitter").EmissionDirection = Enum.NormalId.Front
+				effect:FindFirstChildWhichIsA("ParticleEmitter").EmissionDirection =
+					Enum.NormalId.Front
 				effect:FindFirstChildWhichIsA("ParticleEmitter"):Emit(9)
 			end
 		end
@@ -1872,11 +2339,11 @@ function module.Kurai(player)
 	end
 
 	task.wait(0.4)
-	
+
 	playSound(char, ReplicatedStorage.assets.sounds.katana.katanaLunge)
 
 	root.CFrame = CFrame.new(targetPosition, targetPosition + forwardDir)
-	
+
 	applyDashEffect(char)
 
 	-- Forward Dash after TP
@@ -1891,9 +2358,9 @@ end
 function module.Kirikizu(player)
 	local character = player.Character
 	local rootPart = character:FindFirstChild("HumanoidRootPart")
-	
+
 	rootPart.Anchored = true
-	
+
 	StateHandler.SetState(character, "CantAnything", true, 1)
 	animationHandler.LoadAnim(character, "JudgementCut", "rbxassetid://89034380090419", nil, false)
 
@@ -1902,17 +2369,29 @@ function module.Kirikizu(player)
 	local NewShield2 = game.ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 2)
 
 	task.wait(1)
 
 	playSound(character, ReplicatedStorage.assets.sounds.vermillion.UltSlash)
-	
+
 	local vfxPart = ReplicatedStorage.assets.FX.skills.judgementCutEndVFX:Clone()
 	vfxPart.Parent = workspace
 	vfxPart.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 2, 0)
@@ -1926,18 +2405,30 @@ function module.Kirikizu(player)
 
 	local hitboxParams = { SizeOrPart = 12, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,2,0))
+	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 2, 0))
 	Hitbox:Start()
 
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 15, "Katana", 0, 0.5, 1, character.HumanoidRootPart, "LifeRegen")
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			15,
+			"Katana",
+			0,
+			0.5,
+			1,
+			character.HumanoidRootPart,
+			"LifeRegen"
+		)
 	end)
 
-	task.delay(0.2, function() 
-		Hitbox:Destroy() 
-		rootPart.Anchored = false 
+	task.delay(0.2, function()
+		Hitbox:Destroy()
+		rootPart.Anchored = false
 	end)
 end
 
@@ -1973,11 +2464,11 @@ function module.HiddenDaggers(player)
 	local RunService = game:GetService("RunService")
 
 	-- Tunables
-	local SPAWN_FORWARD  = 0.5   -- studs ahead of torso (small, so point-blank targets still get hit)
-	local FAN_ANGLE      = 30    -- degrees between center dagger and each side dagger
-	local HITBOX_RADIUS  = 2.0   -- fat hitbox radius for the spherecast
-	local LIFETIME       = 1.5   -- seconds before the dagger despawns
-	local WALL_STICK      = 1     -- seconds a stuck dagger lingers in the wall
+	local SPAWN_FORWARD = 0.5 -- studs ahead of torso (small, so point-blank targets still get hit)
+	local FAN_ANGLE = 30 -- degrees between center dagger and each side dagger
+	local HITBOX_RADIUS = 2.0 -- fat hitbox radius for the spherecast
+	local LIFETIME = 1.5 -- seconds before the dagger despawns
+	local WALL_STICK = 1 -- seconds a stuck dagger lingers in the wall
 
 	for i = -1, 1 do
 		local projectile = game.ServerStorage.Extras.ThrowDagger:Clone()
@@ -1985,12 +2476,14 @@ function module.HiddenDaggers(player)
 		-- Setup Visuals
 		projectile.Transparency = 0.5
 		projectile.Color = Color3.new(0, 0, 0)
-		projectile.Anchored = true          -- we drive it ourselves, no physics
+		projectile.Anchored = true -- we drive it ourselves, no physics
 		projectile.CanCollide = false
-		projectile.CanTouch = false         -- collision handled by raycast, not Touched
+		projectile.CanTouch = false -- collision handled by raycast, not Touched
 
 		-- Spawn just in front of the torso, angled outward by the fan
-		local originCF = root.CFrame * CFrame.new(0, 0, -SPAWN_FORWARD) * CFrame.Angles(0, math.rad(i * FAN_ANGLE), 0)
+		local originCF = root.CFrame
+			* CFrame.new(0, 0, -SPAWN_FORWARD)
+			* CFrame.Angles(0, math.rad(i * FAN_ANGLE), 0)
 		projectile.CFrame = originCF
 		projectile.Parent = workspace.plrManager.projectiles
 
@@ -2001,7 +2494,7 @@ function module.HiddenDaggers(player)
 
 		-- Travel direction is the dagger's forward (matches the old bv.Velocity convention)
 		local travelDir = originCF.LookVector
-		local position  = originCF.Position
+		local position = originCF.Position
 
 		-- Per-dagger hit bookkeeping
 		local hitDebounce = {}
@@ -2018,15 +2511,21 @@ function module.HiddenDaggers(player)
 			alive = false
 			projectile.Position = hitPos
 			projectile.Transparency = 1
-			if projectile:FindFirstChild("TestTrail") then projectile.TestTrail.Enabled = false end
-			if projectile:FindFirstChild("ShadowEmitter") then projectile.ShadowEmitter:Emit(100) end
+			if projectile:FindFirstChild("TestTrail") then
+				projectile.TestTrail.Enabled = false
+			end
+			if projectile:FindFirstChild("ShadowEmitter") then
+				projectile.ShadowEmitter:Emit(100)
+			end
 			Debris:AddItem(projectile, WALL_STICK)
 		end
 
 		-- All the damage / parry / block / dodge logic, unchanged, factored into one function.
 		-- Returns true if the projectile should be consumed (destroyed) by this hit.
 		local function onHitCharacter(enemyChar)
-			if hitDebounce[enemyChar] then return false end
+			if hitDebounce[enemyChar] then
+				return false
+			end
 			hitDebounce[enemyChar] = true
 
 			if StateHandler.GetState(enemyChar, "Dodging") then
@@ -2044,7 +2543,8 @@ function module.HiddenDaggers(player)
 				local direction = (enemyChar.HumanoidRootPart.Position - root.Position).Unit
 				helperModule.ApplyKnockback(enemyChar, direction, 10, 0.2)
 
-				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+					or "rbxassetid://111089735892609"
 				animationHandler.LoadAnim(enemyChar, "Hit", animID, nil, false)
 
 				if enemyChar.Humanoid.Health > 0 then
@@ -2060,9 +2560,12 @@ function module.HiddenDaggers(player)
 
 			-- Block/Parry Checks
 			if StateHandler.GetState(enemyChar, "Parrying") then
-				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-				local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-				local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+				local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+					:Clone()
+				local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+					:Clone()
+				local clash = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+					:Clone()
 				local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 				h1.Parent = char
 				game.Debris:AddItem(h1, 0.1)
@@ -2070,7 +2573,8 @@ function module.HiddenDaggers(player)
 				effect2.Parent = char:WaitForChild("Torso")
 				clash.Parent = char:WaitForChild("Right Arm")
 
-				local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+				local clash2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+					:Clone()
 				clash2.Parent = enemyChar:WaitForChild("Right Arm")
 				clash2:Emit(30)
 				game.Debris:AddItem(clash2, 0.7)
@@ -2079,7 +2583,7 @@ function module.HiddenDaggers(player)
 				effect2.Enabled = true
 				clash:Emit(30)
 				game.Debris:AddItem(clash, 0.7)
-				game.Debris:AddItem(parryE,0.7)
+				game.Debris:AddItem(parryE, 0.7)
 				game.Debris:AddItem(effect2, 0.7)
 
 				-- Parry beats hyperarmor: clear it so this punish stun actually lands.
@@ -2088,7 +2592,22 @@ function module.HiddenDaggers(player)
 				StateHandler.SetState(char, "CantAnything", true, 0.5)
 				ParryService.ResetParry(game.Players:GetPlayerFromCharacter(enemyChar))
 				require(game.ServerScriptService.modules.BlockResolver).OnParrySuccess(enemyChar)
-				if game.Players:GetPlayerFromCharacter(enemyChar) then ReplicatedStorage.remotes.replicate:FireClient(game.Players:GetPlayerFromCharacter(enemyChar), {Type = "Combat", Action = "M1", Func = "Parry", FolderName = (enemyChar:FindFirstChildOfClass("Tool") and enemyChar:FindFirstChildOfClass("Tool").Name) or "Katana"}, char, enemyChar) end
+				if game.Players:GetPlayerFromCharacter(enemyChar) then
+					ReplicatedStorage.remotes.replicate:FireClient(
+						game.Players:GetPlayerFromCharacter(enemyChar),
+						{
+							Type = "Combat",
+							Action = "M1",
+							Func = "Parry",
+							FolderName = (
+								enemyChar:FindFirstChildOfClass("Tool")
+								and enemyChar:FindFirstChildOfClass("Tool").Name
+							) or "Katana",
+						},
+						char,
+						enemyChar
+					)
+				end
 
 				local targetPlrData = game.Players:GetPlayerFromCharacter(enemyChar).PlayerStats
 				if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
@@ -2096,7 +2615,13 @@ function module.HiddenDaggers(player)
 				end
 
 				animationHandler.StopAnim(char, "ALL")
-				animationHandler.LoadAnim(char, "Parried", "rbxassetid://116383775729821", nil, false)
+				animationHandler.LoadAnim(
+					char,
+					"Parried",
+					"rbxassetid://116383775729821",
+					nil,
+					false
+				)
 				return true
 			elseif StateHandler.GetState(enemyChar, "Blocking") then
 				-- Route through BlockResolver for facing + guard-bar fill/break. This
@@ -2125,8 +2650,11 @@ function module.HiddenDaggers(player)
 					sound:Play()
 					game.Debris:AddItem(sound, 1)
 
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
 					local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 					h1.Parent = enemyChar
 					game.Debris:AddItem(h1, 0.1)
@@ -2134,7 +2662,7 @@ function module.HiddenDaggers(player)
 					effect2.Parent = enemyChar:FindFirstChild("Torso")
 					parryE.Enabled = true
 					effect2.Enabled = true
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					applyDamage(-3) -- Reduced Damage
@@ -2151,7 +2679,9 @@ function module.HiddenDaggers(player)
 		local conn
 		conn = RunService.Heartbeat:Connect(function(dt)
 			if not alive or not projectile.Parent then
-				if conn then conn:Disconnect() end
+				if conn then
+					conn:Disconnect()
+				end
 				return
 			end
 
@@ -2165,7 +2695,8 @@ function module.HiddenDaggers(player)
 
 			local step = THROW_SPEED * dt
 			-- Spherecast the exact segment we're about to cross, so nothing is tunneled through.
-			local result = workspace:Spherecast(position, HITBOX_RADIUS, travelDir * step, rayParams)
+			local result =
+				workspace:Spherecast(position, HITBOX_RADIUS, travelDir * step, rayParams)
 
 			if result then
 				local hitPart = result.Instance
@@ -2177,7 +2708,11 @@ function module.HiddenDaggers(player)
 					if consumed then
 						alive = false
 						conn:Disconnect()
-						task.delay(0.05, function() if projectile.Parent then projectile:Destroy() end end)
+						task.delay(0.05, function()
+							if projectile.Parent then
+								projectile:Destroy()
+							end
+						end)
 						return
 					end
 					-- not consumed (dodge): advance to the hit point and keep going next frame
@@ -2203,17 +2738,17 @@ function module.YingYangSpiral(player)
 
 	StateHandler.SetState(character, "Dodging", true, 0.5)
 	StateHandler.SetState(character, "CantAnything", true, 0.5)
-	
+
 	animationHandler.LoadAnim(character, "SpecialAtk", "rbxassetid://115983114799315", nil, false)
-	
+
 	task.wait(0.1)
-	
+
 	SpeedService.Push(character, "SkillSlow", 2, SpeedService.Priority.SKILL)
-	
+
 	task.wait(0.4)
-	
+
 	SpeedService.Pop(character, "SkillSlow")
-	
+
 	local part = game:GetService("ReplicatedStorage").assets.FX.skills.tanto.ryougiDashPart:Clone()
 	part.Anchored = true
 	part.CanCollide = false
@@ -2234,23 +2769,39 @@ function module.YingYangSpiral(player)
 
 	playSound(character, ReplicatedStorage.assets.sounds.katana.katanaLunge)
 
-	local hitboxParams = { SizeOrPart = 10, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
+	local hitboxParams =
+		{ SizeOrPart = 10, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 0, -4))
 	Hitbox:Start()
 
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 10, "Dagger", 5, 0.5, 0, character.HumanoidRootPart)
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			10,
+			"Dagger",
+			5,
+			0.5,
+			0,
+			character.HumanoidRootPart
+		)
 	end)
 
-	task.delay(0.3, function() Hitbox:Destroy() end)
+	task.delay(0.3, function()
+		Hitbox:Destroy()
+	end)
 end
 
 function module.MysticEyes(player)
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 	-- activation anim only; buff state + eye/blade FX are owned by BuffService
 	-- (activated from SkillHandler) so they apply to every weapon in the class.
 	animationHandler.LoadAnim(character, "Activate", "rbxassetid://97964685841149", nil, false)
@@ -2261,20 +2812,32 @@ end
 function module.DownwardCleave(player)
 	local character = player.Character
 	local root = character.HumanoidRootPart
-	
+
 	animationHandler.LoadAnim(character, "Activate", "rbxassetid://124210375406879", nil, false)
-	
+
 	playSound(character, ReplicatedStorage.assets.sounds.DANGER)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
-	
+
 	task.wait(0.1)
 
 	SpeedService.Push(character, "SkillSlow", 2, SpeedService.Priority.SKILL)
@@ -2291,17 +2854,18 @@ function module.DownwardCleave(player)
 
 	playSound(character, ReplicatedStorage.assets.sounds.katana.katanaLunge)
 
-	local hitboxParams = { SizeOrPart = 7, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
+	local hitboxParams =
+		{ SizeOrPart = 7, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 0, -4))
 	Hitbox:Start()
-	
+
 	playSound(character, game.ReplicatedStorage.assets.sounds.skills.GroundImpact)
-	
+
 	local startPos = root.Position + (root.CFrame.LookVector * 12)
 	local direction = Vector3.new(0, -15, 0) -- Check 15 studs down
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = {character} -- Ignore the player
+	params.FilterDescendantsInstances = { character } -- Ignore the player
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
@@ -2323,10 +2887,23 @@ function module.DownwardCleave(player)
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 20, "Sword", 5, 0.5, 0, character.HumanoidRootPart)
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			20,
+			"Sword",
+			5,
+			0.5,
+			0,
+			character.HumanoidRootPart
+		)
 	end)
 
-	task.delay(0.2, function() Hitbox:Destroy() end)
+	task.delay(0.2, function()
+		Hitbox:Destroy()
+	end)
 end
 
 function module.Tianshi(player)
@@ -2340,7 +2917,9 @@ function module.Tianshi(player)
 	playSound(character, ReplicatedStorage.assets.sounds.greatsword.woosh)
 
 	task.delay(0.7, function()
-		if not character or not root then return end
+		if not character or not root then
+			return
+		end
 		local airborneVelocity = Instance.new("BodyVelocity")
 		airborneVelocity.Parent = root
 		airborneVelocity.MaxForce = Vector3.new(100000, 100000, 100000)
@@ -2348,7 +2927,7 @@ function module.Tianshi(player)
 		Debris:AddItem(airborneVelocity, 0.4)
 
 		applyDashEffect(character)
-		task.delay(0.5, function ()
+		task.delay(0.5, function()
 			applyDashEffect(character)
 		end)
 	end)
@@ -2358,13 +2937,13 @@ function module.Tianshi(player)
 
 	local hitboxParams = { SizeOrPart = 10, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(root, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(root, CFrame.new(0, 0, -4))
 	Hitbox:Start()
-	
+
 	local startPos = root.Position + (root.CFrame.LookVector * 12)
 	local direction = Vector3.new(0, -50, 0) -- Check 15 studs down
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = {character} -- Ignore the player
+	params.FilterDescendantsInstances = { character } -- Ignore the player
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
@@ -2405,11 +2984,23 @@ function module.Dao(player)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	task.wait(0.1)
@@ -2428,9 +3019,10 @@ function module.Dao(player)
 
 	playSound(character, ReplicatedStorage.assets.sounds.katana.katanaLunge)
 
-	local hitboxParams = { SizeOrPart = 7, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
+	local hitboxParams =
+		{ SizeOrPart = 7, Debug = false, SpatialOption = "InRadius", DebounceTime = 1 }
 	local Hitbox = hitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0,0,-4))
+	Hitbox:WeldTo(character.HumanoidRootPart, CFrame.new(0, 0, -4))
 	Hitbox:Start()
 
 	playSound(character, game.ReplicatedStorage.assets.sounds.skills.GroundImpact)
@@ -2444,14 +3036,27 @@ function module.Dao(player)
 		end
 	end
 	Debris:AddItem(part, 2)
-	
+
 	local alreadyHit = {}
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		processHit(player, character, hitCharsTable, alreadyHit, 30, "Sword", 5, 0.5, 0, character.HumanoidRootPart)
+		processHit(
+			player,
+			character,
+			hitCharsTable,
+			alreadyHit,
+			30,
+			"Sword",
+			5,
+			0.5,
+			0,
+			character.HumanoidRootPart
+		)
 	end)
 
-	task.delay(0.2, function() Hitbox:Destroy() end)
+	task.delay(0.2, function()
+		Hitbox:Destroy()
+	end)
 end
 
 return module

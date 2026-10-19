@@ -141,7 +141,9 @@ local function makeBar(id)
 end
 
 local function exitBar(f)
-	if f.exiting then return end
+	if f.exiting then
+		return
+	end
 	f.exiting = true
 	local info = TweenInfo.new(EXIT_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 	TweenService:Create(f.root, info, {

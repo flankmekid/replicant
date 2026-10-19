@@ -36,7 +36,9 @@ local function swingDispatch(char, combo)
 		E(char, "GSSlashes", "SlashDown", "HumanoidRootPart")
 		-- original references the "Dragon Slayer" tool (clone artifact); guarded no-op on Deathbringer
 		local tool = char:FindFirstChild("Dragon Slayer")
-		if tool and tool:FindFirstChild("Greatsword") then groundSlam(tool) end
+		if tool and tool:FindFirstChild("Greatsword") then
+			groundSlam(tool)
+		end
 	elseif combo == 7 then
 		E(char, "GSSlashes", "SlashDown", "HumanoidRootPart")
 	elseif combo == 8 then

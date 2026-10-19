@@ -27,7 +27,9 @@ local canAttack = true
 
 local function getEquippedTool()
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
@@ -39,7 +41,7 @@ local function getEquippedTool()
 end
 
 local function dashEff()
-	for _,v in pairs(plr.Character:GetChildren()) do
+	for _, v in pairs(plr.Character:GetChildren()) do
 		if v:IsA("BasePart") then
 			if v.Transparency ~= 1 then
 				local part = Instance.new("Part")
@@ -69,28 +71,52 @@ end
 function module.OnM2Activated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
-	if getEquippedTool() ~= script.Parent.Name then return end
+	if getEquippedTool() ~= script.Parent.Name then
+		return
+	end
 
-	if not canAttack then return end
-	if char:GetAttribute("CantAnything") then return end
-	if char:GetAttribute("Stunned") then return end
-	if char:GetAttribute("Sliding") then return end
-	if char:GetAttribute("Blocking") then return end
-	if char:GetAttribute("Parrying") then return end
-	if char:GetAttribute("Dodging") then return end
-	if char:GetAttribute("M1") then return end
-	if char:GetAttribute("M2") then return end
-	if char:GetAttribute("Carried") then return end
-	if char:GetAttribute("Downed") then return end
+	if not canAttack then
+		return
+	end
+	if char:GetAttribute("CantAnything") then
+		return
+	end
+	if char:GetAttribute("Stunned") then
+		return
+	end
+	if char:GetAttribute("Sliding") then
+		return
+	end
+	if char:GetAttribute("Blocking") then
+		return
+	end
+	if char:GetAttribute("Parrying") then
+		return
+	end
+	if char:GetAttribute("Dodging") then
+		return
+	end
+	if char:GetAttribute("M1") then
+		return
+	end
+	if char:GetAttribute("M2") then
+		return
+	end
+	if char:GetAttribute("Carried") then
+		return
+	end
+	if char:GetAttribute("Downed") then
+		return
+	end
 	--if not char:GetAttribute("Equip") then return end
 	canAttack = false
 	CooldownTracker.Register("Shackles_M2", "Critical", 4)
-	
+
 	animationHndlr.StopAnim(char, "ALL")
-	
-	if (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall) then
+
+	if char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall then
 		animationHndlr.LoadAnim(char, "M2", aerialAnimID, nil, false)
-		
+
 		local airSpeed, airLife = DashConfig.Get("ShacklesM2Air")
 		if airSpeed then
 			local BV = Instance.new("BodyVelocity", plr.Character.HumanoidRootPart)
@@ -98,7 +124,7 @@ function module.OnM2Activated()
 			BV.Velocity = plr.Character.HumanoidRootPart.CFrame.lookVector * airSpeed
 			game.Debris:AddItem(BV, airLife)
 		end
-		
+
 		task.delay(0.2, function()
 			dashEff()
 		end)
@@ -106,15 +132,22 @@ function module.OnM2Activated()
 		animationHndlr.LoadAnim(char, "M2", animID, nil, false)
 	end
 
-	ServerRemote:FireServer({Type = "Combat", Action = "M2", Func = "ServerCheck", CombatType = getEquippedTool()})
-	
+	ServerRemote:FireServer({
+		Type = "Combat",
+		Action = "M2",
+		Func = "ServerCheck",
+		CombatType = getEquippedTool(),
+	})
+
 	task.wait(cooldown)
 
 	canAttack = true
 end
 
 function module.ServerResponse(plr, response)
-	if not plr then return end
+	if not plr then
+		return
+	end
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
 	if response == "Declined" then
@@ -135,7 +168,7 @@ module.Hit = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Blocked = function(ochar, echar)
@@ -144,7 +177,7 @@ module.Blocked = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.BlockFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Parry = function(ochar, echar)
@@ -153,7 +186,7 @@ module.Parry = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.ParryFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.GB = function(ochar, echar)
@@ -162,12 +195,11 @@ module.GB = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 plr.CharacterAdded:Connect(function()
 	canAttack = true
 end)
-
 
 return module

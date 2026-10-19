@@ -63,14 +63,24 @@ local isVisible = false
 local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 local function fadeGui(visible)
-	if isVisible == visible then return end
+	if isVisible == visible then
+		return
+	end
 	isVisible = visible
 
 	local targetTransparency = visible and 0 or 1
 	local strokeTransparency = visible and 0.5 or 1
 
-	TweenService:Create(gripLabel, tweenInfo, {TextTransparency = targetTransparency, TextStrokeTransparency = strokeTransparency}):Play()
-	TweenService:Create(carryLabel, tweenInfo, {TextTransparency = targetTransparency, TextStrokeTransparency = strokeTransparency}):Play()
+	TweenService:Create(
+		gripLabel,
+		tweenInfo,
+		{ TextTransparency = targetTransparency, TextStrokeTransparency = strokeTransparency }
+	):Play()
+	TweenService:Create(
+		carryLabel,
+		tweenInfo,
+		{ TextTransparency = targetTransparency, TextStrokeTransparency = strokeTransparency }
+	):Play()
 end
 
 -- 4. UTILITY FUNCTIONS
@@ -79,19 +89,26 @@ function GetClosestDowned(position)
 	local nearestDowned, nearestDistance
 
 	local downedFolder = ReplicatedStorage:FindFirstChild("Downed")
-	if not downedFolder then return nil end
+	if not downedFolder then
+		return nil
+	end
 
 	for i, v in pairs(downedFolder:GetChildren()) do
-		if not v.Value or not v.Value:FindFirstChild("Head") then continue end
+		if not v.Value or not v.Value:FindFirstChild("Head") then
+			continue
+		end
 
-		if v.Value:FindFirstChild("Dead") then continue end
+		if v.Value:FindFirstChild("Dead") then
+			continue
+		end
 
 		local character = v.Value
 		local distance = (character.Head.Position - position).Magnitude
 
-		if not character or 
-			distance > maxDistance or 
-			(nearestDistance and distance >= nearestDistance) 
+		if
+			not character
+			or distance > maxDistance
+			or (nearestDistance and distance >= nearestDistance)
 		then
 			continue
 		end
@@ -104,9 +121,15 @@ end
 
 -- 5. ACTIONS
 local function Carry(actionName, inputState, _inputObject)
-	if Character:GetAttribute("CantAnything") then return end
-	if debounce == true then return end
-	if inputState ~= Enum.UserInputState.Begin then return end
+	if Character:GetAttribute("CantAnything") then
+		return
+	end
+	if debounce == true then
+		return
+	end
+	if inputState ~= Enum.UserInputState.Begin then
+		return
+	end
 	debounce = true
 
 	local victim = GetClosestDowned(Head.Position)
@@ -119,9 +142,15 @@ local function Carry(actionName, inputState, _inputObject)
 end
 
 local function Grip(actionName, inputState, _inputObject)
-	if Character:GetAttribute("CantAnything") then return end
-	if gripDB then return end
-	if inputState ~= Enum.UserInputState.Begin then return end
+	if Character:GetAttribute("CantAnything") then
+		return
+	end
+	if gripDB then
+		return
+	end
+	if inputState ~= Enum.UserInputState.Begin then
+		return
+	end
 	gripDB = true
 
 	local victim = GetClosestDowned(Head.Position)
@@ -140,14 +169,18 @@ CAU:BindAction("Grip", Grip, true, GripButton)
 CAU:SetImage("Grip", "rbxassetid://18362400331")
 
 Hum.HealthChanged:Connect(function(health)
-	if Character:GetAttribute("Stunned") == false then return end
-	if (health/Hum.Health) > 0.3 and Character:GetAttribute("Carried") == false then
+	if Character:GetAttribute("Stunned") == false then
+		return
+	end
+	if (health / Hum.Health) > 0.3 and Character:GetAttribute("Carried") == false then
 		ReplicatedStorage.remotes.ReviveEvent:FireServer()
 	end
 end)
 
 RunService.RenderStepped:Connect(function()
-	if not Head then return end
+	if not Head then
+		return
+	end
 
 	local victim = GetClosestDowned(Head.Position)
 

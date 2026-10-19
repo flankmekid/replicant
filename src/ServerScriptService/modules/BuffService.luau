@@ -73,7 +73,9 @@ module.Buffs = {
 -- ── helpers ─────────────────────────────────────────────────────────────────
 local function getEquippedWeapon(char)
 	local tool = char and char:FindFirstChildOfClass("Tool")
-	if tool and tool.Parent == char then return tool.Name end
+	if tool and tool.Parent == char then
+		return tool.Name
+	end
 	return nil
 end
 
@@ -81,19 +83,29 @@ end
 -- any per-weapon override on top of the base def.
 local function resolveDef(def, weaponName)
 	local perWeapon = def.perWeapon and weaponName and def.perWeapon[weaponName]
-	if not perWeapon then return def end
+	if not perWeapon then
+		return def
+	end
 	local merged = {}
-	for k, v in pairs(def) do merged[k] = v end
-	for k, v in pairs(perWeapon) do merged[k] = v end
+	for k, v in pairs(def) do
+		merged[k] = v
+	end
+	for k, v in pairs(perWeapon) do
+		merged[k] = v
+	end
 	return merged
 end
 
 local function restoreMana(plr, amount)
-	if not amount or amount <= 0 then return end
+	if not amount or amount <= 0 then
+		return
+	end
 	local stats = plr:FindFirstChild("PlayerStats")
 	local mana = stats and stats:FindFirstChild("Mana")
 	local maxMana = stats and stats:FindFirstChild("MaxMana")
-	if not mana then return end
+	if not mana then
+		return
+	end
 	local cap = maxMana and maxMana.Value or math.huge
 	mana.Value = math.min(mana.Value + amount, cap)
 end
@@ -146,7 +158,9 @@ function FX.eyes(char, duration)
 		if highlight and highlight:IsA("Highlight") then
 			highlight.Enabled = true
 			task.delay(duration, function()
-				if highlight.Parent then highlight.Enabled = false end
+				if highlight.Parent then
+					highlight.Enabled = false
+				end
 			end)
 		end
 	end
@@ -159,7 +173,9 @@ local function runActivateFX(def, char, duration)
 		FX.eyes(char, duration)
 	end
 	-- activation sound, matched to the old behavior
-	local ok, s = pcall(function() return RP.assets.sounds.PunchHit:Clone() end)
+	local ok, s = pcall(function()
+		return RP.assets.sounds.PunchHit:Clone()
+	end)
 	if ok and s and char:FindFirstChild("HumanoidRootPart") then
 		s.Parent = char.HumanoidRootPart
 		s:Play()
@@ -179,14 +195,17 @@ end
 -- forward-declared; defined with Deactivate below (Activate refreshes need it).
 local cancelExpiry
 
-
 -- Activate a named buff on a player. Duration comes from the def (falls back to
 -- the passed duration, then 10s). Re-activating refreshes the timer.
 function module.Activate(plr, buffName, durationOverride)
 	local def = module.Buffs[buffName]
-	if not def then return end
+	if not def then
+		return
+	end
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 
 	local weaponName = getEquippedWeapon(char)
 	local eff = resolveDef(def, weaponName)
@@ -227,9 +246,13 @@ end
 -- standing in.
 function cancelExpiry(entry)
 	local token = entry.expireToken
-	if not token then return end
+	if not token then
+		return
+	end
 	entry.expireToken = nil
-	if token == coroutine.running() then return end
+	if token == coroutine.running() then
+		return
+	end
 	pcall(task.cancel, token)
 end
 
@@ -240,12 +263,16 @@ end
 function module.Deactivate(plr, buffName, charOverride)
 	local bucket = active[plr]
 	local entry = bucket and bucket[buffName]
-	if not entry then return end
+	if not entry then
+		return
+	end
 
 	cancelExpiry(entry)
 
 	bucket[buffName] = nil
-	if next(bucket) == nil then active[plr] = nil end
+	if next(bucket) == nil then
+		active[plr] = nil
+	end
 
 	local char = charOverride or entry.char or plr.Character
 	if char then
@@ -260,7 +287,9 @@ end
 -- kept the buff in `active`, and a rerolled race inherited whatever was still there.
 function module.ClearAll(plr, charOverride)
 	local bucket = active[plr]
-	if not bucket then return end
+	if not bucket then
+		return
+	end
 	for buffName in pairs(bucket) do
 		module.Deactivate(plr, buffName, charOverride)
 	end
@@ -271,7 +300,9 @@ end
 -- stack with each other in practice; a class has one buff skill.)
 local function getActiveDef(plr)
 	local bucket = active[plr]
-	if not bucket then return nil end
+	if not bucket then
+		return nil
+	end
 	local _, entry = next(bucket)
 	return entry and entry.def or nil
 end
@@ -289,7 +320,8 @@ function module.ApplyDamage(plr, char, targetChar, dmg, extraDmg, dmgType)
 
 	local mode = DamageModes[def.damage] or DamageModes.additiveHalf
 	local baseArg, extraArg = mode(dmg, extraDmg)
-	local result = damageCalculator.CalculateDamage(char, targetChar, baseArg, extraArg, false, dmgType)
+	local result =
+		damageCalculator.CalculateDamage(char, targetChar, baseArg, extraArg, false, dmgType)
 
 	if def.heal and def.heal > 0 and char:FindFirstChild("Humanoid") then
 		char.Humanoid.Health = math.min(char.Humanoid.Health + def.heal, char.Humanoid.MaxHealth)
@@ -301,8 +333,12 @@ end
 
 function module.IsActive(plr, buffName)
 	local bucket = active[plr]
-	if not bucket then return false end
-	if buffName then return bucket[buffName] ~= nil end
+	if not bucket then
+		return false
+	end
+	if buffName then
+		return bucket[buffName] ~= nil
+	end
 	return next(bucket) ~= nil
 end
 
@@ -310,7 +346,9 @@ Players.PlayerRemoving:Connect(function(plr)
 	local bucket = active[plr]
 	if bucket then
 		for name, entry in pairs(bucket) do
-			if entry.expireToken then task.cancel(entry.expireToken) end
+			if entry.expireToken then
+				task.cancel(entry.expireToken)
+			end
 		end
 		active[plr] = nil
 	end

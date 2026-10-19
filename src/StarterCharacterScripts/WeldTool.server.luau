@@ -3,7 +3,7 @@ local BackTools = ReplicatedStorage:WaitForChild("WeldTools")
 
 local Character = script.Parent
 local Player = game.Players:GetPlayerFromCharacter(Character)
-local Torso = Character:FindFirstChild('Torso')
+local Torso = Character:FindFirstChild("Torso")
 
 local weaponModel = nil
 
@@ -26,7 +26,7 @@ Character.ChildRemoved:Connect(function(child)
 	if weaponModel and Model then
 		weaponModel:Destroy()
 	end
-	if child:IsA('Tool') and Model then
+	if child:IsA("Tool") and Model then
 		if weaponModel then
 			weaponModel:Destroy()
 		end

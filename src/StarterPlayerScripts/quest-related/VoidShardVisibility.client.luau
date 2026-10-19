@@ -3,16 +3,16 @@
 -- Shows the shard only to players with SidurguErrand active at progress 0.
 -- Controls transparency directly on the part. No BillboardGui.
 
-local Players           = game:GetService("Players")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService      = game:GetService("TweenService")
+local TweenService = game:GetService("TweenService")
 
-local player        = Players.LocalPlayer
-local QuestUpdate   = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
+local player = Players.LocalPlayer
+local QuestUpdate = ReplicatedStorage.QuestSystem:WaitForChild("QuestUpdate")
 local QuestStateRequest = ReplicatedStorage.QuestSystem:WaitForChild("QuestStateRequest")
-local PickupRemote  = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("ShardPickup")
+local PickupRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("ShardPickup")
 
-local QUEST_ID        = "SidurguErrand"
+local QUEST_ID = "SidurguErrand"
 local SHARD_PART_NAME = "VoidStoneShard"
 
 local shardPart = workspace:WaitForChild(SHARD_PART_NAME, 10)
@@ -25,12 +25,12 @@ end
 local prompt = shardPart:FindFirstChildWhichIsA("ProximityPrompt")
 if not prompt then
 	prompt = Instance.new("ProximityPrompt")
-	prompt.ObjectText            = "Void-stone Shard"
-	prompt.ActionText            = "Take"
-	prompt.KeyboardKeyCode       = Enum.KeyCode.E
+	prompt.ObjectText = "Void-stone Shard"
+	prompt.ActionText = "Take"
+	prompt.KeyboardKeyCode = Enum.KeyCode.E
 	prompt.MaxActivationDistance = 6
-	prompt.RequiresLineOfSight   = false
-	prompt.Parent                = shardPart
+	prompt.RequiresLineOfSight = false
+	prompt.Parent = shardPart
 end
 
 -- ── VISIBILITY ────────────────────────────────────────────────────────────────
@@ -57,7 +57,9 @@ local function checkState()
 	local success, state = pcall(function()
 		return QuestStateRequest:InvokeServer(QUEST_ID)
 	end)
-	if not success or not state then return end
+	if not success or not state then
+		return
+	end
 	setVisible(state.active and state.progress == 0)
 end
 

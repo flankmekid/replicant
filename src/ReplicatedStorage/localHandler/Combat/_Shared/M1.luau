@@ -25,7 +25,9 @@ local UPPERCUT_VELOCITY = 15
 -- AlignPosition drives the position via the physics engine, so it plays nice with the
 -- character's own simulation instead of fighting it the way a CFrame tween would.
 local function juggleFloat(hrp, targetPos, window, responsiveness)
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 	local att = Instance.new("Attachment")
 	att.Name = "UppercutApex"
 	att.Parent = hrp
@@ -58,7 +60,9 @@ end
 
 local function getEquippedTool()
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
@@ -68,7 +72,9 @@ end
 
 -- resolve a dotted path ("katana.katanaSwing" or "PunchSound") under assets.sounds
 local function resolveSound(path)
-	if not path then return nil end
+	if not path then
+		return nil
+	end
 	local node = Sounds
 	for part in path:gmatch("[^.]+") do
 		node = node and node:FindFirstChild(part)
@@ -89,7 +95,7 @@ local function soundsFor(char)
 end
 
 local function dashEff()
-	for _,v in pairs(plr.Character:GetChildren()) do
+	for _, v in pairs(plr.Character:GetChildren()) do
 		if v:IsA("BasePart") then
 			if v.Transparency ~= 1 then
 				local part = Instance.new("Part")
@@ -120,25 +126,51 @@ function module.OnM1Activated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
 	local weapon = getEquippedTool()
-	if not weapon then return end
+	if not weapon then
+		return
+	end
 	local cfg = WeaponConfig[weapon]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	local m1 = cfg.client.m1
 	local comboMax = cfg.server.m1.maxCombo
 	local cooldown = m1.cooldown
 	local spd = m1.animSpeed
 
-	if InputGate.IsLocked() then return end
-	if not canAttack then return end
-	if char:GetAttribute("CantAnything") then return end
-	if char:GetAttribute("Stunned") then return end
-	if char:GetAttribute("Blocking") then return end
-	if char:GetAttribute("Parrying") then return end
-	if char:GetAttribute("Dodging") then return end
-	if char:GetAttribute("M1") then return end
-	if char:GetAttribute("M2") then return end
-	if char:GetAttribute("Carried") then return end
-	if char:GetAttribute("Downed") then return end
+	if InputGate.IsLocked() then
+		return
+	end
+	if not canAttack then
+		return
+	end
+	if char:GetAttribute("CantAnything") then
+		return
+	end
+	if char:GetAttribute("Stunned") then
+		return
+	end
+	if char:GetAttribute("Blocking") then
+		return
+	end
+	if char:GetAttribute("Parrying") then
+		return
+	end
+	if char:GetAttribute("Dodging") then
+		return
+	end
+	if char:GetAttribute("M1") then
+		return
+	end
+	if char:GetAttribute("M2") then
+		return
+	end
+	if char:GetAttribute("Carried") then
+		return
+	end
+	if char:GetAttribute("Downed") then
+		return
+	end
 	canAttack = false
 	InputGate.Lock(cfg.server.m1.windup + 0.2)
 
@@ -166,7 +198,8 @@ function module.OnM1Activated()
 	-- UserInputService is fetched here, not at module scope: this module sits in
 	-- ReplicatedStorage and GetService("UserInputService") throws if the server loads it.
 	local UIS = game:GetService("UserInputService")
-	local ctrlHeld = UIS:IsKeyDown(Enum.KeyCode.LeftControl) or UIS:IsKeyDown(Enum.KeyCode.RightControl)
+	local ctrlHeld = UIS:IsKeyDown(Enum.KeyCode.LeftControl)
+		or UIS:IsKeyDown(Enum.KeyCode.RightControl)
 	local grounded = char.Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall
 	local wantsUppercut = char:GetAttribute("Sliding") or (ctrlHeld and grounded)
 
@@ -177,7 +210,9 @@ function module.OnM1Activated()
 		-- End the slide cleanly FIRST: fires StopSlide (kills its Heartbeat loop and
 		-- SlideVelocity) so nothing fights the AlignPosition launch we author below.
 		local usEv = RP:FindFirstChild("UppercutStopSlide")
-		if usEv then usEv:Fire() end
+		if usEv then
+			usEv:Fire()
+		end
 
 		animationHndlr.StopAnim(char, "Sliding", "rbxassetid://136848049831912")
 		char.Humanoid.HipHeight = 0
@@ -193,7 +228,13 @@ function module.OnM1Activated()
 		-- below authors the exact same AlignPosition lift, timed to the confirmed hit so
 		-- attacker and victim leave the ground together). On a whiff, no rise ever comes.
 		-- The slide is already killed above, so we are grounded and committed until then.
-		ServerRemote:FireServer({Type = "Combat", Action = "M1", Func = "ServerCheck", CombatType = weapon, SubType = "Uppercut"})
+		ServerRemote:FireServer({
+			Type = "Combat",
+			Action = "M1",
+			Func = "ServerCheck",
+			CombatType = weapon,
+			SubType = "Uppercut",
+		})
 
 		task.wait(m1.uppercutWait)
 
@@ -204,8 +245,12 @@ function module.OnM1Activated()
 		task.delay(3, function()
 			uppercutDB = false
 		end)
-
-	elseif (not launched) and char:GetAttribute("Running") and lungeDB == false and (char.Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall) then
+	elseif
+		not launched
+		and char:GetAttribute("Running")
+		and lungeDB == false
+		and (char.Humanoid:GetState() ~= Enum.HumanoidStateType.Freefall)
+	then
 		lungeDB = true
 		canAttack = false
 		local animID = m1.lungeAnim
@@ -222,7 +267,13 @@ function module.OnM1Activated()
 		-- FireServer moves FIRST: the server needs to start the lunge at the top of the
 		-- attack, not lungeWait seconds into it. The animation still plays here on the
 		-- same schedule, so the step-in reads identically.
-		ServerRemote:FireServer({Type = "Combat", Action = "M1", Func = "ServerCheck", CombatType = weapon, SubType = "Lunge"})
+		ServerRemote:FireServer({
+			Type = "Combat",
+			Action = "M1",
+			Func = "ServerCheck",
+			CombatType = weapon,
+			SubType = "Lunge",
+		})
 
 		task.wait(m1.lungeWait)
 
@@ -233,7 +284,11 @@ function module.OnM1Activated()
 		task.delay(3, function()
 			lungeDB = false
 		end)
-	elseif (not launched) and (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall) and airDB == false then
+	elseif
+		not launched
+		and (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall)
+		and airDB == false
+	then
 		airDB = true
 		canAttack = false
 		local animID = m1.airAnim
@@ -252,7 +307,13 @@ function module.OnM1Activated()
 			game.Debris:AddItem(BV, airLife)
 		end
 
-		ServerRemote:FireServer({Type = "Combat", Action = "M1", Func = "ServerCheck", CombatType = weapon, SubType = "AirLunge"})
+		ServerRemote:FireServer({
+			Type = "Combat",
+			Action = "M1",
+			Func = "ServerCheck",
+			CombatType = weapon,
+			SubType = "AirLunge",
+		})
 
 		task.wait(m1.airWait)
 		dashEff()
@@ -279,7 +340,12 @@ function module.OnM1Activated()
 			comboResetTask = nil
 		end
 		comboResetTask = task.delay(comboResetTime, resetCombo)
-		ServerRemote:FireServer({Type = "Combat", Action = "M1", Func = "ServerCheck", CombatType = weapon})
+		ServerRemote:FireServer({
+			Type = "Combat",
+			Action = "M1",
+			Func = "ServerCheck",
+			CombatType = weapon,
+		})
 
 		if combo == comboMax then
 			task.delay(0.25, function()
@@ -330,17 +396,30 @@ end
 -- the server-juggled victim. On a whiff the server never fires this, so no rise.
 function module.UppercutRise()
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 	local hrp = char:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 	local UC = WeaponConfig.Uppercut
-	juggleFloat(hrp, hrp.Position + Vector3.new(0, UC.RiseHeight, 0), UC.HangWindow, UC.Responsiveness)
+	juggleFloat(
+		hrp,
+		hrp.Position + Vector3.new(0, UC.RiseHeight, 0),
+		UC.HangWindow,
+		UC.Responsiveness
+	)
 end
 
 module.Hitstop = function(ochar, echar)
 	-- freeze both attacker and victim animations on impact (client-side feel)
-	if ochar then animationHndlr.Hitstop(ochar, 0.12) end
-	if echar then animationHndlr.Hitstop(echar, 0.12) end
+	if ochar then
+		animationHndlr.Hitstop(ochar, 0.12)
+	end
+	if echar then
+		animationHndlr.Hitstop(echar, 0.12)
+	end
 end
 
 module.Swing = function(ochar)
@@ -364,7 +443,7 @@ module.Hit = function(ochar, echar)
 	end
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Blocked = function(ochar, echar)
@@ -373,7 +452,7 @@ module.Blocked = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.BlockFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Parry = function(ochar, echar)
@@ -382,7 +461,7 @@ module.Parry = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.ParryFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.GB = function(ochar, echar)
@@ -395,7 +474,7 @@ module.GB = function(ochar, echar)
 	end
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 return module

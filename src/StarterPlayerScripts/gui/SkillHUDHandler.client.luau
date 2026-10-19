@@ -23,7 +23,7 @@ screenGui.Parent = playerGui
 
 local container = Instance.new("Frame")
 container.Name = "Container"
-container.AnchorPoint = Vector2.new(0.5, 1) 
+container.AnchorPoint = Vector2.new(0.5, 1)
 container.Position = UDim2.new(0.5, 0, 0.89, 0)
 container.Size = UDim2.new(0, 0, 0, 0)
 container.AutomaticSize = Enum.AutomaticSize.XY
@@ -32,30 +32,30 @@ container.Parent = screenGui
 
 local listLayout = Instance.new("UIListLayout")
 listLayout.Parent = container
-listLayout.FillDirection = Enum.FillDirection.Horizontal 
+listLayout.FillDirection = Enum.FillDirection.Horizontal
 listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 listLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 8) 
+listLayout.Padding = UDim.new(0, 8)
 
 local activeSkillFrames = {}
 
 -- [[ STATE TRACKING ]] --
 -- This table remembers cooldowns even if the UI is deleted/refreshed
 -- Format: { [skillName] = { endTime = number, totalDuration = number } }
-local activeCooldowns = {} 
+local activeCooldowns = {}
 
 -- [[ FUNCTIONS ]] --
 
 local function createSkillBar(skillName, slotIndex, isRace)
 	local frame = Instance.new("Frame")
 	frame.Name = skillName
-	frame.Size = UDim2.new(0, 160, 0, 30) 
+	frame.Size = UDim2.new(0, 160, 0, 30)
 	frame.BackgroundColor3 = isRace and Color3.fromRGB(50, 40, 60) or Color3.fromRGB(36, 36, 36)
-	frame.BackgroundTransparency = 0.4 
+	frame.BackgroundTransparency = 0.4
 	frame.BorderSizePixel = 0
 	frame.LayoutOrder = slotIndex
-	frame.ClipsDescendants = true 
+	frame.ClipsDescendants = true
 
 	local uiCorner = Instance.new("UICorner")
 	uiCorner.CornerRadius = UDim.new(0, 6)
@@ -72,11 +72,11 @@ local function createSkillBar(skillName, slotIndex, isRace)
 	label.Position = UDim2.new(0, 0, 0, 0)
 	label.BackgroundTransparency = 1
 	label.Text = string.format("[%s] %s", KEY_NAMES[slotIndex] or "?", skillName)
-	label.Font = Enum.Font.RobotoMono 
-	label.TextSize = 14 
+	label.Font = Enum.Font.RobotoMono
+	label.TextSize = 14
 	label.TextColor3 = Color3.fromRGB(230, 230, 230)
-	label.TextXAlignment = Enum.TextXAlignment.Center 
-	label.ZIndex = 5 
+	label.TextXAlignment = Enum.TextXAlignment.Center
+	label.ZIndex = 5
 	label.Parent = frame
 
 	local textStroke = Instance.new("UIStroke")
@@ -88,7 +88,7 @@ local function createSkillBar(skillName, slotIndex, isRace)
 	cdBar.Name = "CooldownBar"
 	cdBar.Size = UDim2.new(0, 0, 1, 0) -- Starts empty (visuals only appear when CD active)
 	cdBar.BackgroundColor3 = isRace and Color3.fromRGB(120, 60, 180) or Color3.fromRGB(180, 40, 40)
-	cdBar.BackgroundTransparency = 0.6 
+	cdBar.BackgroundTransparency = 0.6
 	cdBar.BorderSizePixel = 0
 	cdBar.ZIndex = 2
 	cdBar.Parent = frame
@@ -110,19 +110,23 @@ local function ApplyCooldownAnimation(bar, remainingTime, totalDuration)
 
 	-- Tween to 0
 	local tweenInfo = TweenInfo.new(remainingTime, Enum.EasingStyle.Linear)
-	local tween = TweenService:Create(bar, tweenInfo, {Size = UDim2.new(0, 0, 1, 0)})
+	local tween = TweenService:Create(bar, tweenInfo, { Size = UDim2.new(0, 0, 1, 0) })
 	tween:Play()
 end
 
 local function RefreshHUD()
 	-- Clear existing GUI
 	for _, child in pairs(container:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
 	end
 	activeSkillFrames = {}
 
 	local char = player.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	-- 1. WEAPON SKILLS (Slots 1-3)
 	-- Read the player's equipped loadout per family (set in the spellbook), not the
@@ -183,7 +187,7 @@ local function OnCooldownTriggered(skillName, duration)
 	-- 1. Save State
 	activeCooldowns[skillName] = {
 		endTime = os.clock() + duration,
-		totalDuration = duration
+		totalDuration = duration,
 	}
 
 	-- 2. Animate if visible
@@ -202,10 +206,15 @@ TriggerCooldownEvent.Event:Connect(OnCooldownTriggered)
 -- respawns so we don't re-hook per character.
 local equippedHooked = false
 local function hookEquippedSkills()
-	if equippedHooked then return end
+	if equippedHooked then
+		return
+	end
 	local stats = player:FindFirstChild("PlayerStats") or player:WaitForChild("PlayerStats", 10)
-	local equippedFolder = stats and (stats:FindFirstChild("EquippedSkills") or stats:WaitForChild("EquippedSkills", 10))
-	if not equippedFolder then return end
+	local equippedFolder = stats
+		and (stats:FindFirstChild("EquippedSkills") or stats:WaitForChild("EquippedSkills", 10))
+	if not equippedFolder then
+		return
+	end
 	equippedHooked = true
 	RefreshHUD()
 
@@ -216,26 +225,36 @@ local function hookEquippedSkills()
 	end
 	-- Existing family folders + their slot values.
 	for _, famFolder in ipairs(equippedFolder:GetChildren()) do
-		for _, sv in ipairs(famFolder:GetChildren()) do watchSlot(sv) end
+		for _, sv in ipairs(famFolder:GetChildren()) do
+			watchSlot(sv)
+		end
 		famFolder.ChildAdded:Connect(watchSlot)
 	end
 	-- Family folders created later (first skill in a new family).
 	equippedFolder.ChildAdded:Connect(function(famFolder)
-		for _, sv in ipairs(famFolder:GetChildren()) do watchSlot(sv) end
+		for _, sv in ipairs(famFolder:GetChildren()) do
+			watchSlot(sv)
+		end
 		famFolder.ChildAdded:Connect(watchSlot)
 		RefreshHUD()
 	end)
 end
 
 local function hookCharacter(char)
-	if not char then return end
+	if not char then
+		return
+	end
 
 	char.ChildAdded:Connect(function(child)
-		if child:IsA("Tool") then RefreshHUD() end
+		if child:IsA("Tool") then
+			RefreshHUD()
+		end
 	end)
 
 	char.ChildRemoved:Connect(function(child)
-		if child:IsA("Tool") then RefreshHUD() end
+		if child:IsA("Tool") then
+			RefreshHUD()
+		end
 	end)
 
 	task.spawn(hookEquippedSkills)
@@ -243,4 +262,6 @@ local function hookCharacter(char)
 end
 
 player.CharacterAdded:Connect(hookCharacter)
-if player.Character then hookCharacter(player.Character) end
+if player.Character then
+	hookCharacter(player.Character)
+end

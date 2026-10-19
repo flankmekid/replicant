@@ -42,8 +42,8 @@ local DashConfig = require(RP.modules.DashConfig)
 --
 -- These do NOT touch the M2 cooldown (cfg.postCooldown, 3-7s). You still cannot chain
 -- M2 into another M2. M2 opens a window; it does not become the window.
-local M2_ENDLAG_HIT   = 0.1
-local M2_ENDLAG_WHIFF = 0.65  -- +0.2: whiffing a guardbreak is punished harder
+local M2_ENDLAG_HIT = 0.1
+local M2_ENDLAG_WHIFF = 0.65 -- +0.2: whiffing a guardbreak is punished harder
 
 -- [[ M1 / E WHIFF RECOVERY ]] --
 -- M1 and E have no hit/whiff split of their own: recovery is uniform (M1's is the
@@ -75,20 +75,20 @@ local M1E_WHIFF_RECOVERY = 0.2
 --
 -- Tune freely. Raising M1_ADVANTAGE makes M1 strings harder to parry out of
 -- (toward true combos); lowering it (or negative) opens the parry window.
-local M1_ADVANTAGE      = 0.20  -- seconds of frame advantage on a light/med M1.
+local M1_ADVANTAGE = 0.20 -- seconds of frame advantage on a light/med M1.
 -- At 0.20 the victim's hitstun outlasts the attacker's
 -- recovery by enough that the NEXT M1's startup lands
 -- while they are still frozen: a landed M1 is now a TRUE
 -- combo (no walk-out, no dash-out). The only escape is a
 -- parry, which is allowed mid-stun (see _Shared.Block).
-local M1_MIN_HITSTUN    = 0.45  -- floor so a fast weapon still stuns meaningfully
+local M1_MIN_HITSTUN = 0.45 -- floor so a fast weapon still stuns meaningfully
 local GREATSWORD_M1_HITSTUN = 1.0 -- heavies do NOT get a free M1 chain: recovery
 -- 1.1 minus this = negative advantage (a read,
 -- never a guaranteed second light). Keyed by
 -- WeaponConfig `family` (GS / DS / Deathbringer).
-local M2_HITSTUN        = 1.10  -- flat: links into M1 on every weapon
-local E_HITSTUN         = 1.00  -- flat: E is the combo STARTER, flows into M1
-local HITSTUN_STUNSPEED = 1     -- walkspeed while in weapon hitstun (near-immobile; kills S-hold backpedal-out)
+local M2_HITSTUN = 1.10 -- flat: links into M1 on every weapon
+local E_HITSTUN = 1.00 -- flat: E is the combo STARTER, flows into M1
+local HITSTUN_STUNSPEED = 1 -- walkspeed while in weapon hitstun (near-immobile; kills S-hold backpedal-out)
 
 -- Resolve hitstun for a landed weapon hit. `action` is the move type
 -- ("M1"/"M2"/"E"). `weaponName` is the equipped weapon, used for the M1 cooldown
@@ -119,7 +119,7 @@ end
 -- Combo is 1-indexed and set on the first M1, so >= 2 means "you have thrown at least a
 -- couple of M1s and the window has not lapsed."
 local M2_FINISHER_MIN_COMBO = 2
-local M2_FINISHER_LAUNCH_UP = 40   -- upward pop on a combo-ender M2
+local M2_FINISHER_LAUNCH_UP = 40 -- upward pop on a combo-ender M2
 local M2_FINISHER_LAUNCH_BACK = 20 -- backward shove so they travel away as they rise
 local M2_FINISHER_STUN = 1.2
 
@@ -131,7 +131,7 @@ local M2_FINISHER_STUN = 1.2
 -- M1 path reads to force a GROUND combo in the air (see RunM1) instead of the aerial
 -- attack. The victim is held in a hittable stun (NOT ragdolled: a ragdoll flops out of
 -- hitboxes and cannot be cleanly juggled).
-local LAUNCH_WINDOW      = WeaponConfig.Uppercut.HangWindow  -- apex hold + Launched-flag lifetime (shared with client M1 via WeaponConfig.Uppercut)
+local LAUNCH_WINDOW = WeaponConfig.Uppercut.HangWindow -- apex hold + Launched-flag lifetime (shared with client M1 via WeaponConfig.Uppercut)
 
 local comboResetTime = 5
 local comboResetTasks = {}
@@ -141,7 +141,9 @@ local activeAttacks = setmetatable({}, { __mode = "k" }) -- [char] = { cancelled
 
 local function getEquippedTool(plr)
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
@@ -155,11 +157,15 @@ end
 -- push a launched victim away from the attacker as they rise). Cleans itself up.
 local function floatUp(char, burstUp, hangUp, back, lookVec, window)
 	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+	if not root then
+		return
+	end
 
 	-- clear any prior launch mover so two uppercuts do not stack drives
 	local old = root:FindFirstChild("JuggleForce")
-	if old then old:Destroy() end
+	if old then
+		old:Destroy()
+	end
 
 	local horizontal = Vector3.new(0, 0, 0)
 	if back and lookVec then
@@ -190,7 +196,9 @@ end
 -- the uppercut juggle: an AlignPosition replicates to the target's own client and moves it,
 -- so this works on a victim we do NOT own the network ownership of, no ownership juggling.
 local function juggleFloat(hrp, targetPos, window, responsiveness)
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 	local att = Instance.new("Attachment")
 	att.Name = "UppercutApex"
 	att.Parent = hrp
@@ -219,18 +227,28 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 
 	-- tell every client to freeze both fighters' animations
 	ReplicateRemote:FireAllClients({
-		Type = "Combat", Action = action, Func = "Hitstop",
-		FolderName = getEquippedTool(plr)
+		Type = "Combat",
+		Action = action,
+		Func = "Hitstop",
+		FolderName = getEquippedTool(plr),
 	}, attackerChar, targetChar)
 
 	-- lock the victim in place for the freeze window (server side, so it holds).
 	-- do NOT touch a victim who is already fully Stunned or Downed (a real hit
 	-- reaction owns their movement; hitstop must not shorten or fight it).
 	local humanoid = targetChar:FindFirstChild("Humanoid")
-	if not humanoid then return end
-	if StateHandler.GetState(targetChar, "Stunned") then return end
-	if StateHandler.GetState(targetChar, "Downed") then return end
-	if hitstopLocks[targetChar] then return end -- already frozen; let it ride
+	if not humanoid then
+		return
+	end
+	if StateHandler.GetState(targetChar, "Stunned") then
+		return
+	end
+	if StateHandler.GetState(targetChar, "Downed") then
+		return
+	end
+	if hitstopLocks[targetChar] then
+		return
+	end -- already frozen; let it ride
 
 	hitstopLocks[targetChar] = {
 		jumpP = humanoid.JumpPower,
@@ -248,7 +266,9 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 	task.delay(duration, function()
 		local saved = hitstopLocks[targetChar]
 		hitstopLocks[targetChar] = nil
-		if not saved then return end
+		if not saved then
+			return
+		end
 		local h = targetChar:FindFirstChild("Humanoid")
 		if not h then
 			-- humanoid gone: still drop the modifier so it can't linger on a rig reuse
@@ -260,7 +280,9 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 		-- need the old "return early to avoid stomping" dance. Jump/AutoRotate are only
 		-- restored when no stun owns them (a live stun owns those for its duration).
 		SpeedService.Pop(targetChar, "Hitstop")
-		if StateHandler.GetState(targetChar, "Stunned") then return end
+		if StateHandler.GetState(targetChar, "Stunned") then
+			return
+		end
 		h.JumpPower = saved.jumpP
 		h.JumpHeight = saved.jumpH
 		h.AutoRotate = saved.autoRotate
@@ -298,23 +320,41 @@ end
 -- combo -> swing FX using the comboMap ("R"=rightSwing/SlashFXLeft, "L"=leftSwing/SlashFXRight, "U"=upSwing/SlashFXUp)
 local function genericSwing(char, combo, cfg)
 	local fx = cfg.swingFX
-	if not fx then return end
+	if not fx then
+		return
+	end
 	local m = cfg.comboMap and cfg.comboMap[combo]
-	if not m then return end
-	if m:find("R") then emitSlash(char, fx.folder, "SlashFXLeft", fx.rightPart) end
-	if m:find("L") then emitSlash(char, fx.folder, "SlashFXRight", fx.rightPart) end
-	if m:find("U") then emitSlash(char, fx.folder, "SlashFXUp", fx.upPart) end
+	if not m then
+		return
+	end
+	if m:find("R") then
+		emitSlash(char, fx.folder, "SlashFXLeft", fx.rightPart)
+	end
+	if m:find("L") then
+		emitSlash(char, fx.folder, "SlashFXRight", fx.rightPart)
+	end
+	if m:find("U") then
+		emitSlash(char, fx.folder, "SlashFXUp", fx.upPart)
+	end
 end
 
 local function setTrail(char, trailBlade, on)
-	if not trailBlade then return end
+	if not trailBlade then
+		return
+	end
 	local model = char:FindFirstChild(trailBlade.model)
 	local blade = model and model:FindFirstChild(trailBlade.part)
-	if not blade then return end
+	if not blade then
+		return
+	end
 	local t1 = blade:FindFirstChild("MeleeTrail")
-	if t1 then t1.Enabled = on end
+	if t1 then
+		t1.Enabled = on
+	end
 	local t2 = blade:FindFirstChild("MeleeTrail2")
-	if t2 then t2.Enabled = on end
+	if t2 then
+		t2.Enabled = on
+	end
 end
 
 -- afterimage effect (shared by the M2 dash)
@@ -347,7 +387,14 @@ local function makeM2Knockback(isFinisher)
 	return function(char, targetChar, targetHRP, attackerHRP, direction, knockbackDistance)
 		if isFinisher then
 			local lookVec = attackerHRP.CFrame.LookVector
-			floatUp(targetChar, M2_FINISHER_LAUNCH_UP, M2_FINISHER_LAUNCH_UP * 0.4, M2_FINISHER_LAUNCH_BACK, lookVec, 0.6)
+			floatUp(
+				targetChar,
+				M2_FINISHER_LAUNCH_UP,
+				M2_FINISHER_LAUNCH_UP * 0.4,
+				M2_FINISHER_LAUNCH_BACK,
+				lookVec,
+				0.6
+			)
 			StateHandler.SetStun(targetChar, true, M2_FINISHER_STUN, HITSTUN_STUNSPEED)
 		else
 			Helper.ApplyKnockback(targetChar, direction, knockbackDistance, 0.2)
@@ -370,21 +417,33 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(char, "Stunned") then continue end
+				if StateHandler.GetState(char, "Stunned") then
+					continue
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
 					local sound = RP.assets.sounds.Dodged:Clone()
@@ -397,10 +456,17 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					game.Debris:AddItem(effect, 0.3)
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
-								task.delay(0.3, function() part.Transparency = oldTrans end)
+								task.delay(0.3, function()
+									part.Transparency = oldTrans
+								end)
 							end
 						end
 					end
@@ -415,7 +481,14 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					-- in eKnockback / makeM2Knockback / m1Knockback). damageCalculator
 					-- deliberately SKIPS its own stun when dmgType == "Weapon", so there
 					-- is no second writer to clobber the per-move value.
-					ctx.applyKnockback(char, targetChar, targetHRP, attackerHRP, direction, knockbackDistance)
+					ctx.applyKnockback(
+						char,
+						targetChar,
+						targetHRP,
+						attackerHRP,
+						direction,
+						knockbackDistance
+					)
 
 					if ctx.onDamage then
 						ctx.onDamage(plr, char, targetChar, ctx.dmg, extraDmg)
@@ -426,21 +499,31 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					local xpName = ctx.xpName or getEquippedTool(plr)
 					-- no XP off a downed body: they take no damage (damageCalculator bails on
 					-- Downed) and cannot fight back, so awarding XP here is a free farm.
-					if targetChar.Humanoid.Health > 0
+					if
+						targetChar.Humanoid.Health > 0
 						and targetChar.Humanoid.MaxHealth < 10000
-						and not StateHandler.GetState(targetChar, "Downed") then
-						DataManager.AddWeaponXP(game.Players:GetPlayerFromCharacter(char), xpName, (ctx.dmg + extraDmg) * (ctx.xpMultiplier or 1))
+						and not StateHandler.GetState(targetChar, "Downed")
+					then
+						DataManager.AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(char),
+							xpName,
+							(ctx.dmg + extraDmg) * (ctx.xpMultiplier or 1)
+						)
 					end
 
 					local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 					highlight.Parent = humanoid.Parent
 					game.Debris:AddItem(highlight, 0.1)
-					local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+					local hitEff =
+						game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+							:Clone()
 					hitEff.Parent = targetChar:FindFirstChild("Torso")
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
 						for _, v in pairs(hitEff:GetChildren()) do
-							if v:IsA("ParticleEmitter") then v.Enabled = false end
+							if v:IsA("ParticleEmitter") then
+								v.Enabled = false
+							end
 						end
 					end)
 					alreadyHit[targetChar] = true
@@ -475,7 +558,12 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 				local targetToken = activeAttacks[targetChar]
 				if targetToken then
 					local iAmArmored = ctx.token and ctx.token.hyperArmored
-					if targetToken.hitboxStart and ctx.token and ctx.token.hitboxStart and targetToken.hitboxStart < ctx.token.hitboxStart then
+					if
+						targetToken.hitboxStart
+						and ctx.token
+						and ctx.token.hitboxStart
+						and targetToken.hitboxStart < ctx.token.hitboxStart
+					then
 						-- their hitbox started first: I lose the clash, unless my move is
 						-- armored, in which case I trade (eat their hit, keep swinging).
 						if not iAmArmored then
@@ -494,12 +582,22 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 				end
 				if StateHandler.GetState(targetChar, "Parrying") then
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = action, Func = "Parry", FolderName = getEquippedTool(plr)
+						Type = "Combat",
+						Action = action,
+						Func = "Parry",
+						FolderName = getEquippedTool(plr),
 					}, char, targetChar)
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = targetChar:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -522,11 +620,20 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					BlockResolver.OnParrySuccess(targetChar)
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
 					AnimationHandler.StopAnim(char, "ALL")
-					AnimationHandler.LoadAnim(char, "Parried", "rbxassetid://74891530644094", nil, false)
+					AnimationHandler.LoadAnim(
+						char,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
 				elseif StateHandler.GetState(targetChar, "Blocking") then
 					-- All block outcomes route through BlockResolver (the single
 					-- chokepoint that also owns the guard bar). It performs the guard
@@ -555,19 +662,35 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 							doAttack(extra, verdict.knockback)
 						else
 							-- attack-guardbreak (e.g. M2): full damage.
-							damageCalculator.CalculateDamage(char, targetChar, ctx.dmg, verdict.knockback, false, "Weapon")
+							damageCalculator.CalculateDamage(
+								char,
+								targetChar,
+								ctx.dmg,
+								verdict.knockback,
+								false,
+								"Weapon"
+							)
 						end
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = action, Func = "GB", FolderName = getEquippedTool(plr)
+							Type = "Combat",
+							Action = action,
+							Func = "GB",
+							FolderName = getEquippedTool(plr),
 						}, char, targetChar)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "Block", Func = "GB", FolderName = getEquippedTool(plr)
+							Type = "Combat",
+							Action = "Block",
+							Func = "GB",
+							FolderName = getEquippedTool(plr),
 						}, char, targetChar)
 					elseif verdict.outcome == "Bypass" then
 						AnimationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 						doAttack(extra, verdict.knockback)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = action, Func = "Blocked", FolderName = getEquippedTool(plr)
+							Type = "Combat",
+							Action = action,
+							Func = "Blocked",
+							FolderName = getEquippedTool(plr),
 						}, char, targetChar)
 					else
 						-- normal successful block (chip + frame advantage already set).
@@ -582,20 +705,36 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 						-- with an explicit small stunOverride so the blocker is only briefly
 						-- checked, not comboed.
 						local BLOCK_STUN = 0.18
-						local BLOCK_STUN_SPEED = 8   -- can still shuffle; not pinned like a real hit
+						local BLOCK_STUN_SPEED = 8 -- can still shuffle; not pinned like a real hit
 						BlockResolver.OnAttackerLandedHit(char)
 						local direction = (targetHRP.Position - attackerHRP.Position).Unit
 						Helper.ApplyKnockback(targetChar, direction, verdict.knockback, 0.2)
 						if verdict.chipDamage > 0 then
-							damageCalculator.CalculateDamage(char, targetChar, verdict.chipDamage, 0, false, nil, BLOCK_STUN, BLOCK_STUN_SPEED)
+							damageCalculator.CalculateDamage(
+								char,
+								targetChar,
+								verdict.chipDamage,
+								0,
+								false,
+								nil,
+								BLOCK_STUN,
+								BLOCK_STUN_SPEED
+							)
 						else
 							StateHandler.SetStun(targetChar, true, BLOCK_STUN, BLOCK_STUN_SPEED)
 						end
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = action, Func = "Blocked", FolderName = getEquippedTool(plr)
+							Type = "Combat",
+							Action = action,
+							Func = "Blocked",
+							FolderName = getEquippedTool(plr),
 						}, char, targetChar)
-						local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-						local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+						local parryE =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+								:Clone()
+						local effect2 =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+								:Clone()
 						local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 						h1.Parent = targetChar
 						game.Debris:AddItem(h1, 0.1)
@@ -608,7 +747,10 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					end
 				else
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = action, Func = "Hit", FolderName = getEquippedTool(plr)
+						Type = "Combat",
+						Action = action,
+						Func = "Hit",
+						FolderName = getEquippedTool(plr),
 					}, char, targetChar)
 					doAttack(0, 5)
 					applyHitstop(plr, char, targetChar, action, ctx.hitstopDuration)
@@ -621,7 +763,9 @@ end
 function module.RunM1(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 
 	local dmg = cfg.dmg
 	local guardbreak = cfg.guardbreak
@@ -633,8 +777,10 @@ function module.RunM1(plr, cfg, opts)
 	-- one attack in flight per player; also the clash/interrupt registry
 	if activeAttacks[char] then
 		ReplicateRemote:FireClient(plr, {
-			Type = "Combat", Action = "M1", Func = "ServerResponse",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "M1",
+			Func = "ServerResponse",
+			FolderName = getEquippedTool(plr),
 		}, plr, "Declined")
 		return
 	end
@@ -647,18 +793,26 @@ function module.RunM1(plr, cfg, opts)
 	-- the clash logic reads a real value. See RunM2 for the full rationale.
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
-	if hyperArmored then char:SetAttribute("HyperArmor", true) end
+	if hyperArmored then
+		char:SetAttribute("HyperArmor", true)
+	end
 
 	-- reactive interrupt: a stun/downed cancels the whole sequence
 	local stopWatch = StateHandler.WatchInterrupt(char, windupDelay + 0.6, function()
-		if hyperArmored then return end
+		if hyperArmored then
+			return
+		end
 		token.cancelled = true
 		AnimationHandler.StopAnim(char, "ALL")
 	end)
 	local function finish()
 		stopWatch()
-		if hyperArmored then char:SetAttribute("HyperArmor", nil) end
-		if activeAttacks[char] == token then activeAttacks[char] = nil end
+		if hyperArmored then
+			char:SetAttribute("HyperArmor", nil)
+		end
+		if activeAttacks[char] == token then
+			activeAttacks[char] = nil
+		end
 	end
 	local function abort()
 		StateHandler.RemoveStates(char, "Windup")
@@ -667,7 +821,9 @@ function module.RunM1(plr, cfg, opts)
 		-- held through the endlag now (see the finish block). If the swing is interrupted
 		-- after windup, reset here so an aborted attacker is never left slowed. ResetSpeed
 		-- no-ops when no slow was stored, so the running-attack case needs no guard.
-		if cfg.setSpeed then Helper.ResetSpeed(char) end
+		if cfg.setSpeed then
+			Helper.ResetSpeed(char)
+		end
 		AnimationHandler.StopAnim(char, "ALL")
 		finish()
 	end
@@ -701,7 +857,9 @@ function module.RunM1(plr, cfg, opts)
 		extraAtk = 0
 	elseif subType == "Lunge" then
 		extraAtk = 6
-	elseif subType == "AirLunge" or (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall) then
+	elseif
+		subType == "AirLunge" or (char.Humanoid:GetState() == Enum.HumanoidStateType.Freefall)
+	then
 		extraAtk = 7
 	elseif subType == "Uppercut" then
 		extraAtk = 8
@@ -717,7 +875,9 @@ function module.RunM1(plr, cfg, opts)
 	end
 	StateHandler.SetState(char, "Combo", nextCombo)
 
-	if comboResetTasks[plr] then task.cancel(comboResetTasks[plr]) end
+	if comboResetTasks[plr] then
+		task.cancel(comboResetTasks[plr])
+	end
 	comboResetTasks[plr] = task.delay(comboResetTime, function()
 		StateHandler.RemoveStates(char, "Combo")
 		comboResetTasks[plr] = nil
@@ -734,7 +894,9 @@ function module.RunM1(plr, cfg, opts)
 	-- displacement against a runner was about zero, which is exactly why the running
 	-- attack never landed on one, and why a bigger hitbox would not have helped.
 	if extraAtk ~= 6 then
-		if cfg.setSpeed then Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2]) end
+		if cfg.setSpeed then
+			Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2])
+		end
 	end
 
 	-- The lunge itself. Server-side now: it used to be a client one-shot BodyVelocity
@@ -761,10 +923,14 @@ function module.RunM1(plr, cfg, opts)
 	end
 
 	task.delay(0.2, function()
-		if token.cancelled then return end
+		if token.cancelled then
+			return
+		end
 		ReplicateRemote:FireAllClients({
-			Type = "Combat", Action = "M1", Func = "Swing",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "M1",
+			Func = "Swing",
+			FolderName = getEquippedTool(plr),
 		}, char)
 	end)
 
@@ -776,11 +942,16 @@ function module.RunM1(plr, cfg, opts)
 	task.wait(windupDelay - 0.1)
 
 	-- interrupted during windup: no swing VFX, no hitbox
-	if token.cancelled then abort() return end
+	if token.cancelled then
+		abort()
+		return
+	end
 
 	local oldCombo = nextCombo
 	local newCombo = 0
-	if extraAtk ~= 0 then newCombo = extraAtk end
+	if extraAtk ~= 0 then
+		newCombo = extraAtk
+	end
 	if newCombo ~= 0 then
 		nextCombo = newCombo
 		oldCombo = oldCombo - 1
@@ -801,7 +972,10 @@ function module.RunM1(plr, cfg, opts)
 	-- block below (recovery + 0.2s), with abort() as the interrupt safety net.
 
 	-- interrupted right before the hitbox: abort cleanly
-	if token.cancelled then abort() return end
+	if token.cancelled then
+		abort()
+		return
+	end
 
 	-- ACTIVE phase: hitbox live; stamp the clash timestamp
 	StateHandler.RemoveStates(char, "Windup")
@@ -812,7 +986,8 @@ function module.RunM1(plr, cfg, opts)
 	local hitboxParams = {
 		SizeOrPart = cfg.hitboxSize,
 		SpatialOption = cfg.hitboxShape,
-		Debug = false, DebounceTime = 0.5,
+		Debug = false,
+		DebounceTime = 0.5,
 	}
 	local Hitbox, connected = HitboxClass.new(hitboxParams)
 	Hitbox:WeldTo(humrp, cfg.hitboxOffset)
@@ -837,7 +1012,14 @@ function module.RunM1(plr, cfg, opts)
 	-- combo-5 finisher keep their own longer launch stuns.
 	local m1Hitstun = computeHitstun("M1", getEquippedTool(plr))
 
-	local function m1Knockback(kchar, ktargetChar, ktargetHRP, kattackerHRP, direction, knockbackDistance)
+	local function m1Knockback(
+		kchar,
+		ktargetChar,
+		ktargetHRP,
+		kattackerHRP,
+		direction,
+		knockbackDistance
+	)
 		if isUppercut then
 			-- Launch the victim to the SAME apex height the attacker rides to (client-side),
 			-- placed UC.Offset studs ahead of the attacker so the follow-up M1 string reaches
@@ -859,7 +1041,9 @@ function module.RunM1(plr, cfg, opts)
 			end
 			ktargetChar:SetAttribute("Launched", true)
 			task.delay(LAUNCH_WINDOW, function()
-				if ktargetChar then ktargetChar:SetAttribute("Launched", nil) end
+				if ktargetChar then
+					ktargetChar:SetAttribute("Launched", nil)
+				end
 			end)
 			StateHandler.SetStun(ktargetChar, true, LAUNCH_WINDOW, HITSTUN_STUNSPEED)
 
@@ -871,11 +1055,15 @@ function module.RunM1(plr, cfg, opts)
 			-- flagged. Attacker and victim leave the ground together and only on a connect.
 			kchar:SetAttribute("Launched", true)
 			task.delay(LAUNCH_WINDOW, function()
-				if kchar then kchar:SetAttribute("Launched", nil) end
+				if kchar then
+					kchar:SetAttribute("Launched", nil)
+				end
 			end)
 			ReplicateRemote:FireClient(plr, {
-				Type = "Combat", Action = "M1", Func = "UppercutRise",
-				FolderName = getEquippedTool(plr)
+				Type = "Combat",
+				Action = "M1",
+				Func = "UppercutRise",
+				FolderName = getEquippedTool(plr),
 			}, kchar)
 		elseif StateHandler.GetState(kchar, "Combo") == 5 then
 			Helper.ApplyKnockback(ktargetChar, direction, knockbackDistance * 2, 0.2)
@@ -890,8 +1078,11 @@ function module.RunM1(plr, cfg, opts)
 	end
 
 	resolveHit(plr, char, Hitbox, "M1", {
-		dmg = dmg, guardbreak = guardbreak,
-		onDamage = opts.onDamage, xpMultiplier = opts.xpMultiplier, xpName = cfg.xpName,
+		dmg = dmg,
+		guardbreak = guardbreak,
+		onDamage = opts.onDamage,
+		xpMultiplier = opts.xpMultiplier,
+		xpName = cfg.xpName,
 		applyKnockback = m1Knockback,
 		hitstopDuration = cfg.hitstopDuration,
 		token = token,
@@ -913,7 +1104,9 @@ function module.RunM1(plr, cfg, opts)
 		-- took the slow, so they are skipped. abort() covers the interrupted case.
 		if cfg.setSpeed and extraAtk ~= 6 then
 			task.delay(0.45, function()
-				if char and char.Parent then Helper.ResetSpeed(char) end
+				if char and char.Parent then
+					Helper.ResetSpeed(char)
+				end
 			end)
 		end
 		finish()
@@ -923,26 +1116,38 @@ end
 function module.RunM2(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 
 	local WINDUP_DELAY = cfg.windup
 	local HITBOX_DURATION = cfg.hitboxDuration or 0.2
 	local POST_COOLDOWN = cfg.postCooldown or 3
 
 	local isBusy = false
-	if activeAttacks[char] then isBusy = true
-	elseif playerM2Debounces[plr] then isBusy = true
-	elseif StateHandler.GetState(char, "M1") then isBusy = true
-	elseif StateHandler.GetState(char, "M2") then isBusy = true
-	elseif StateHandler.GetState(char, "CantAnything") then isBusy = true
-	elseif StateHandler.GetState(char, "Blocking") then isBusy = true
-	elseif StateHandler.GetState(char, "Stunned") then isBusy = true
-	elseif StateHandler.GetState(char, "Dodging") then isBusy = true
+	if activeAttacks[char] then
+		isBusy = true
+	elseif playerM2Debounces[plr] then
+		isBusy = true
+	elseif StateHandler.GetState(char, "M1") then
+		isBusy = true
+	elseif StateHandler.GetState(char, "M2") then
+		isBusy = true
+	elseif StateHandler.GetState(char, "CantAnything") then
+		isBusy = true
+	elseif StateHandler.GetState(char, "Blocking") then
+		isBusy = true
+	elseif StateHandler.GetState(char, "Stunned") then
+		isBusy = true
+	elseif StateHandler.GetState(char, "Dodging") then
+		isBusy = true
 	end
 	if isBusy then
 		ReplicateRemote:FireClient(plr, {
-			Type = "Combat", Action = "M2", Func = "ServerResponse",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "M2",
+			Func = "ServerResponse",
+			FolderName = getEquippedTool(plr),
 		}, plr, "Declined")
 		return
 	end
@@ -967,27 +1172,37 @@ function module.RunM2(plr, cfg, opts)
 	-- does not stop the swing anim or stun us out of it. Cleared in finish().
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
-	if hyperArmored then char:SetAttribute("HyperArmor", true) end
+	if hyperArmored then
+		char:SetAttribute("HyperArmor", true)
+	end
 
 	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5)
 	StateHandler.SetState(char, "Windup", true, WINDUP_DELAY + 0.2)
 
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
 		-- Armored: absorb the interrupt, keep swinging. Non-armored: cancel as before.
-		if hyperArmored then return end
+		if hyperArmored then
+			return
+		end
 		token.cancelled = true
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			for _, mover in ipairs(hrp:GetChildren()) do
-				if mover:IsA("BodyVelocity") or mover:IsA("LinearVelocity") then mover:Destroy() end
+				if mover:IsA("BodyVelocity") or mover:IsA("LinearVelocity") then
+					mover:Destroy()
+				end
 			end
 		end
 		AnimationHandler.StopAnim(char, "ALL")
 	end)
 	local function finish()
 		stopWatch()
-		if hyperArmored then char:SetAttribute("HyperArmor", nil) end
-		if activeAttacks[char] == token then activeAttacks[char] = nil end
+		if hyperArmored then
+			char:SetAttribute("HyperArmor", nil)
+		end
+		if activeAttacks[char] == token then
+			activeAttacks[char] = nil
+		end
 	end
 
 	local NewShield = RP.assets.FX.danger:Clone()
@@ -1004,7 +1219,11 @@ function module.RunM2(plr, cfg, opts)
 	NewShield.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = char.HumanoidRootPart
 	WeldCon.Part1 = NewShield
-	TweenService:Create(NewShield, TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }):Play()
+	TweenService:Create(
+		NewShield,
+		TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+		{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+	):Play()
 	parrysfx:Play()
 	game.Debris:AddItem(parrysfx, 3)
 
@@ -1012,7 +1231,9 @@ function module.RunM2(plr, cfg, opts)
 	-- otherwise read the new weapon's dash for a swing the old weapon started.
 	local m2Weapon = getEquippedTool(plr)
 	task.delay(0.3, function()
-		if token.cancelled then return end
+		if token.cancelled then
+			return
+		end
 		local m2Speed, m2Life = DashConfig.Get("M2", m2Weapon)
 		if m2Speed then
 			local BV = Instance.new("BodyVelocity", char.HumanoidRootPart)
@@ -1023,16 +1244,24 @@ function module.RunM2(plr, cfg, opts)
 		dashEff(char)
 	end)
 
-	if cfg.setSpeed then Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2]) end
+	if cfg.setSpeed then
+		Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2])
+	end
 	task.delay(WINDUP_DELAY, function()
-		if cfg.setSpeed then Helper.ResetSpeed(char) end
+		if cfg.setSpeed then
+			Helper.ResetSpeed(char)
+		end
 	end)
 
 	task.delay(0.25, function()
-		if token.cancelled then return end
+		if token.cancelled then
+			return
+		end
 		ReplicateRemote:FireAllClients({
-			Type = "Combat", Action = "M2", Func = "Swing",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "M2",
+			Func = "Swing",
+			FolderName = getEquippedTool(plr),
 		}, char)
 	end)
 
@@ -1040,11 +1269,17 @@ function module.RunM2(plr, cfg, opts)
 
 	if token.cancelled then
 		StateHandler.RemoveStates(char, "Windup")
-		if cfg.setSpeed then Helper.ResetSpeed(char) end
-		if NewShield then NewShield:Destroy() end
+		if cfg.setSpeed then
+			Helper.ResetSpeed(char)
+		end
+		if NewShield then
+			NewShield:Destroy()
+		end
 		AnimationHandler.StopAnim(char, "ALL")
 		finish()
-		task.delay(POST_COOLDOWN, function() playerM2Debounces[plr] = nil end)
+		task.delay(POST_COOLDOWN, function()
+			playerM2Debounces[plr] = nil
+		end)
 		return
 	end
 
@@ -1056,14 +1291,17 @@ function module.RunM2(plr, cfg, opts)
 		opts.swingM2(char)
 	else
 		local fx = cfg.swingFX
-		if fx then emitSlash(char, fx.folder, fx.slash, fx.part) end
+		if fx then
+			emitSlash(char, fx.folder, fx.slash, fx.part)
+		end
 	end
 
 	local humrp = char.HumanoidRootPart
 	local hitboxParams = {
 		SizeOrPart = cfg.hitboxSize,
 		SpatialOption = cfg.hitboxShape,
-		Debug = false, DebounceTime = 0.5,
+		Debug = false,
+		DebounceTime = 0.5,
 	}
 	local Hitbox = HitboxClass.new(hitboxParams)
 	Hitbox:WeldTo(humrp, cfg.hitboxOffset)
@@ -1072,8 +1310,11 @@ function module.RunM2(plr, cfg, opts)
 	StateHandler.SetState(char, "M2", true, HITBOX_DURATION)
 
 	resolveHit(plr, char, Hitbox, "M2", {
-		dmg = cfg.dmg, guardbreak = cfg.guardbreak,
-		onDamage = opts.onDamage, xpMultiplier = opts.xpMultiplier, xpName = cfg.xpName,
+		dmg = cfg.dmg,
+		guardbreak = cfg.guardbreak,
+		onDamage = opts.onDamage,
+		xpMultiplier = opts.xpMultiplier,
+		xpName = cfg.xpName,
 		applyKnockback = m2Knockback,
 		hitstopDuration = cfg.hitstopDuration,
 		token = token,
@@ -1124,12 +1365,16 @@ end
 function module.RunE(plr, cfg, opts)
 	opts = opts or {}
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 
 	if activeAttacks[char] then
 		ReplicateRemote:FireClient(plr, {
-			Type = "Combat", Action = "E", Func = "ServerResponse",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "E",
+			Func = "ServerResponse",
+			FolderName = getEquippedTool(plr),
 		}, plr, "Declined")
 		return
 	end
@@ -1142,17 +1387,25 @@ function module.RunE(plr, cfg, opts)
 	-- in WeaponConfig) and always stamp token.hyperArmored for the clash logic.
 	local hyperArmored = (cfg.guardbreak or cfg.hyperArmor) and true or false
 	token.hyperArmored = hyperArmored
-	if hyperArmored then char:SetAttribute("HyperArmor", true) end
+	if hyperArmored then
+		char:SetAttribute("HyperArmor", true)
+	end
 
 	local stopWatch = StateHandler.WatchInterrupt(char, windupDelay + 0.6, function()
-		if hyperArmored then return end
+		if hyperArmored then
+			return
+		end
 		token.cancelled = true
 		AnimationHandler.StopAnim(char, "ALL")
 	end)
 	local function finish()
 		stopWatch()
-		if hyperArmored then char:SetAttribute("HyperArmor", nil) end
-		if activeAttacks[char] == token then activeAttacks[char] = nil end
+		if hyperArmored then
+			char:SetAttribute("HyperArmor", nil)
+		end
+		if activeAttacks[char] == token then
+			activeAttacks[char] = nil
+		end
 	end
 	local function abort()
 		StateHandler.RemoveStates(char, "Windup")
@@ -1169,33 +1422,51 @@ function module.RunE(plr, cfg, opts)
 	StateHandler.SetState(char, "Windup", true, windupDelay + 0.2)
 	setTrail(char, cfg.trailBlade, true)
 
-	if cfg.setSpeed then Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2]) end
+	if cfg.setSpeed then
+		Helper.SetSpeed(char, cfg.setSpeed[1], cfg.setSpeed[2])
+	end
 
-	if opts.onWindupStart then opts.onWindupStart(char) end
+	if opts.onWindupStart then
+		opts.onWindupStart(char)
+	end
 
 	task.delay(0.4, function()
-		if token.cancelled then return end
+		if token.cancelled then
+			return
+		end
 		ReplicateRemote:FireAllClients({
-			Type = "Combat", Action = "M1", Func = "Swing",
-			FolderName = getEquippedTool(plr)
+			Type = "Combat",
+			Action = "M1",
+			Func = "Swing",
+			FolderName = getEquippedTool(plr),
 		}, char)
 	end)
 
 	task.wait(windupDelay - 0.1)
 
-	if token.cancelled then abort() return end
+	if token.cancelled then
+		abort()
+		return
+	end
 
 	if opts.swingE then
 		opts.swingE(char)
 	else
 		local fx = cfg.swingFX
-		if fx then emitSlash(char, fx.folder, fx.slash, fx.part) end
+		if fx then
+			emitSlash(char, fx.folder, fx.slash, fx.part)
+		end
 	end
 
 	task.wait(0.1)
-	if cfg.setSpeed then Helper.ResetSpeed(char) end
+	if cfg.setSpeed then
+		Helper.ResetSpeed(char)
+	end
 
-	if token.cancelled then abort() return end
+	if token.cancelled then
+		abort()
+		return
+	end
 
 	StateHandler.RemoveStates(char, "Windup")
 	StateHandler.SetState(char, "Active", true, 0.25)
@@ -1205,7 +1476,8 @@ function module.RunE(plr, cfg, opts)
 	local hitboxParams = {
 		SizeOrPart = cfg.hitboxSize,
 		SpatialOption = cfg.hitboxShape,
-		Debug = false, DebounceTime = 0.5,
+		Debug = false,
+		DebounceTime = 0.5,
 	}
 	local Hitbox = HitboxClass.new(hitboxParams)
 	Hitbox:WeldTo(humrp, cfg.hitboxOffset)
@@ -1214,8 +1486,11 @@ function module.RunE(plr, cfg, opts)
 	StateHandler.SetState(char, "M1", true, 0.2)
 
 	resolveHit(plr, char, Hitbox, "M1", {
-		dmg = cfg.dmg, guardbreak = cfg.guardbreak,
-		onDamage = opts.onDamage, xpMultiplier = opts.xpMultiplier, xpName = cfg.xpName,
+		dmg = cfg.dmg,
+		guardbreak = cfg.guardbreak,
+		onDamage = opts.onDamage,
+		xpMultiplier = opts.xpMultiplier,
+		xpName = cfg.xpName,
 		applyKnockback = eKnockback,
 		hitstopDuration = cfg.hitstopDuration,
 		token = token,
@@ -1264,17 +1539,28 @@ function module.GetAttack(char)
 	return activeAttacks[char]
 end
 function module.MarkHitbox(token)
-	if token then token.hitboxStart = os.clock() end
+	if token then
+		token.hitboxStart = os.clock()
+	end
 end
 function module.FinishAttack(char, token)
-	if activeAttacks[char] == token then activeAttacks[char] = nil end
+	if activeAttacks[char] == token then
+		activeAttacks[char] = nil
+	end
 end
 -- attackerToken's hitbox hits targetChar. Returns "lose" (attacker beaten, cancel self),
 -- "win" + targetToken (attacker wins, cancel target), or nil (target not mid-attack).
 function module.ResolveClash(attackerToken, targetChar)
 	local targetToken = activeAttacks[targetChar]
-	if not targetToken then return nil end
-	if targetToken.hitboxStart and attackerToken and attackerToken.hitboxStart and targetToken.hitboxStart < attackerToken.hitboxStart then
+	if not targetToken then
+		return nil
+	end
+	if
+		targetToken.hitboxStart
+		and attackerToken
+		and attackerToken.hitboxStart
+		and targetToken.hitboxStart < attackerToken.hitboxStart
+	then
 		return "lose"
 	end
 	return "win", targetToken

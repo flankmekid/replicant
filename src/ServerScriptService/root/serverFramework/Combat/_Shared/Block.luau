@@ -18,14 +18,18 @@ local GuardBarService = require(SSS.modules.GuardBarService)
 local parryHighlightTemplate = RP.assets.FX:WaitForChild("parryHighlight")
 local blockVFXTemplate = RP.assets.FX:WaitForChild("blockVFXPart"):WaitForChild("blockVFXAttach")
 
-local parryWindow = 0.28   -- widened from 0.2 for a more forgiving parry
+local parryWindow = 0.28 -- widened from 0.2 for a more forgiving parry
 
 module.ParryActive = function(plr)
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	-- Server-authoritative parry cooldown gate.
-	if not ParryService.CanParry(plr) then return end
+	if not ParryService.CanParry(plr) then
+		return
+	end
 	ParryService.StartCooldown(plr)
 
 	StateHandler.SetState(char, "Parrying", true, parryWindow)
@@ -40,7 +44,8 @@ module.ParryActive = function(plr)
 
 	task.delay(parryWindow, function()
 		if highlight and highlight.Parent then
-			local tweenOut = TweenService:Create(highlight, TweenInfo.new(0.1), { OutlineTransparency = 1 })
+			local tweenOut =
+				TweenService:Create(highlight, TweenInfo.new(0.1), { OutlineTransparency = 1 })
 			tweenOut:Play()
 			game.Debris:AddItem(highlight, 0.1)
 		end
@@ -49,11 +54,15 @@ end
 
 module.BlockActive = function(plr)
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	-- Guard-broken players cannot block until the recovery window ends. The client
 	-- already gates this (and flashes the bar), but the server is authoritative.
-	if GuardBarService.IsGuardBroken(char) then return end
+	if GuardBarService.IsGuardBroken(char) then
+		return
+	end
 
 	StateHandler.SetState(char, "Blocking", true, 99999999)
 	-- Block owns its own speed modifier (priority BLOCK). It no longer routes through
@@ -79,7 +88,9 @@ end
 
 module.Deactivated = function(plr)
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	if StateHandler.GetState(char, "Blocking") then
 		StateHandler.RemoveStates(char, "Blocking")
@@ -104,7 +115,6 @@ module.Deactivated = function(plr)
 	end
 end
 
-Players.PlayerRemoving:Connect(function(plr)
-end)
+Players.PlayerRemoving:Connect(function(plr) end)
 
 return module

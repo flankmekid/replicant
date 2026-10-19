@@ -59,9 +59,9 @@ end
 -- damage shake. taking a hit rattles harder than landing one.
 function ClientCameraShake.Damage(taken)
 	if taken then
-		shaker:ShakeOnce(6, 9, 0, 0.55)   -- bigger when you take it
+		shaker:ShakeOnce(6, 9, 0, 0.55) -- bigger when you take it
 	else
-		shaker:ShakeOnce(3.5, 9, 0, 0.4)  -- smaller when you deal it
+		shaker:ShakeOnce(3.5, 9, 0, 0.4) -- smaller when you deal it
 	end
 end
 
@@ -74,7 +74,9 @@ end
 -- descriptor: { kind = "Damage", taken = bool } or { kind = "Bump" }
 local remote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("CameraShake")
 remote.OnClientEvent:Connect(function(descriptor)
-	if type(descriptor) ~= "table" then return end
+	if type(descriptor) ~= "table" then
+		return
+	end
 	if descriptor.kind == "Damage" then
 		ClientCameraShake.Damage(descriptor.taken == true)
 	elseif descriptor.kind == "Bump" then

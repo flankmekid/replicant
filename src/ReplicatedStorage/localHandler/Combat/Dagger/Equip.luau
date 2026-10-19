@@ -12,7 +12,9 @@ local char = plr.Character or plr.CharacterAdded:Wait()
 
 local function getEquippedTool()
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
@@ -24,7 +26,12 @@ local function getEquippedTool()
 end
 
 function module.Equip()
-	ServerRemote:FireServer({Type = "Combat", Action = "Equip", Func = "Equip", CombatType = getEquippedTool()})
+	ServerRemote:FireServer({
+		Type = "Combat",
+		Action = "Equip",
+		Func = "Equip",
+		CombatType = getEquippedTool(),
+	})
 end
 
 return module

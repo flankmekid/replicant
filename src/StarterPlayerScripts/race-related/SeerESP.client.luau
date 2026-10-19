@@ -11,12 +11,14 @@ local MAX_DISTANCE = 150 -- Distance in studs
 local HIGHLIGHT_NAME = "SeerHighlight"
 
 -- Cache to track active highlights so we don't spam create/destroy
-local activeHighlights = {} 
+local activeHighlights = {}
 
 -- [[ HELPER FUNCTIONS ]] --
 
 local function AddHighlight(targetChar)
-	if targetChar:FindFirstChild(HIGHLIGHT_NAME) then return end
+	if targetChar:FindFirstChild(HIGHLIGHT_NAME) then
+		return
+	end
 
 	local highlight = Instance.new("Highlight")
 	highlight.Name = HIGHLIGHT_NAME
@@ -54,11 +56,17 @@ local function UpdateESP()
 	end
 
 	local myRoot = myChar:FindFirstChild("HumanoidRootPart")
-	if not myRoot then return end
+	if not myRoot then
+		return
+	end
 
 	-- 2. Check every other player
 	for _, targetChar in ipairs(workspace.plrManager.alive:GetDescendants()) do
-		if targetChar:IsA("Model") and targetChar:FindFirstChild("Humanoid") and targetChar ~= myChar then
+		if
+			targetChar:IsA("Model")
+			and targetChar:FindFirstChild("Humanoid")
+			and targetChar ~= myChar
+		then
 			local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
 			local targetHum = targetChar and targetChar:FindFirstChild("Humanoid")
 

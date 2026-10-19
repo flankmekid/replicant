@@ -33,7 +33,9 @@ local function clearTag(victim)
 end
 
 function CombatManager.TagPlayer(victim, attacker)
-	if not victim or not victim:IsA("Player") then return end
+	if not victim or not victim:IsA("Player") then
+		return
+	end
 
 	local expiryTime = os.clock() + TAG_DURATION
 	local currentTag = ActiveTags[victim]

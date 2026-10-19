@@ -17,41 +17,49 @@ local isThrowing = false
 -- Helper to get tool name for the server request
 local function getEquippedToolName()
 	local char = plr.Character
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	local tool = char:FindFirstChildOfClass("Tool")
 	return tool and tool.Name
 end
 
 function module.OnThrowActivated()
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
-	if isThrowing then return end
+	if isThrowing then
+		return
+	end
 
 	-- Standard Client-Side State Checks (Predictive)
-	if char:GetAttribute("CantAnything") or 
-		char:GetAttribute("Stunned") or 
-		char:GetAttribute("Dodging") or
-		char:GetAttribute("Sliding") or
-		char:GetAttribute("M1") or
-		char:GetAttribute("M2") then 
-		return 
+	if
+		char:GetAttribute("CantAnything")
+		or char:GetAttribute("Stunned")
+		or char:GetAttribute("Dodging")
+		or char:GetAttribute("Sliding")
+		or char:GetAttribute("M1")
+		or char:GetAttribute("M2")
+	then
+		return
 	end
 
 	isThrowing = true
 
 	local toolName = getEquippedToolName()
-	if not toolName then 
+	if not toolName then
 		isThrowing = false
-		return 
+		return
 	end
 
 	-- Fire request to server
 	ServerRemote:FireServer({
-		Type = "Combat", 
-		Action = "Throw", 
+		Type = "Combat",
+		Action = "Throw",
 		Func = "ServerCheck",
-		CombatType = toolName
+		CombatType = toolName,
 	})
 
 	-- Play initial grab attempt animation immediately for responsiveness
@@ -71,10 +79,9 @@ function module.ExecuteEffect(char, effectType)
 		s.Parent = char.Torso
 		s:Play()
 		game.Debris:AddItem(s, 2)
-		
+
 		animationHndlr.StopAnim(char, "ThrowStart", ANIM)
 		animationHndlr.LoadAnim(char, "Whiff", ANIM_WHIFF, nil, false)
-		
 	elseif effectType == "Hit" then
 		local s = RP.assets.sounds.PunchHit:Clone()
 		s.Parent = char.Torso
@@ -83,6 +90,5 @@ function module.ExecuteEffect(char, effectType)
 		-- Create an impact particle
 	end
 end
-
 
 return module

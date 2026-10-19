@@ -1,5 +1,5 @@
 local Manager = {}
-local M = require(script.RagdollModule) 
+local M = require(script.RagdollModule)
 --local stun = require(game.ServerStorage.Modules.StunHandlerV2)
 
 --- Call this module directely if u wanna ragdoll from server
@@ -13,28 +13,36 @@ function Manager:Ragdoll(Duration)
 		Duration = nil
 	end
 
-	M.Ragdoll(self,Duration)
+	M.Ragdoll(self, Duration)
 
 	if not game.Players:GetPlayerFromCharacter(self) then
 		local Hum = self:FindFirstChildWhichIsA("Humanoid")
-		if not Hum then return end
-		Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp,false)
+		if not Hum then
+			return
+		end
+		Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
 		Hum:ChangeState(Enum.HumanoidStateType.Physics)
 		--stun.Stun(Hum, Duration)
 
 		if Duration then
-			task.delay(Duration,function()
+			task.delay(Duration, function()
 				-- re-check: they may have been knocked down inside the window
-				if not self.Parent then return end
-				if self:GetAttribute("Downed") then return end
-				Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp,true)
+				if not self.Parent then
+					return
+				end
+				if self:GetAttribute("Downed") then
+					return
+				end
+				Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
 				Hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-				Hum:SetStateEnabled(Enum.HumanoidStateType.Physics,false)
-
+				Hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
 			end)
 		end
 	else
-		game.ReplicatedStorage.remotes.Ragdoll:FireClient(game.Players:GetPlayerFromCharacter(self),Duration)
+		game.ReplicatedStorage.remotes.Ragdoll:FireClient(
+			game.Players:GetPlayerFromCharacter(self),
+			Duration
+		)
 	end
 end
 

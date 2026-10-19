@@ -1,6 +1,6 @@
 local RP = game:GetService("ReplicatedStorage")
 local ServerRemote = RP.remotes.server
-local Players = game:GetService("Players") 
+local Players = game:GetService("Players")
 
 local loadedModules = {}
 
@@ -17,38 +17,31 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	local root = script:FindFirstChild(actionType)
 	local folderName
 
-	
 	if actionType == "Combat" then
-		
 		local combatTypeName = data.CombatType
-		if not combatTypeName then 
+		if not combatTypeName then
 			warn(`[Server] Combat action received without CombatType.`)
-			return 
+			return
 		end
 		folderName = combatTypeName
 
-		
 		local char = plr.Character
-		
+
 		if not char then
 			warn(`[Server] Player character not found.`)
-			
+
 			return
 		end
-		
-
 	else
-		
 		local stringValueName = typeToStringValue[actionType]
 		local folderNameValue = plr:FindFirstChild(stringValueName)
-		if not folderNameValue then 
-			warn(`[Server] Missing StringValue for {actionType}.`) 
-			return 
+		if not folderNameValue then
+			warn(`[Server] Missing StringValue for {actionType}.`)
+			return
 		end
 		folderName = folderNameValue.Value
 	end
 
-	
 	local actionFolder = root:FindFirstChild(folderName)
 	local module = actionFolder and actionFolder:FindFirstChild(moduleName)
 
@@ -67,11 +60,11 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 		return
 	end
 
-	
 	loadedModules[plr] = loadedModules[plr] or {}
 	loadedModules[plr][actionType] = loadedModules[plr][actionType] or {}
 	loadedModules[plr][actionType][folderName] = loadedModules[plr][actionType][folderName] or {}
-	loadedModules[plr][actionType][folderName][moduleName] = loadedModules[plr][actionType][folderName][moduleName] or require(module)
+	loadedModules[plr][actionType][folderName][moduleName] = loadedModules[plr][actionType][folderName][moduleName]
+		or require(module)
 
 	local moduleTable = loadedModules[plr][actionType][folderName][moduleName]
 

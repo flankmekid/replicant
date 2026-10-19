@@ -20,7 +20,7 @@ local ParryCooldownClient = require(RP.modules.ParryCooldownClient)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 
 -- [[ CONFIGURATION ]] --
-local BLOCK_COOLDOWN = 0.35   -- lower than the old 0.5, but still not spammable
+local BLOCK_COOLDOWN = 0.35 -- lower than the old 0.5, but still not spammable
 
 -- [[ STATE ]] --
 local isBlocking = false
@@ -28,7 +28,9 @@ local nextBlockTime = 0
 
 local function getEquippedTool()
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
@@ -38,13 +40,27 @@ end
 
 -- Shared gate for both parry and block presses.
 local function canAct(char)
-	if not char then return false end
-	if char:GetAttribute("CantAnything") then return false end
-	if char:GetAttribute("Sliding") then return false end
-	if char:GetAttribute("M1") then return false end
-	if char:GetAttribute("M2") then return false end
-	if char:GetAttribute("Carried") then return false end
-	if char:GetAttribute("Downed") then return false end
+	if not char then
+		return false
+	end
+	if char:GetAttribute("CantAnything") then
+		return false
+	end
+	if char:GetAttribute("Sliding") then
+		return false
+	end
+	if char:GetAttribute("M1") then
+		return false
+	end
+	if char:GetAttribute("M2") then
+		return false
+	end
+	if char:GetAttribute("Carried") then
+		return false
+	end
+	if char:GetAttribute("Downed") then
+		return false
+	end
 	return true
 end
 
@@ -53,21 +69,38 @@ end
 -- of an M1 combo), so Stunned is NOT checked here. Block (below) still forbids it.
 function module.Parry()
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 	local weapon = getEquippedTool()
-	if not weapon then return end
+	if not weapon then
+		return
+	end
 	local cfg = WeaponConfig[weapon]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	local blk = cfg.client.block
 
-	if not canAct(char) then return end
-	if isBlocking then return end
-	if not ParryCooldownClient.CanParry() then return end
+	if not canAct(char) then
+		return
+	end
+	if isBlocking then
+		return
+	end
+	if not ParryCooldownClient.CanParry() then
+		return
+	end
 
 	-- cooldown applied immediately on press, keyed per weapon
 	ParryCooldownClient.StartCooldown(weapon .. "_Block")
 
-	ServerRemote:FireServer({ Type = "Combat", Action = "Block", Func = "ParryActive", CombatType = weapon })
+	ServerRemote:FireServer({
+		Type = "Combat",
+		Action = "Block",
+		Func = "ParryActive",
+		CombatType = weapon,
+	})
 
 	animationHndlr.StopAnim(char, "ALL")
 	animationHndlr.LoadAnim(char, "Parrying", blk.parryAnim, nil, false)
@@ -79,16 +112,28 @@ end
 -- victim gets the parry option only) and gated by the block cooldown.
 function module.Hold()
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 	local weapon = getEquippedTool()
-	if not weapon then return end
+	if not weapon then
+		return
+	end
 	local cfg = WeaponConfig[weapon]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	local blk = cfg.client.block
 
-	if not canAct(char) then return end
-	if isBlocking then return end
-	if char:GetAttribute("Stunned") then return end
+	if not canAct(char) then
+		return
+	end
+	if isBlocking then
+		return
+	end
+	if char:GetAttribute("Stunned") then
+		return
+	end
 
 	-- Guard-broken: block is locked out during the 5s recovery. Give the player
 	-- feedback (bar flashes darker) instead of silently eating the press.
@@ -97,11 +142,18 @@ function module.Hold()
 		return
 	end
 
-	if os.clock() < nextBlockTime then return end
+	if os.clock() < nextBlockTime then
+		return
+	end
 
 	isBlocking = true
 	animationHndlr.LoadAnim(char, "Blocking", blk.blockAnim, nil, false)
-	ServerRemote:FireServer({ Type = "Combat", Action = "Block", Func = "BlockActive", CombatType = weapon })
+	ServerRemote:FireServer({
+		Type = "Combat",
+		Action = "Block",
+		Func = "BlockActive",
+		CombatType = weapon,
+	})
 end
 
 function module.Release()
@@ -113,7 +165,12 @@ function module.Release()
 		nextBlockTime = os.clock() + BLOCK_COOLDOWN
 		local anim = cfg and cfg.client.block.blockAnim
 		animationHndlr.StopAnim(char, "Blocking", anim)
-		ServerRemote:FireServer({ Type = "Combat", Action = "Block", Func = "Deactivated", CombatType = weapon })
+		ServerRemote:FireServer({
+			Type = "Combat",
+			Action = "Block",
+			Func = "Deactivated",
+			CombatType = weapon,
+		})
 	end
 	isBlocking = false
 end

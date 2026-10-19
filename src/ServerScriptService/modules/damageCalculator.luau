@@ -29,7 +29,9 @@ local function getStatValue(character, statName, defaultValue)
 		local stats = player:FindFirstChild("PlayerStats")
 		if stats then
 			local statObj = stats:FindFirstChild(statName)
-			if statObj then return statObj.Value end
+			if statObj then
+				return statObj.Value
+			end
 		end
 	end
 	return defaultValue
@@ -40,11 +42,17 @@ end
 -- scaling is a no-op against them and nothing nil-indexes.
 local function getStatPoints(character, statName)
 	local player = Players:GetPlayerFromCharacter(character)
-	if not player then return 0 end
+	if not player then
+		return 0
+	end
 	local stats = player:FindFirstChild("PlayerStats")
-	if not stats then return 0 end
+	if not stats then
+		return 0
+	end
 	local folder = stats:FindFirstChild("Stats")
-	if not folder then return 0 end
+	if not folder then
+		return 0
+	end
 	local obj = folder:FindFirstChild(statName)
 	return obj and obj.Value or 0
 end
@@ -54,11 +62,24 @@ end
 -- nothing keep the historical 0.85s duration. stunSpeedOverride defaults to 2 so
 -- a hit victim is pinned near-immobile (they cannot walk out of an attack); pass a
 -- higher value for stuns that should still allow repositioning.
-function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isInstantKill, dmgType, stunOverride, stunSpeedOverride)
-	if not targetChar then return end
+function module.CalculateDamage(
+	attackerChar,
+	targetChar,
+	baseDmg,
+	extraDmg,
+	isInstantKill,
+	dmgType,
+	stunOverride,
+	stunSpeedOverride
+)
+	if not targetChar then
+		return
+	end
 
 	local targetHum = targetChar:FindFirstChild("Humanoid")
-	if not targetHum or targetHum.Health <= 0 then return end
+	if not targetHum or targetHum.Health <= 0 then
+		return
+	end
 
 	local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
 	local attackerPlayer = Players:GetPlayerFromCharacter(attackerChar)
@@ -67,9 +88,11 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	if targetPlayer and attackerPlayer then
 		CombatManager.TagPlayer(targetPlayer, attackerPlayer)
 		CombatManager.TagPlayer(attackerPlayer, targetPlayer)
-		
+
 		local oldTag = targetHum:FindFirstChild("KillTag")
-		if oldTag then oldTag:Destroy() end
+		if oldTag then
+			oldTag:Destroy()
+		end
 
 		local tag = Instance.new("StringValue")
 		tag.Name = "KillTag"
@@ -81,7 +104,9 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	-- [[ 2. APPLY NPC KILL TAG (PvE) ]] --
 	if not targetPlayer and attackerPlayer then
 		local oldTag = targetHum:FindFirstChild("KillTag")
-		if oldTag then oldTag:Destroy() end
+		if oldTag then
+			oldTag:Destroy()
+		end
 
 		local tag = Instance.new("StringValue")
 		tag.Name = "KillTag"
@@ -124,7 +149,9 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	local totalBonus = statBonus + (dmgBoost - 1) + (armorDmgBoost - 1)
 	local finalMult = math.max(0, 1 + totalBonus)
 	local rawDamage = (baseDmg + extraDmg) * finalMult
-	if defBoost == 0 then defBoost = 1 end
+	if defBoost == 0 then
+		defBoost = 1
+	end
 	local finalDamage = rawDamage / defBoost
 
 	-- [[ DOWNED SYSTEM INTEGRATION START ]] --
@@ -132,8 +159,8 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	local wasDowned = DownedManager.CheckDownedCondition(targetChar, finalDamage, isInstantKill)
 
 	if wasDowned then
-		-- Player was JUST knocked down. 
-		return finalDamage 
+		-- Player was JUST knocked down.
+		return finalDamage
 	end
 
 	-- [[ THE FIX: Abort the rest of the script if they are ALREADY downed ]] --
@@ -154,23 +181,23 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	if StateHandler.GetState(targetChar, "DefenseBuff") then
 		finalDamage = finalDamage * 0.6
 	end
-	
+
 	if StateHandler.GetState(attackerChar, "AttackBuff") then
 		finalDamage = finalDamage * 1.3
 	end
 
 	-- [[ DEAL DAMAGE ]] --
 	targetHum:TakeDamage(finalDamage)
-	
+
 	-- slash fx
 	if targetChar:FindFirstChild("Torso") then
 		local r = math.random(-180, 180)
-		
+
 		local slashClone = game:GetService("ReplicatedStorage").assets.FX.SlashFX.A_Slice:Clone()
 		slashClone.Parent = targetChar:FindFirstChild("Torso")
-		
+
 		slashClone.Orientation = Vector3.new(0, 180, r)
-		
+
 		task.delay(0.5, function()
 			for _, v in pairs(slashClone:GetChildren()) do
 				if v:IsA("ParticleEmitter") then
@@ -180,7 +207,7 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 		end)
 		game.Debris:AddItem(slashClone, 2)
 	end
-	
+
 	local hrp = targetChar:FindFirstChild("HumanoidRootPart")
 	if hrp then
 		local rounded = math.floor(finalDamage + 0.5)
@@ -208,7 +235,8 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	-- not stomp their in-progress swing/cast animation. They still took the damage
 	-- above; they just do not visibly flinch out of their move.
 	if not targetChar:GetAttribute("HyperArmor") then
-		local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+		local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+			or "rbxassetid://111089735892609"
 		local anim = Instance.new("Animation")
 		anim.AnimationId = animID
 		local track = targetChar.Humanoid:LoadAnimation(anim)
@@ -230,7 +258,7 @@ function module.CalculateDamage(attackerChar, targetChar, baseDmg, extraDmg, isI
 	if dmgType ~= "Weapon" then
 		StateHandler.SetStun(targetChar, true, stunOverride or 0.85, stunSpeedOverride or 2)
 	end
-	
+
 	DownedManager.DropIfCarrying(targetChar)
 
 	if targetHum.Health <= 0 then

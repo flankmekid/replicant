@@ -1,11 +1,13 @@
-local stateHandler = require(game.ReplicatedStorage.modules.stateHandler) 
+local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 
 local Ragdoll = {}
 
 function Ragdoll:Ragdoll(Duration)
 	-- Ensure we have a humanoid to work with
 	local humanoid = self:FindFirstChild("Humanoid")
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	local isDowned = self:GetAttribute("Downed")
 
@@ -14,11 +16,13 @@ function Ragdoll:Ragdoll(Duration)
 	-- fired every single time and the knockdown ragdoll never ran at all. The
 	-- actual intent was "don't stack ragdolls on an already-ragdolled body", so
 	-- guard on Ragdolled instead.
-	if self:GetAttribute("Ragdolled") then return end
+	if self:GetAttribute("Ragdolled") then
+		return
+	end
 
 	-- 1. Check Hyperarmor
-	if self:GetAttribute("Hyperarmor") and not self:GetAttribute("Hyperarmor") then 
-		return 
+	if self:GetAttribute("Hyperarmor") and not self:GetAttribute("Hyperarmor") then
+		return
 	end
 
 	-- 2. Apply Stun States.
@@ -40,11 +44,16 @@ function Ragdoll:Ragdoll(Duration)
 	humanoid.AutoRotate = false -- Stop them from spinning on floor
 	humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- Stop them from trying to stand up
 	-- Optional: If they float, enable PlatformStand instead
-	-- humanoid.PlatformStand = true 
+	-- humanoid.PlatformStand = true
 
 	-- 4. Convert Joints to Constraints
 	for i, v in pairs(self:GetDescendants()) do
-		if v:IsA("Motor6D") and v.Name ~= "ToolGrip" and v.Name ~= "RootJoint" and v.Name ~= "Root" then
+		if
+			v:IsA("Motor6D")
+			and v.Name ~= "ToolGrip"
+			and v.Name ~= "RootJoint"
+			and v.Name ~= "Root"
+		then
 			local Attachment1 = Instance.new("Attachment")
 			Attachment1.Name = "RagdollAttach"
 			local Attachment2 = Instance.new("Attachment")
@@ -76,7 +85,7 @@ function Ragdoll:Ragdoll(Duration)
 	if Duration then
 		task.delay(Duration, function()
 			-- We check if self still exists to prevent errors if NPC died/despawned
-			if self and self.Parent then 
+			if self and self.Parent then
 				Ragdoll.UnRagdoll(self)
 			end
 		end)
@@ -88,9 +97,13 @@ end
 -- would stand a downed player back up.
 function Ragdoll:UnRagdoll(force)
 	local humanoid = self:FindFirstChild("Humanoid")
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
-	if self:GetAttribute("Downed") and not force then return end
+	if self:GetAttribute("Downed") and not force then
+		return
+	end
 
 	stateHandler.SetStun(self, false)
 	stateHandler.RemoveStates(self, "Ragdolled")
@@ -106,7 +119,7 @@ function Ragdoll:UnRagdoll(force)
 	humanoid.PlatformStand = false
 
 	-- 2. Force the "GettingUp" state
-	-- This is the magic line that fixes the tweaking. 
+	-- This is the magic line that fixes the tweaking.
 	-- It tells Roblox "I am on the floor, help me stand up safely."
 	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 

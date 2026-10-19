@@ -4,8 +4,12 @@ local TweenService = game:GetService("TweenService")
 local DamageNumberRemote = ReplicatedStorage.remotes:WaitForChild("DamageNumber")
 
 DamageNumberRemote.OnClientEvent:Connect(function(anchorPart, damage)
-	if not anchorPart or not anchorPart.Parent then return end
-	if type(damage) ~= "number" then return end
+	if not anchorPart or not anchorPart.Parent then
+		return
+	end
+	if type(damage) ~= "number" then
+		return
+	end
 
 	local big = damage > 20
 	local text = big and (tostring(damage) .. "!") or tostring(damage)

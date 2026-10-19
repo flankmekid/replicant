@@ -21,34 +21,44 @@ local debounce = false
 -- Helper to get tool name
 local function getEquippedToolName()
 	local char = plr.Character
-	if not char then return nil end
+	if not char then
+		return nil
+	end
 	local tool = char:FindFirstChildOfClass("Tool")
 	return tool and tool.Name
 end
 
 function module.OnEActivated()
 	local char = plr.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
-	if debounce then return end
+	if debounce then
+		return
+	end
 
 	-- Standard Client-Side State Checks
-	if char:GetAttribute("CantAnything") or 
-		char:GetAttribute("Stunned") or 
-		char:GetAttribute("Dodging") or
-		char:GetAttribute("Sliding") or
-		char:GetAttribute("M1") or
-		char:GetAttribute("M2") then 
-		return 
+	if
+		char:GetAttribute("CantAnything")
+		or char:GetAttribute("Stunned")
+		or char:GetAttribute("Dodging")
+		or char:GetAttribute("Sliding")
+		or char:GetAttribute("M1")
+		or char:GetAttribute("M2")
+	then
+		return
 	end
 
 	local toolName = getEquippedToolName()
-	if not toolName then return end
+	if not toolName then
+		return
+	end
 
 	debounce = true
-	
+
 	CooldownTracker.Register("Dagger_E", "E", ATTACK_COOLDOWN)
-	
+
 	local s = RP.assets.sounds.dagger.daggerLunge:Clone()
 	s.Parent = char.HumanoidRootPart
 	s:Play()
@@ -56,10 +66,10 @@ function module.OnEActivated()
 
 	-- Fire request to server
 	ServerRemote:FireServer({
-		Type = "Combat", 
-		Action = "E", 
+		Type = "Combat",
+		Action = "E",
 		Func = "ServerCheck",
-		CombatType = toolName
+		CombatType = toolName,
 	})
 
 	-- Play initial throw animation immediately for responsiveness
@@ -93,7 +103,7 @@ module.Hit = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Blocked = function(ochar, echar)
@@ -102,7 +112,7 @@ module.Blocked = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.BlockFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Parry = function(ochar, echar)
@@ -111,7 +121,7 @@ module.Parry = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.ParryFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.GB = function(ochar, echar)
@@ -120,12 +130,11 @@ module.GB = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 plr.CharacterAdded:Connect(function()
 	debounce = false
 end)
-
 
 return module

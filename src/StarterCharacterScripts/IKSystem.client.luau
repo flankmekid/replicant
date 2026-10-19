@@ -28,7 +28,7 @@ local leftLegRotation = CFrame.new()
 
 -- Params to ignore the character itself during raycasting
 local rayParams = RaycastParams.new()
-rayParams.FilterDescendantsInstances = {character}
+rayParams.FilterDescendantsInstances = { character }
 rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
 -- Function to calculate the IK for a single leg
@@ -54,7 +54,7 @@ local function solveIK(hipC0, hipPosition, currentOffset, currentRot)
 		local heightDiff = distanceToGround - 2 -- 2 is the length of the leg
 
 		-- Clamp values to prevent legs stretching too far into infinity
-		targetOffset = math.clamp(heightDiff, -1, 1) 
+		targetOffset = math.clamp(heightDiff, -1, 1)
 
 		-- 3. Calculate Surface Rotation (Optional: Makes feet tilt on slopes)
 		local normal = rayResult.Normal
@@ -78,7 +78,9 @@ local function solveIK(hipC0, hipPosition, currentOffset, currentRot)
 end
 
 RunService.RenderStepped:Connect(function()
-	if not character or not character:FindFirstChild("Torso") then return end
+	if not character or not character:FindFirstChild("Torso") then
+		return
+	end
 
 	-- Calculate world positions of the hips for Raycasting
 	-- (Torso CFrame * Hip Offset)

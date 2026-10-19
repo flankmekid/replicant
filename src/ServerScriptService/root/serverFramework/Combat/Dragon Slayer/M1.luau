@@ -34,7 +34,9 @@ local function swingDispatch(char, combo)
 	elseif combo == 6 then
 		E(char, "GSSlashes", "SlashDown", "HumanoidRootPart")
 		local tool = char:FindFirstChild("Dragon Slayer")
-		if tool and tool:FindFirstChild("Greatsword") then groundSlam(tool) end
+		if tool and tool:FindFirstChild("Greatsword") then
+			groundSlam(tool)
+		end
 	elseif combo == 7 then
 		E(char, "GSSlashes", "SlashDown", "HumanoidRootPart")
 	elseif combo == 8 then

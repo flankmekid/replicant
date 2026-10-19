@@ -7,10 +7,11 @@ local Players = game:GetService("Players")
 
 module.Anims = {}
 
-
 local function getAnimator(char)
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if not humanoid then return nil end
+	if not humanoid then
+		return nil
+	end
 
 	local animator = humanoid:FindFirstChildOfClass("Animator")
 	if not animator then
@@ -23,11 +24,22 @@ local function getAnimator(char)
 end
 
 -- [UPDATED] Added 'speed' parameter (defaults to 1 if nil)
-function module.LoadAnim(char, _type: string, animID: string, keyframeCallback: number, isLooped: boolean, speed: number)
-	if not char or not _type or not animID then return end
+function module.LoadAnim(
+	char,
+	_type: string,
+	animID: string,
+	keyframeCallback: number,
+	isLooped: boolean,
+	speed: number
+)
+	if not char or not _type or not animID then
+		return
+	end
 
 	local animator = getAnimator(char)
-	if not animator then return end
+	if not animator then
+		return
+	end
 
 	local animation = Instance.new("Animation")
 	animation.AnimationId = animID
@@ -39,14 +51,20 @@ function module.LoadAnim(char, _type: string, animID: string, keyframeCallback: 
 	local connections = {}
 
 	if keyframeCallback then
-		table.insert(connections, track.KeyframeReached:Connect(function(markerName)
-			keyframeCallback(markerName)
-		end))
+		table.insert(
+			connections,
+			track.KeyframeReached:Connect(function(markerName)
+				keyframeCallback(markerName)
+			end)
+		)
 	end
 
-	table.insert(connections, track.Stopped:Connect(function()
-		module.RemoveAnim(char, _type, animID)
-	end))
+	table.insert(
+		connections,
+		track.Stopped:Connect(function()
+			module.RemoveAnim(char, _type, animID)
+		end)
+	)
 
 	module.Anims[char][_type][animID] = {
 		Track = track,
@@ -69,7 +87,9 @@ function module.LoadAnim(char, _type: string, animID: string, keyframeCallback: 
 end
 
 function module.GetAnims(char, animType)
-	if not module.Anims[char] then return {} end
+	if not module.Anims[char] then
+		return {}
+	end
 	if animType then
 		return module.Anims[char][animType] or {}
 	end
@@ -77,12 +97,16 @@ function module.GetAnims(char, animType)
 end
 
 function module.GetTrack(char, _type: string, animID: string)
-	local entry = module.Anims[char] and module.Anims[char][_type] and module.Anims[char][_type][animID]
+	local entry = module.Anims[char]
+		and module.Anims[char][_type]
+		and module.Anims[char][_type][animID]
 	return entry and entry.Track or nil
 end
 
 function module.ConnectKeyframeReached(char, _type: string, animID: string, callback)
-	local entry = module.Anims[char] and module.Anims[char][_type] and module.Anims[char][_type][animID]
+	local entry = module.Anims[char]
+		and module.Anims[char][_type]
+		and module.Anims[char][_type][animID]
 
 	if entry and entry.Track then
 		local connection = entry.Track.KeyframeReached:Connect(callback)
@@ -102,10 +126,14 @@ end
 module._hitstopState = module._hitstopState or setmetatable({}, { __mode = "k" })
 
 function module.Hitstop(char: Model, duration: number)
-	if not char then return end
+	if not char then
+		return
+	end
 	duration = duration or 0.12
 	local charAnims = module.Anims[char]
-	if not charAnims then return end
+	if not charAnims then
+		return
+	end
 
 	local frozen = module._hitstopState[char]
 	if not frozen then
@@ -129,7 +157,9 @@ function module.Hitstop(char: Model, duration: number)
 
 	task.delay(duration, function()
 		local state = module._hitstopState[char]
-		if not state then return end
+		if not state then
+			return
+		end
 		for track, prevSpeed in pairs(state) do
 			if track and track.IsPlaying and track.Speed == 0 then
 				track:AdjustSpeed(prevSpeed or 1)
@@ -141,7 +171,7 @@ end
 
 -- NEW FUNCTION: Pauses animation(s)
 -- @param duration (optional): If provided, the animation will resume automatically after this time (Hitstop)
-function module.PauseAnim(char : Model, _type: string, animID: string, duration: number)
+function module.PauseAnim(char: Model, _type: string, animID: string, duration: number)
 	module.Anims[char] = module.Anims[char] or {}
 	module.Anims[char][_type] = module.Anims[char][_type] or {}
 
@@ -213,12 +243,16 @@ function module.ResumeAnim(char, _type: string, animID: string)
 end
 
 function module.IsAnim(char, _type: string, animID: string)
-	local entry = module.Anims[char] and module.Anims[char][_type] and module.Anims[char][_type][animID]
+	local entry = module.Anims[char]
+		and module.Anims[char][_type]
+		and module.Anims[char][_type][animID]
 	return entry and entry.Track and entry.Track.IsPlaying or false
 end
 
 function module.RemoveAnim(char, _type: string, animID: string)
-	local animData = module.Anims[char] and module.Anims[char][_type] and module.Anims[char][_type][animID]
+	local animData = module.Anims[char]
+		and module.Anims[char][_type]
+		and module.Anims[char][_type][animID]
 	if animData then
 		if animData.Track then
 			animData.Track:Stop()
@@ -245,7 +279,9 @@ function module.RemoveAnim(char, _type: string, animID: string)
 end
 
 function module.StopAnim(char: Player, _type: string, animID: string)
-	if not module.Anims[char] then return end
+	if not module.Anims[char] then
+		return
+	end
 
 	if _type == "ALL" then
 		for typeKey, anims in pairs(module.Anims[char]) do
@@ -274,7 +310,9 @@ end)
 
 function module.PreloadAnimations(char, animList)
 	local animator = getAnimator(char)
-	if not animator then return end
+	if not animator then
+		return
+	end
 	for _, animID in ipairs(animList) do
 		if not preloaded[animID] then
 			local animation = Instance.new("Animation")
@@ -296,7 +334,7 @@ end
 
 local AnimationIdsToPreload = {
 	--fists (bandages)
-	"rbxassetid://131646776816840", --Lunge [Atk6] 
+	"rbxassetid://131646776816840", --Lunge [Atk6]
 	"rbxassetid://120719298691152", --M2
 
 	--fists (shackles)
@@ -325,12 +363,12 @@ local AnimationIdsToPreload = {
 	"rbxassetid://72037949342562", --EAtk
 	"rbxassetid://88771475533388", --Block
 	"rbxassetid://12075933616", --Parry
-	
+
 	--tanto
 	"rbxassetid://116490680994705", --daggerThrow
 	"rbxassetid://115237120299356", --EAtk
 	"rbxassetid://115983114799315", --SpAtk2
-	
+
 	--scythe
 	"rbxassetid://85617413780831", --Atk1 --old: 74535696665387
 	"rbxassetid://100835881970712", --Atk2 --old: 71402041930858
@@ -340,7 +378,7 @@ local AnimationIdsToPreload = {
 	"rbxassetid://104237193184444", --Lunge [Atk6]
 	"rbxassetid://125596523289062", --Air [Atk7]
 	"rbxassetid://128904437387172", --E
-	
+
 	--guandao
 	"rbxassetid://124210375406879", --s1
 	"rbxassetid://100711039492817", --s2
@@ -419,15 +457,17 @@ local AnimationIdsToPreload = {
 
 	"rbxassetid://86099520309760", --Block
 	"rbxassetid://116806359529444", --Parry
-	
+
 	-- dark knight
 	"rbxassetid://78646471226698", --Idle (torso)
 	"rbxassetid://126116554289996", --Idle (legs)
 
 	--extras
 	"rbxassetid://113982059903937", --Uppercut
-	"rbxassetid://96311777205911", "rbxassetid://111089735892609", -- hits
-	"rbxassetid://118025182512218", "rbxassetid://91901047304475", --climbing anims
+	"rbxassetid://96311777205911",
+	"rbxassetid://111089735892609", -- hits
+	"rbxassetid://118025182512218",
+	"rbxassetid://91901047304475", --climbing anims
 	"rbxassetid://71959991904098", -- rise
 	"rbxassetid://89337388294441", -- fist dash
 	"rbxassetid://108425878268854", -- fist ult windup
@@ -444,7 +484,7 @@ local AnimationIdsToPreload = {
 	"rbxassetid://125236478541602", --gs
 	"rbxassetid://116383775729821", --dagger
 	"rbxassetid://83649127182166", --sword
-	
+
 	--skill anims
 	"rbxassetid://130627090034596", --meskari
 	"rbxassetid://70984351311195", --arach grapple

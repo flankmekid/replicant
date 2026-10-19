@@ -74,7 +74,8 @@ remote.OnClientEvent:Connect(function(data, ...)
 	-- Load and cache the module (Cache logic remains the same)
 	loadedClientModules[actionType] = loadedClientModules[actionType] or {}
 	loadedClientModules[actionType][folderName] = loadedClientModules[actionType][folderName] or {}
-	loadedClientModules[actionType][folderName][moduleName] = loadedClientModules[actionType][folderName][moduleName] or require(module)
+	loadedClientModules[actionType][folderName][moduleName] = loadedClientModules[actionType][folderName][moduleName]
+		or require(module)
 
 	local moduleTable = loadedClientModules[actionType][folderName][moduleName]
 

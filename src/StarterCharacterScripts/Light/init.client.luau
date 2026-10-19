@@ -2,10 +2,10 @@ local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
 -- Configuration
-local START_TIME = 17.9     -- Approx 5:54 PM
-local END_TIME = 6.3        -- Approx 6:18 AM
-local MAX_BRIGHTNESS = 1    -- How bright the light gets
-local FADE_DURATION = 3     -- How many seconds the fade takes
+local START_TIME = 17.9 -- Approx 5:54 PM
+local END_TIME = 6.3 -- Approx 6:18 AM
+local MAX_BRIGHTNESS = 1 -- How bright the light gets
+local FADE_DURATION = 3 -- How many seconds the fade takes
 
 -- Setup Character and Light
 local character = script.Parent
@@ -35,8 +35,9 @@ local function updateLight()
 		local targetBrightness = shouldBeOn and MAX_BRIGHTNESS or 0
 
 		-- Create and play the animation
-		local tweenInfo = TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-		local tween = TweenService:Create(light, tweenInfo, {Brightness = targetBrightness})
+		local tweenInfo =
+			TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(light, tweenInfo, { Brightness = targetBrightness })
 		tween:Play()
 	end
 end

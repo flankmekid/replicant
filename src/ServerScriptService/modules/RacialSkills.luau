@@ -24,7 +24,10 @@ local FXFolder = Assets:WaitForChild("FX")
 -- [[ HELPER: SOUND ]] --
 local function playSound(char: Instance, soundTemplate: Sound?)
 	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then wait("No HRP found!") return end
+	if not root then
+		wait("No HRP found!")
+		return
+	end
 
 	local s
 	if typeof(soundTemplate) == "string" then
@@ -49,9 +52,16 @@ end
 
 -- [[ HELPER: KNOCKBACK ]] --
 -- Simple body velocity knockback
-local function applyKnockback(targetChar: Model, direction: Vector3, force: number, duration: number)
+local function applyKnockback(
+	targetChar: Model,
+	direction: Vector3,
+	force: number,
+	duration: number
+)
 	local hrp = targetChar:FindFirstChild("HumanoidRootPart") :: BasePart
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	-- Reset existing velocity
 	hrp.AssemblyLinearVelocity = Vector3.zero
@@ -73,37 +83,48 @@ end
 -- This handles the complex combat triangle (Hit -> Dodge -> Block -> Parry)
 
 local function processHit(
-	attackerPlayer: Player, 
-	attackerChar: Model, 
-	hitCharsTable: {Model}, 
-	alreadyHit: {[Model]: boolean}, 
-	damage: number, 
+	attackerPlayer: Player,
+	attackerChar: Model,
+	hitCharsTable: { Model },
+	alreadyHit: { [Model]: boolean },
+	damage: number,
 	weaponType: string?, -- Optional, for specific VFX
-	knockbackDist: number?, 
-	stunTime: number?, 
-	ragdollTime: number?, 
+	knockbackDist: number?,
+	stunTime: number?,
+	ragdollTime: number?,
 	originPart: BasePart?,
-	specialProperties: {[string]: any}? -- For guard breaks, silence, etc.
+	specialProperties: { [string]: any }? -- For guard breaks, silence, etc.
 )
 	local attackerHRP = attackerChar:FindFirstChild("HumanoidRootPart") :: BasePart
 	-- Use originPart for projectiles, otherwise attacker HRP
-	local originPosition = (originPart and originPart.Position) or (attackerHRP and attackerHRP.Position)
+	local originPosition = (originPart and originPart.Position)
+		or (attackerHRP and attackerHRP.Position)
 
-	if not attackerHRP or not originPosition then return end
+	if not attackerHRP or not originPosition then
+		return
+	end
 
 	-- Attacker shouldn't deal damage if they got stunned mid-swing
-	if StateHandler.IsInterrupted(attackerChar) then return end
+	if StateHandler.IsInterrupted(attackerChar) then
+		return
+	end
 
 	for _, targetChar in pairs(hitCharsTable) do
 		local humanoid = targetChar:FindFirstChild("Humanoid") :: Humanoid
-		if not humanoid or humanoid.Health <= 0 then continue end
+		if not humanoid or humanoid.Health <= 0 then
+			continue
+		end
 
 		-- prevent self-hit and duplicate hits
 		local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
-		if (isPlayer and isPlayer == attackerPlayer) or alreadyHit[targetChar] then continue end
+		if (isPlayer and isPlayer == attackerPlayer) or alreadyHit[targetChar] then
+			continue
+		end
 
 		local targetHRP = targetChar:FindFirstChild("HumanoidRootPart") :: BasePart
-		if not targetHRP then continue end
+		if not targetHRP then
+			continue
+		end
 
 		-- [[ 1. DODGE CHECK ]] --
 		if StateHandler.GetState(targetChar, "Dodging") then
@@ -111,7 +132,12 @@ local function processHit(
 
 			-- Visual Ghost Effect
 			for _, part in pairs(targetChar:GetChildren()) do
-				if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+				if
+					part:IsA("BasePart")
+					and part.Name ~= "HumanoidRootPart"
+					and part.Name ~= "Head"
+					and part.Name ~= "Left Arm"
+				then
 					local oldTansparency = part.Transparency
 					part.Transparency = 0.7
 					task.delay(0.5, function()
@@ -127,7 +153,8 @@ local function processHit(
 			local direction = (targetHRP.Position - originPosition).Unit
 
 			-- Animation
-			local animID = (math.random() > 0.5) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+			local animID = (math.random() > 0.5) and "rbxassetid://96311777205911"
+				or "rbxassetid://111089735892609"
 			AnimationHandler.LoadAnim(targetChar, "Hit", animID, nil, false)
 
 			-- Stats
@@ -154,7 +181,7 @@ local function processHit(
 
 			local blood = Assets.FX:FindFirstChild("BloodHitEff").Attachment
 			if blood then
-				local clone = blood:Clone() 
+				local clone = blood:Clone()
 				clone.Parent = targetHRP
 				clone.BloodHit:Emit(10)
 				Debris:AddItem(clone, 1)
@@ -163,25 +190,39 @@ local function processHit(
 			-- Apply Special Properties (Silence, Root, etc)
 			if specialProperties then
 				if specialProperties.Silence then
-					StateHandler.SetState(targetChar, "Silenced", true, specialProperties.SilenceDuration or 2)
+					StateHandler.SetState(
+						targetChar,
+						"Silenced",
+						true,
+						specialProperties.SilenceDuration or 2
+					)
 				end
 				if specialProperties.Root then
 					targetHRP.Anchored = true
 
 					playSound(targetChar, SoundFolder:FindFirstChild("Crackling"))
 
-					AnimationHandler.LoadAnim(targetChar, "Rooted", "rbxassetid://84818556494893", nil, false)
+					AnimationHandler.LoadAnim(
+						targetChar,
+						"Rooted",
+						"rbxassetid://84818556494893",
+						nil,
+						false
+					)
 
-					local rootEffectTop = ReplicatedStorage.assets.FX.skills:FindFirstChild("RootedPart").Top:Clone()
-					local rootEffectBottom = ReplicatedStorage.assets.FX.skills:FindFirstChild("RootedPart").Bottom:Clone()
+					local rootEffectTop =
+						ReplicatedStorage.assets.FX.skills:FindFirstChild("RootedPart").Top:Clone()
+					local rootEffectBottom = ReplicatedStorage.assets.FX.skills
+						:FindFirstChild("RootedPart").Bottom
+						:Clone()
 					rootEffectTop.Parent = targetHRP
 					rootEffectBottom.Parent = targetHRP
 
 					game.Debris:AddItem(rootEffectTop, specialProperties.RootDuration or 2)
 					game.Debris:AddItem(rootEffectBottom, specialProperties.RootDuration or 2)
 
-					task.delay(specialProperties.RootDuration or 2, function() 
-						targetHRP.Anchored = false 
+					task.delay(specialProperties.RootDuration or 2, function()
+						targetHRP.Anchored = false
 					end)
 				end
 				if specialProperties.Slow then
@@ -198,7 +239,12 @@ local function processHit(
 						-- stacking, and it correctly loses to a stun/hitstop pin but overrides
 						-- the target's base/block speed. The old NullGazeOrigSpeed attribute
 						-- stash is gone: the stack owns the restore.
-						SpeedService.Push(targetChar, "NullGaze", slowSpeed, SpeedService.Priority.DEBUFF)
+						SpeedService.Push(
+							targetChar,
+							"NullGaze",
+							slowSpeed,
+							SpeedService.Priority.DEBUFF
+						)
 						-- Stop dashes too. WalkSpeed alone does nothing to a dash (it
 						-- runs on a LinearVelocity that overrides WalkSpeed), so a slowed
 						-- target could otherwise just dash out. DashLocked is read by the
@@ -210,8 +256,12 @@ local function processHit(
 						task.delay(slowDuration, function()
 							-- only the most recent application restores, so an earlier
 							-- tick's timer can't snap speed back while the beam is ongoing
-							if not targetChar or not targetChar.Parent then return end
-							if targetChar:GetAttribute("NullGazeSlowToken") ~= token then return end
+							if not targetChar or not targetChar.Parent then
+								return
+							end
+							if targetChar:GetAttribute("NullGazeSlowToken") ~= token then
+								return
+							end
 							-- Pop the debuff and let SpeedService recompute (base, or a still-live
 							-- higher-priority pin). Token guard still ensures only the latest
 							-- beam tick's timer performs the release.
@@ -227,28 +277,50 @@ local function processHit(
 
 			if weaponType == "Water" then
 				local ballClone = game:GetService("ReplicatedStorage").Magic.Ball:Clone()
-				local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire:Clone()
-				local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround:Clone()
+				local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire
+					:Clone()
+				local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround
+					:Clone()
 
 				groundClone.Parent = game.Workspace
 				ballClone.Parent = game.Workspace
 				swirlClone.Parent = game.Workspace
 				ballClone.Position = humanoid.Parent.Torso.Position
 				swirlClone.Position = humanoid.Parent.Torso.Position
-				groundClone.Position = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y -  5.5, humanoid.Parent.Torso.Position.Z)
+				groundClone.Position = Vector3.new(
+					humanoid.Parent.Torso.Position.X,
+					humanoid.Parent.Torso.Position.Y - 5.5,
+					humanoid.Parent.Torso.Position.Z
+				)
 
-				local destination1 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 3.5, humanoid.Parent.Torso.Position.Z)
-				local destination2 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 6.5, humanoid.Parent.Torso.Position.Z)
+				local destination1 = Vector3.new(
+					humanoid.Parent.Torso.Position.X,
+					humanoid.Parent.Torso.Position.Y - 3.5,
+					humanoid.Parent.Torso.Position.Z
+				)
+				local destination2 = Vector3.new(
+					humanoid.Parent.Torso.Position.X,
+					humanoid.Parent.Torso.Position.Y - 6.5,
+					humanoid.Parent.Torso.Position.Z
+				)
 
 				local TweenService = game:GetService("TweenService")
-				local tweenInfo1 = TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-				local tweenInfo2 = TweenInfo.new(2,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
+				local tweenInfo1 = TweenInfo.new(
+					0.5,
+					Enum.EasingStyle.Back,
+					Enum.EasingDirection.InOut,
+					0,
+					false,
+					0
+				)
+				local tweenInfo2 =
+					TweenInfo.new(2, Enum.EasingStyle.Back, Enum.EasingDirection.InOut, 0, false, 0)
 
-				local Settings1 = {Position = destination1}
-				local Tween1 = TweenService:Create(groundClone,tweenInfo1,Settings1)
+				local Settings1 = { Position = destination1 }
+				local Tween1 = TweenService:Create(groundClone, tweenInfo1, Settings1)
 
-				local Settings2 = {Position = destination2}
-				local Tween2 = TweenService:Create(groundClone,tweenInfo2,Settings2)
+				local Settings2 = { Position = destination2 }
+				local Tween2 = TweenService:Create(groundClone, tweenInfo2, Settings2)
 
 				Tween1:Play()
 				wait(5)
@@ -269,9 +341,12 @@ local function processHit(
 		local isFacing = dot > 0.5 -- 60 degree cone roughly
 
 		if isParrying then
-			local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-			local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-			local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+			local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+				:Clone()
+			local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+				:Clone()
+			local clash = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+				:Clone()
 			local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 			h1.Parent = attackerChar
 			game.Debris:AddItem(h1, 0.1)
@@ -279,7 +354,8 @@ local function processHit(
 			effect2.Parent = attackerChar:WaitForChild("Torso")
 			clash.Parent = attackerChar:WaitForChild("Right Arm")
 
-			local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+			local clash2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+				:Clone()
 			clash2.Parent = targetChar:WaitForChild("Right Arm")
 			clash2:Emit(30)
 			game.Debris:AddItem(clash2, 0.7)
@@ -293,7 +369,7 @@ local function processHit(
 			effect2.Enabled = true
 			clash:Emit(30)
 			game.Debris:AddItem(clash, 0.7)
-			game.Debris:AddItem(parryE,0.7)
+			game.Debris:AddItem(parryE, 0.7)
 			game.Debris:AddItem(effect2, 0.7)
 
 			-- Parry beats hyperarmor: clear it so this punish stun actually lands.
@@ -302,9 +378,14 @@ local function processHit(
 			StateHandler.SetState(attackerChar, "CantAnything", true, 0.5)
 
 			AnimationHandler.StopAnim(attackerChar, "ALL")
-			AnimationHandler.LoadAnim(attackerChar, "Parried", "rbxassetid://116383775729821", nil, false)
+			AnimationHandler.LoadAnim(
+				attackerChar,
+				"Parried",
+				"rbxassetid://116383775729821",
+				nil,
+				false
+			)
 			return -- No damage to target
-
 		elseif isBlocking then
 			-- Route through BlockResolver (single chokepoint + guard bar). Racial
 			-- skills may carry their own GuardBreak via specialProperties.
@@ -354,7 +435,9 @@ end
 function RacialSkills.Human(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid") :: Humanoid
-	if not hrp or not hum then return end
+	if not hrp or not hum then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
@@ -369,7 +452,9 @@ function RacialSkills.Human(player: Player, character: Model)
 	local aura = ReplicatedStorage.assets.FX.adrenalineSurgePart
 
 	local function applyAura(targetPart, duration)
-		if not targetPart then return end
+		if not targetPart then
+			return
+		end
 
 		for _, item in pairs(aura:GetChildren()) do
 			if item:IsA("ParticleEmitter") then
@@ -415,7 +500,9 @@ end
 -- Skill: Arcane Siphon (Counter)
 function RacialSkills.Elezen(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
@@ -429,7 +516,7 @@ function RacialSkills.Elezen(player: Player, character: Model)
 	hrp.Anchored = false
 
 	if not character or not character.Parent or StateHandler.GetState(character, "Stunned") then
-		return 
+		return
 	end
 
 	local sparks = ReplicatedStorage.assets.FX.skills.manaSparks.Main:Clone()
@@ -445,14 +532,17 @@ function RacialSkills.Elezen(player: Player, character: Model)
 
 	-- Logic: Set Counter State
 	-- If they get hit while this state is active, your DamageHandler should check for "ManaCounter", negate dmg, and give mana
-	player:FindFirstChild("PlayerStats"):FindFirstChild("Mana").Value = player:FindFirstChild("PlayerStats"):FindFirstChild("MaxMana").Value
+	player:FindFirstChild("PlayerStats"):FindFirstChild("Mana").Value =
+		player:FindFirstChild("PlayerStats"):FindFirstChild("MaxMana").Value
 end
 
 -- [[ 3. APHANIS (Seer) ]] --
 -- Skill: Null Gaze (Silence Beam)
 function RacialSkills.Seer(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 6)
 
@@ -460,11 +550,23 @@ function RacialSkills.Seer(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.75)
 
 	-- Animation
@@ -492,12 +594,12 @@ function RacialSkills.Seer(player: Player, character: Model)
 		SizeOrPart = Vector3.new(4, 6, 12), -- Long beam
 		LookingFor = "Humanoid",
 		Debug = false,
-		Blacklist = {character}
+		Blacklist = { character },
 	}
 
 	local hitbox = HitboxClass.new(params)
 	local hitList = {}
-	hitbox:WeldTo(hrp, CFrame.new(0,0,-6))
+	hitbox:WeldTo(hrp, CFrame.new(0, 0, -6))
 
 	hitbox.HitSomeone:Connect(function(hitChars)
 		-- Null Gaze: doubled tick count at half damage per tick keeps the same
@@ -506,8 +608,8 @@ function RacialSkills.Seer(player: Player, character: Model)
 		-- tick (SlowDuration slightly above tick spacing) so it holds for the whole beam.
 		processHit(player, character, hitChars, hitList, 5, "Magic", 10, 0, 0, nil, {
 			Slow = true,
-			SlowSpeed = 4,     -- hard crawl (base walkspeed ~16): can't reposition or
-			                   -- walk out of an M1 while tagged. Buffed from 6.
+			SlowSpeed = 4, -- hard crawl (base walkspeed ~16): can't reposition or
+			-- walk out of an M1 while tagged. Buffed from 6.
 			SlowDuration = 1.0, -- comfortably above tick spacing so it holds the whole beam
 		})
 	end)
@@ -516,7 +618,9 @@ function RacialSkills.Seer(player: Player, character: Model)
 		-- 10 ticks at 0.4s active + 0.1s gap = ~5s total beam (same as the old
 		-- 5 ticks at 0.8 + 0.2), but twice as many damage windows.
 		for i = 1, 10 do
-			if not hitbox or not character or character.Humanoid.Health <= 0 then break end
+			if not hitbox or not character or character.Humanoid.Health <= 0 then
+				break
+			end
 			hitbox:Start()
 			task.wait(0.4)
 
@@ -528,7 +632,9 @@ function RacialSkills.Seer(player: Player, character: Model)
 	end)
 
 	task.delay(5, function()
-		if hitbox then hitbox:Destroy() end
+		if hitbox then
+			hitbox:Destroy()
+		end
 		if character and character:FindFirstChild("Humanoid") then
 			SpeedService.Pop(character, "RacialSkill")
 		end
@@ -539,7 +645,9 @@ end
 -- Skill: Spectre Round (Cero Beam)
 function RacialSkills.Meskar(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	-- [[ 1. EQUIP GUN VISUAL ]] --
 	local gunTemplate = ReplicatedStorage.assets:FindFirstChild("gunHandle")
@@ -568,19 +676,14 @@ function RacialSkills.Meskar(player: Player, character: Model)
 
 	local laser = gun.Laser2
 
-	local info = TweenInfo.new(
-		0.1,
-		Enum.EasingStyle.Quart,
-		Enum.EasingDirection.In,
-		0
-	)
+	local info = TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.In, 0)
 
-	local laser2tweenON = game.TweenService:Create(laser,info,{Transparency = 0.3})
-	local laser2tweenOFF = game.TweenService:Create(laser,info,{Transparency = 1})
+	local laser2tweenON = game.TweenService:Create(laser, info, { Transparency = 0.3 })
+	local laser2tweenOFF = game.TweenService:Create(laser, info, { Transparency = 1 })
 
 	task.wait(0.5)
 
-	for i,v in pairs(gun.MuzzleFlash:GetChildren()) do
+	for i, v in pairs(gun.MuzzleFlash:GetChildren()) do
 		if v:IsA("ParticleEmitter") then
 			v:Emit(3)
 		end
@@ -600,14 +703,14 @@ function RacialSkills.Meskar(player: Player, character: Model)
 	local params = {
 		SizeOrPart = Vector3.new(3, 14, 3),
 		LookingFor = "Humanoid",
-		Blacklist = {character},
-		Debug = false
+		Blacklist = { character },
+		Debug = false,
 	}
 
 	local hitbox = HitboxClass.new(params)
 
 	-- Offset the hitbox slightly to the left to match the gun position
-	hitbox:WeldTo(character["Left Arm"], CFrame.new(0, -9, 0)) 
+	hitbox:WeldTo(character["Left Arm"], CFrame.new(0, -9, 0))
 
 	local alreadyHit = {}
 
@@ -617,8 +720,10 @@ function RacialSkills.Meskar(player: Player, character: Model)
 	end)
 
 	hitbox:Start()
-	task.delay(duration, function() 
-		if hitbox then hitbox:Destroy() end 
+	task.delay(duration, function()
+		if hitbox then
+			hitbox:Destroy()
+		end
 	end)
 end
 
@@ -626,7 +731,9 @@ end
 -- Skill: Headbutt (Lunge)
 function RacialSkills.Karu(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
@@ -634,11 +741,23 @@ function RacialSkills.Karu(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
@@ -670,8 +789,8 @@ function RacialSkills.Karu(player: Player, character: Model)
 		SizeOrPart = Vector3.new(4, 6, 4),
 		LookingFor = "Humanoid",
 		Debug = false,
-		Blacklist = {character},
-		WeldTo = hrp
+		Blacklist = { character },
+		WeldTo = hrp,
 	}
 
 	local hitbox = HitboxClass.new(params)
@@ -695,7 +814,9 @@ end
 -- Skill: Root Prison (AoE Root)
 function RacialSkills.Verdis(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	hrp.Anchored = true
 
@@ -705,11 +826,23 @@ function RacialSkills.Verdis(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
@@ -727,7 +860,7 @@ function RacialSkills.Verdis(player: Player, character: Model)
 		SizeOrPart = 10, -- Large Radius
 		SpatialOption = "InRadius",
 		LookingFor = "Humanoid",
-		Blacklist = {character},
+		Blacklist = { character },
 		Debug = false,
 	}
 
@@ -737,7 +870,19 @@ function RacialSkills.Verdis(player: Player, character: Model)
 
 	hitbox.HitSomeone:Connect(function(hitChars)
 		-- No ragdoll, just root
-		processHit(player, character, hitChars, hitList, 5, "Nature", 0, 0, 0, nil, {Root = true, RootDuration = 2})
+		processHit(
+			player,
+			character,
+			hitChars,
+			hitList,
+			5,
+			"Nature",
+			0,
+			0,
+			0,
+			nil,
+			{ Root = true, RootDuration = 2 }
+		)
 	end)
 
 	hitbox:Start()
@@ -758,18 +903,32 @@ end
 function RacialSkills.Marasi(player: Player, character: Model)
 	-- Identical logic to Ossuar, just different visual and stats
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 	playSound(character, ReplicatedStorage.assets.sounds.DANGER)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
@@ -805,7 +964,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 	local params = {
 		SizeOrPart = 3, -- Larger sphere
 		LookingFor = "Humanoid",
-		Blacklist = {character},
+		Blacklist = { character },
 		Debug = false,
 	}
 
@@ -818,7 +977,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = hrp.CFrame.LookVector * 70 -- Slower than gun
-	bv.MaxForce = Vector3.new(1,1,1) * 1000000
+	bv.MaxForce = Vector3.new(1, 1, 1) * 1000000
 	bv.Parent = projectile
 
 	local alreadyHit = {}
@@ -827,23 +986,32 @@ function RacialSkills.Marasi(player: Player, character: Model)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = game.Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= player) and not alreadyHit[targetChar] then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = player.Character:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(player.Character, "Stunned") then return end
+				if StateHandler.GetState(player.Character, "Stunned") then
+					return
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					print("iframed lawl :p")
 
-					local targetPlrData = game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
+					local targetPlrData =
+						game.Players:GetPlayerFromCharacter(targetChar).PlayerStats
 					if targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
 						targetPlrData.Mana.Value += 8
 					end
@@ -859,7 +1027,12 @@ function RacialSkills.Marasi(player: Player, character: Model)
 
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -875,29 +1048,48 @@ function RacialSkills.Marasi(player: Player, character: Model)
 				local function doAttack(extraDmg, knockbackDistance)
 					local direction = (targetHRP.Position - attackerHRP.Position).Unit
 
-					local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+					local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+						or "rbxassetid://111089735892609"
 					AnimationHandler.LoadAnim(targetChar, "Hit", animID, nil, false)
-					require(game.ServerScriptService.modules.helperModule).ApplyKnockback(targetChar, direction, knockbackDistance * 5, 0.2)
+					require(game.ServerScriptService.modules.helperModule).ApplyKnockback(
+						targetChar,
+						direction,
+						knockbackDistance * 5,
+						0.2
+					)
 					StateHandler.SetStun(targetChar, true, 1, 2)
 					require(game.ServerScriptService.modules.ragdollManager).Ragdoll(targetChar, 1)
 
-					dmgCalculator.CalculateDamage(attackerHRP.Parent, targetChar, 25, extraDmg, false, "Racial")
+					dmgCalculator.CalculateDamage(
+						attackerHRP.Parent,
+						targetChar,
+						25,
+						extraDmg,
+						false,
+						"Racial"
+					)
 
 					playSound(targetChar, game.ReplicatedStorage.assets.sounds.magic.Explosion)
 
-					if targetChar.Humanoid.Health > 0 then 
-						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(game.Players:GetPlayerFromCharacter(player.Character), "Fists", 25 + extraDmg) 
+					if targetChar.Humanoid.Health > 0 then
+						require(game.ServerScriptService.modules.dataManager).AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(player.Character),
+							"Fists",
+							25 + extraDmg
+						)
 					end
 
 					local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 					highlight.Parent = humanoid.Parent
 					game.Debris:AddItem(highlight, 0.1)
 
-					local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+					local hitEff =
+						game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+							:Clone()
 					hitEff.Parent = targetChar:FindFirstChild("Torso")
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
+						for _, v in pairs(hitEff:GetChildren()) do
 							if v:IsA("ParticleEmitter") then
 								v.Enabled = false
 							end
@@ -905,28 +1097,56 @@ function RacialSkills.Marasi(player: Player, character: Model)
 					end)
 
 					local ballClone = game:GetService("ReplicatedStorage").Magic.Ball:Clone()
-					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire:Clone()
-					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround:Clone()
+					local swirlClone = game:GetService("ReplicatedStorage").Magic.SwirlShockwaveFire
+						:Clone()
+					local groundClone = game:GetService("ReplicatedStorage").Magic.DestroyedGround
+						:Clone()
 
 					groundClone.Parent = game.Workspace
 					ballClone.Parent = game.Workspace
 					swirlClone.Parent = game.Workspace
 					ballClone.Position = humanoid.Parent.Torso.Position
 					swirlClone.Position = humanoid.Parent.Torso.Position
-					groundClone.Position = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y -  5.5, humanoid.Parent.Torso.Position.Z)
+					groundClone.Position = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 5.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
-					local destination1 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 3.5, humanoid.Parent.Torso.Position.Z)
-					local destination2 = Vector3.new(humanoid.Parent.Torso.Position.X, humanoid.Parent.Torso.Position.Y - 6.5, humanoid.Parent.Torso.Position.Z)
+					local destination1 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 3.5,
+						humanoid.Parent.Torso.Position.Z
+					)
+					local destination2 = Vector3.new(
+						humanoid.Parent.Torso.Position.X,
+						humanoid.Parent.Torso.Position.Y - 6.5,
+						humanoid.Parent.Torso.Position.Z
+					)
 
 					local TweenService = game:GetService("TweenService")
-					local tweenInfo1 = TweenInfo.new(0.5,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
-					local tweenInfo2 = TweenInfo.new(2,Enum.EasingStyle.Back,Enum.EasingDirection.InOut, 0,false,0)
+					local tweenInfo1 = TweenInfo.new(
+						0.5,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
+					local tweenInfo2 = TweenInfo.new(
+						2,
+						Enum.EasingStyle.Back,
+						Enum.EasingDirection.InOut,
+						0,
+						false,
+						0
+					)
 
-					local Settings1 = {Position = destination1}
-					local Tween1 = TweenService:Create(groundClone,tweenInfo1,Settings1)
+					local Settings1 = { Position = destination1 }
+					local Tween1 = TweenService:Create(groundClone, tweenInfo1, Settings1)
 
-					local Settings2 = {Position = destination2}
-					local Tween2 = TweenService:Create(groundClone,tweenInfo2,Settings2)
+					local Settings2 = { Position = destination2 }
+					local Tween2 = TweenService:Create(groundClone, tweenInfo2, Settings2)
 
 					Tween1:Play()
 					wait(5)
@@ -936,10 +1156,17 @@ function RacialSkills.Marasi(player: Player, character: Model)
 				end
 
 				if StateHandler.GetState(targetChar, "Parrying") then
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = targetChar:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -953,7 +1180,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 					effect2.Enabled = true
 					clash:Emit(30)
 					game.Debris:AddItem(clash, 0.7)
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					playSound(player.Character, ReplicatedStorage.assets.sounds.ParrySound)
@@ -964,12 +1191,20 @@ function RacialSkills.Marasi(player: Player, character: Model)
 					StateHandler.SetState(player.Character, "CantAnything", true, 0.5)
 
 					AnimationHandler.StopAnim(player.Character, "ALL")
-					AnimationHandler.LoadAnim(player.Character, "Parried", "rbxassetid://74891530644094", nil, false)
+					AnimationHandler.LoadAnim(
+						player.Character,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
 
 					hitbox:Destroy()
 					game.Debris:AddItem(projectile, 0.2)
-
-				elseif StateHandler.GetState(targetChar, "M1") or StateHandler.GetState(targetChar, "M2") then
+				elseif
+					StateHandler.GetState(targetChar, "M1")
+					or StateHandler.GetState(targetChar, "M2")
+				then
 					hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
@@ -996,8 +1231,12 @@ function RacialSkills.Marasi(player: Player, character: Model)
 						BlockResolver.OnAttackerLandedHit(attackerChar)
 						doAttack(-4, 5)
 						playSound(targetChar, ReplicatedStorage.assets.sounds.BlockingHit2)
-						local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-						local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+						local parryE =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+								:Clone()
+						local effect2 =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+								:Clone()
 						local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 						h1.Parent = targetChar
 						game.Debris:AddItem(h1, 0.1)
@@ -1005,7 +1244,7 @@ function RacialSkills.Marasi(player: Player, character: Model)
 						effect2.Parent = targetChar:WaitForChild("Torso")
 						parryE.Enabled = true
 						effect2.Enabled = true
-						game.Debris:AddItem(parryE,0.7)
+						game.Debris:AddItem(parryE, 0.7)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
@@ -1018,10 +1257,10 @@ function RacialSkills.Marasi(player: Player, character: Model)
 
 	hitbox:Start()
 	Debris:AddItem(projectile, 3)
-	task.delay(3, function() 
-		if hitbox then 
-			hitbox:Destroy() 
-		end 
+	task.delay(3, function()
+		if hitbox then
+			hitbox:Destroy()
+		end
 	end)
 end
 
@@ -1029,7 +1268,9 @@ end
 -- Skill: Parasitic Impale (Grab + DoT)
 function RacialSkills.Cruor(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
@@ -1038,30 +1279,37 @@ function RacialSkills.Cruor(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
 
 	local tweenInfo = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut)
-	game.TweenService:Create(NewShield2, tweenInfo, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0)}):Play()
+	game.TweenService
+		:Create(NewShield2, tweenInfo, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
 	anim.AnimationId = "rbxassetid://139662498198370"
-	local animator = character:FindFirstChild("Humanoid") and character.Humanoid:FindFirstChild("Animator")
+	local animator = character:FindFirstChild("Humanoid")
+		and character.Humanoid:FindFirstChild("Animator")
 	if animator then
 		local skillAnim = animator:LoadAnimation(anim)
 		skillAnim:Play()
 
-		task.delay(1, function() if skillAnim.IsPlaying then skillAnim:Stop() end end)
+		task.delay(1, function()
+			if skillAnim.IsPlaying then
+				skillAnim:Stop()
+			end
+		end)
 	end
 
 	SpeedService.Push(character, "RacialSkill", 0, SpeedService.Priority.SKILL)
 
 	task.wait(0.75)
 
-	if not character or not character.Parent or not hrp or not hrp.Parent then 
-		return 
+	if not character or not character.Parent or not hrp or not hrp.Parent then
+		return
 	end
 
 	-- [[ HITBOX LOGIC ]] --
@@ -1069,29 +1317,44 @@ function RacialSkills.Cruor(player: Player, character: Model)
 		SizeOrPart = Vector3.new(4, 4, 5),
 		LookingFor = "Humanoid",
 		Debug = false,
-		Blacklist = {character},
-		InitialPosition = hrp.CFrame
+		Blacklist = { character },
+		InitialPosition = hrp.CFrame,
 	}
 
 	local hitbox = HitboxClass.new(params)
 	hitbox:WeldTo(hrp, CFrame.new(0, 0, -3))
 
-	local grabbed = false 
+	local grabbed = false
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		if grabbed then return end
+		if grabbed then
+			return
+		end
 
 		for _, target in pairs(hitChars) do
-			if target == character or not target:FindFirstChild("Humanoid") or target.Humanoid.Health <= 0 then continue end
+			if
+				target == character
+				or not target:FindFirstChild("Humanoid")
+				or target.Humanoid.Health <= 0
+			then
+				continue
+			end
 			SpeedService.Pop(character, "RacialSkill")
 
-			if StateHandler.GetState(target, "Dodging") then 
+			if StateHandler.GetState(target, "Dodging") then
 				playSound(target.HumanoidRootPart, SoundFolder:FindFirstChild("Dodged"))
 				for _, part in pairs(target:GetChildren()) do
-					if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+					if
+						part:IsA("BasePart")
+						and part.Name ~= "HumanoidRootPart"
+						and part.Name ~= "Head"
+						and part.Name ~= "Left Arm"
+					then
 						local oldTrans = part.Transparency
 						part.Transparency = 0.7
-						task.delay(0.3, function() part.Transparency = oldTrans end)
+						task.delay(0.3, function()
+							part.Transparency = oldTrans
+						end)
 					end
 				end
 				continue
@@ -1126,7 +1389,9 @@ function RacialSkills.Cruor(player: Player, character: Model)
 
 				task.spawn(function()
 					for i = 1, 2 do
-						if not target.Parent or tHum.Health <= 0 or not character.Parent then break end
+						if not target.Parent or tHum.Health <= 0 or not character.Parent then
+							break
+						end
 						task.wait(0.5)
 
 						dmgCalculator.CalculateDamage(character, target, 10, 0, false, "Racial")
@@ -1142,7 +1407,9 @@ function RacialSkills.Cruor(player: Player, character: Model)
 						playSound(tHRP, ReplicatedStorage.assets.sounds:FindFirstChild("PunchHit"))
 					end
 
-					if weld then weld:Destroy() end
+					if weld then
+						weld:Destroy()
+					end
 					RagdollManager.Ragdoll(target, 1)
 				end)
 
@@ -1155,7 +1422,9 @@ function RacialSkills.Cruor(player: Player, character: Model)
 
 	-- Cleanup hitbox after 0.2s if no one hit
 	task.delay(0.2, function()
-		if hitbox then hitbox:Destroy() end
+		if hitbox then
+			hitbox:Destroy()
+		end
 		SpeedService.Pop(character, "RacialSkill")
 	end)
 end
@@ -1165,7 +1434,9 @@ end
 function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid")
-	if not hrp or not hum or not mouseHit then return end
+	if not hrp or not hum or not mouseHit then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 2)
 
@@ -1175,13 +1446,13 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	-- Asset References (Assuming they exist in ServerStorage/Assets based on your script)
 	local AssetFolder = ReplicatedStorage.assets:FindFirstChild("grapple")
-	local cordTemplate = AssetFolder:FindFirstChild("Cord") 
-	local grapplePartTemplate = AssetFolder:FindFirstChild("GrapplePart") 
+	local cordTemplate = AssetFolder:FindFirstChild("Cord")
+	local grapplePartTemplate = AssetFolder:FindFirstChild("GrapplePart")
 
 	-- If assets are missing, use fallbacks to prevent errors
-	if not cordTemplate or not grapplePartTemplate then 
-		warn("Missing Grapple Assets in ServerStorage!") 
-		return 
+	if not cordTemplate or not grapplePartTemplate then
+		warn("Missing Grapple Assets in ServerStorage!")
+		return
 	end
 
 	-- 2. RAYCAST (Server Validation)
@@ -1189,7 +1460,8 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	local direction = (mouseHit.Position - startPos).Unit * MAX_DIST
 
 	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {character, workspace:FindFirstChild("ProjectileFolder")}
+	rayParams.FilterDescendantsInstances =
+		{ character, workspace:FindFirstChild("ProjectileFolder") }
 	rayParams.FilterType = Enum.RaycastFilterType.Exclude
 
 	local rayResult = workspace:Raycast(startPos, direction, rayParams)
@@ -1198,13 +1470,23 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	-- Distance Check
 	local dist = (targetPos - startPos).Magnitude
-	if dist > MAX_DIST then return end
+	if dist > MAX_DIST then
+		return
+	end
 
 	-- Verticality Check (From your script)
-	if not hitInstance and (targetPos.Y - hrp.Position.Y) < 4 then return end
+	if not hitInstance and (targetPos.Y - hrp.Position.Y) < 4 then
+		return
+	end
 
 	-- Transparency Check
-	if hitInstance and hitInstance.Transparency == 1 and not hitInstance.Parent:FindFirstChild("Humanoid") then return end
+	if
+		hitInstance
+		and hitInstance.Transparency == 1
+		and not hitInstance.Parent:FindFirstChild("Humanoid")
+	then
+		return
+	end
 
 	-- 3. ENEMY DETECTION
 	local enemyChar = nil
@@ -1217,8 +1499,13 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	end
 
 	-- Alive Check
-	if enemyChar and not enemyChar:IsDescendantOf(workspace:FindFirstChild("plrManager") and workspace.plrManager.alive or workspace) then
-		return 
+	if
+		enemyChar
+		and not enemyChar:IsDescendantOf(
+			workspace:FindFirstChild("plrManager") and workspace.plrManager.alive or workspace
+		)
+	then
+		return
 	end
 
 	-- 4. VISUALS (Grapple Rope)
@@ -1235,13 +1522,15 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 	local cord = cordTemplate:Clone()
 	cord.Attachment0 = attach
-	cord.Attachment1 = grapplePart:FindFirstChild("Attachment2") or Instance.new("Attachment", grapplePart)
+	cord.Attachment1 = grapplePart:FindFirstChild("Attachment2")
+		or Instance.new("Attachment", grapplePart)
 	cord.Parent = attach.Parent
 	Debris:AddItem(cord, 0.7)
 
 	-- If we hit an enemy, attach the part to them
 	if enemyChar then
-		local enemyTorso = enemyChar:FindFirstChild("Torso") or enemyChar:FindFirstChild("UpperTorso")
+		local enemyTorso = enemyChar:FindFirstChild("Torso")
+			or enemyChar:FindFirstChild("UpperTorso")
 		if enemyTorso then
 			local weld = Instance.new("Weld")
 			weld.Part0 = enemyTorso
@@ -1254,20 +1543,26 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 	end
 
 	-- Tween visuals
-	local tween = game:GetService("TweenService"):Create(grapplePart, TweenInfo.new(GRAPPLE_SPEED), {CFrame = CFrame.new(targetPos)})
+	local tween =
+		game:GetService("TweenService")
+			:Create(grapplePart, TweenInfo.new(GRAPPLE_SPEED), { CFrame = CFrame.new(targetPos) })
 	tween:Play()
 
 	-- Wait for travel time
-	task.wait(GRAPPLE_SPEED) 
+	task.wait(GRAPPLE_SPEED)
 
-	if not character:IsDescendantOf(workspace) then return end
+	if not character:IsDescendantOf(workspace) then
+		return
+	end
 
 	-- 5. MOVEMENT LOGIC
 	playSound(character, SoundFolder:FindFirstChild("GrappleSound")) -- Ensure this sound exists in Assets/sounds/skills
 
 	-- Remove existing velocities
 	for _, obj in pairs(hrp:GetChildren()) do
-		if obj:IsA("BodyVelocity") then obj:Destroy() end
+		if obj:IsA("BodyVelocity") then
+			obj:Destroy()
+		end
 	end
 
 	local bv = Instance.new("BodyVelocity")
@@ -1291,8 +1586,14 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 
 		task.spawn(function()
 			for i = 1, 8 do
-				if not bv.Parent then break end
-				bv.Velocity = Vector3.new(daf.X * (math.abs(i - 10)/10 + 1), daf.Y + 50, daf.Z * (math.abs(i - 10)/10 + 1))
+				if not bv.Parent then
+					break
+				end
+				bv.Velocity = Vector3.new(
+					daf.X * (math.abs(i - 10) / 10 + 1),
+					daf.Y + 50,
+					daf.Z * (math.abs(i - 10) / 10 + 1)
+				)
 				task.wait(0.1)
 			end
 		end)
@@ -1303,12 +1604,14 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 		-- 6. COMBAT LOGIC
 		task.wait(0.6) -- Impact time
 
-		if not enemyChar or not enemyChar:FindFirstChild("Humanoid") then return end
+		if not enemyChar or not enemyChar:FindFirstChild("Humanoid") then
+			return
+		end
 
 		local enemyState = {
 			Blocking = StateHandler.GetState(enemyChar, "Blocking"),
 			Parrying = StateHandler.GetState(enemyChar, "Parrying"),
-			Dodging = StateHandler.GetState(enemyChar, "Dodging")
+			Dodging = StateHandler.GetState(enemyChar, "Dodging"),
 		}
 
 		if not enemyState.Blocking and not enemyState.Parrying and not enemyState.Dodging then
@@ -1322,18 +1625,22 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 				h1.Parent = enemyChar:FindFirstChild("HumanoidRootPart")
 				Debris:AddItem(h1, 0.1)
 
-				AnimationHandler.LoadAnim(enemyChar, "Hit", "rbxassetid://96311777205911", nil, false)
+				AnimationHandler.LoadAnim(
+					enemyChar,
+					"Hit",
+					"rbxassetid://96311777205911",
+					nil,
+					false
+				)
 				RagdollManager.Ragdoll(enemyChar, 1)
 
 				playSound(enemyChar.HumanoidRootPart, SoundFolder:FindFirstChild("OwlSlash"))
 				playSound(enemyChar.HumanoidRootPart, SoundFolder:FindFirstChild("PunchHit"))
 			end
-
 		elseif enemyState.Parrying then
 			-- PARRIED
 			RagdollManager.Ragdoll(character, 2)
 			playSound(character, ReplicatedStorage.assets.FX["parry/blocked"].parry) -- Visual/Sound for parry
-
 		elseif enemyState.Blocking then
 			-- BLOCKED. This ult's block interaction is bespoke (the attacker bounces
 			-- off / ragdolls), so we keep that, but still feed the defender's guard
@@ -1341,19 +1648,27 @@ function RacialSkills.Arach(player: Player, character: Model, mouseHit: CFrame?)
 			local GuardBarService = require(game.ServerScriptService.modules.GuardBarService)
 			if GuardBarService.AddOnBlock(enemyChar, "Skill") == false then
 				RagdollManager.Ragdoll(character, 2)
-				playSound(enemyChar.HumanoidRootPart, ReplicatedStorage.assets.sounds:FindFirstChild("Block"))
+				playSound(
+					enemyChar.HumanoidRootPart,
+					ReplicatedStorage.assets.sounds:FindFirstChild("Block")
+				)
 			end
-
 		elseif enemyState.Dodging then
 			-- DODGED
 			playSound(enemyChar.HumanoidRootPart, SoundFolder:FindFirstChild("Dodged"))
 
 			-- Transparency Effect
 			for _, part in pairs(enemyChar:GetChildren()) do
-				if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" and part.Name ~= "Head" then
+				if
+					part:IsA("BasePart")
+					and part.Name ~= "HumanoidRootPart"
+					and part.Name ~= "Head"
+				then
 					local oldTrans = part.Transparency
 					part.Transparency = 0.7
-					task.delay(0.3, function() part.Transparency = oldTrans end)
+					task.delay(0.3, function()
+						part.Transparency = oldTrans
+					end)
 				end
 			end
 
@@ -1366,7 +1681,9 @@ end
 -- Skill: Void Crunch (Guard Break)
 function RacialSkills.Maw(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
@@ -1374,11 +1691,23 @@ function RacialSkills.Maw(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
@@ -1403,7 +1732,7 @@ function RacialSkills.Maw(player: Player, character: Model)
 	local params = {
 		SizeOrPart = 6,
 		LookingFor = "Humanoid",
-		Blacklist = {character}
+		Blacklist = { character },
 	}
 
 	local hitbox = HitboxClass.new(params)
@@ -1412,7 +1741,19 @@ function RacialSkills.Maw(player: Player, character: Model)
 
 	hitbox.HitSomeone:Connect(function(hitChars)
 		-- Send GuardBreak = true
-		processHit(player, character, hitChars, hitList, 30, "Void", 20, 1, 0, nil, {GuardBreak = true})
+		processHit(
+			player,
+			character,
+			hitChars,
+			hitList,
+			30,
+			"Void",
+			20,
+			1,
+			0,
+			nil,
+			{ GuardBreak = true }
+		)
 	end)
 
 	hitbox:Start()
@@ -1429,7 +1770,9 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 	-- Identical logic to Cruor, but with Heal on attacker
 	local hrp = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid")
-	if not hrp or not hum then return end
+	if not hrp or not hum then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
@@ -1440,7 +1783,7 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 	local params = {
 		SizeOrPart = Vector3.new(6, 5, 6),
 		LookingFor = "Humanoid",
-		Blacklist = {character}
+		Blacklist = { character },
 	}
 
 	local hitbox = HitboxClass.new(params)
@@ -1453,22 +1796,36 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	task.wait(0.5)
 
 	hitbox.HitSomeone:Connect(function(hitChars)
-		if grabbed then return end
+		if grabbed then
+			return
+		end
 		for _, target in pairs(hitChars) do
 			local tHRP = target:FindFirstChild("HumanoidRootPart")
 			local tHum = target:FindFirstChild("Humanoid")
 
-			if StateHandler.GetState(target, "Dodging") then 
+			if StateHandler.GetState(target, "Dodging") then
 				local sound = ReplicatedStorage.assets.sounds.Dodged:Clone()
 				sound.Parent = tHRP
 				sound:Play()
@@ -1483,7 +1840,9 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 						if part:IsA("BasePart") and part ~= tHRP and part.Name ~= "Head" then
 							local oldTrans = part.Transparency
 							part.Transparency = 0.7
-							task.delay(0.3, function() part.Transparency = oldTrans end)
+							task.delay(0.3, function()
+								part.Transparency = oldTrans
+							end)
 						end
 					end
 				end
@@ -1493,7 +1852,13 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 			if tHRP and tHum then
 				AnimationHandler.StopAnim(character, "VampireBite", "rbxassetid://84861768973112")
 
-				AnimationHandler.LoadAnim(character, "VampGrabAnim", "rbxassetid://108023368315027", nil, false)
+				AnimationHandler.LoadAnim(
+					character,
+					"VampGrabAnim",
+					"rbxassetid://108023368315027",
+					nil,
+					false
+				)
 
 				StateHandler.SetState(character, "CantAnything", true, 1)
 				StateHandler.SetState(target, "CantAnything", true, 1.5)
@@ -1513,27 +1878,31 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 				task.wait(0.5)
 
 				-- Drain
-				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911" or "rbxassetid://111089735892609"
+				local animID = (math.random(1, 100) < 50) and "rbxassetid://96311777205911"
+					or "rbxassetid://111089735892609"
 				AnimationHandler.LoadAnim(target, "Hit", animID, nil, false)
 
 				RagdollManager.Ragdoll(target, 1)
 
 				dmgCalculator.CalculateDamage(character, target, 15, 0, false, "Racial")
 
-				playSound(target, ReplicatedStorage.assets.sounds.PunchHit) 
+				playSound(target, ReplicatedStorage.assets.sounds.PunchHit)
 
 				local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 				highlight.Parent = target
 				game.Debris:AddItem(highlight, 0.1)
 
-				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+				local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+					:Clone()
 				local torso = target:FindFirstChild("Torso") or target:FindFirstChild("UpperTorso")
 				if torso then
 					hitEff.Parent = torso
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
-							if v:IsA("ParticleEmitter") then v.Enabled = false end
+						for _, v in pairs(hitEff:GetChildren()) do
+							if v:IsA("ParticleEmitter") then
+								v.Enabled = false
+							end
 						end
 					end)
 				end
@@ -1543,13 +1912,21 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 				-- [[ SAFETY FIX ]] --
 				-- If the enemy died, destroy the weld IMMEDIATELY to prevent physics bugs dragging you down.
 				if tHum.Health <= 0 then
-					if weld then weld:Destroy() end
-					if hrp then hrp.Anchored = false end
+					if weld then
+						weld:Destroy()
+					end
+					if hrp then
+						hrp.Anchored = false
+					end
 				else
 					-- Normal release
-					task.delay(0.5, function() 
-						if weld then weld:Destroy() end 
-						if hrp then hrp.Anchored = false end
+					task.delay(0.5, function()
+						if weld then
+							weld:Destroy()
+						end
+						if hrp then
+							hrp.Anchored = false
+						end
 					end)
 				end
 
@@ -1562,7 +1939,9 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 
 	task.delay(0.2, function()
 		hitbox:Destroy()
-		if not grabbed then hrp.Anchored = false end
+		if not grabbed then
+			hrp.Anchored = false
+		end
 	end)
 end
 
@@ -1570,7 +1949,9 @@ end
 -- Skill: Jury-Rigged Bomb (RNG)
 function RacialSkills.Grob(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	AnimationHandler.LoadAnim(character, "ThrowBomb", "rbxassetid://98864333664089", nil, false)
 
@@ -1592,7 +1973,7 @@ function RacialSkills.Grob(player: Player, character: Model)
 	-- Apply Velocity to the Root Part (Since they are welded, the whole model moves)
 	local bv = Instance.new("BodyVelocity")
 	bv.Velocity = (hrp.CFrame.LookVector + Vector3.new(0, 0.5, 0)) * 50
-	bv.MaxForce = Vector3.new(1,1,1) * 10000
+	bv.MaxForce = Vector3.new(1, 1, 1) * 10000
 	bv.Parent = bombPart -- Apply force to the physical part
 
 	game.Debris:AddItem(bv, 0.3)
@@ -1601,13 +1982,18 @@ function RacialSkills.Grob(player: Player, character: Model)
 	-- Explode after 1.5s
 	task.delay(1.5, function()
 		-- Check if the MODEL exists
-		if not bombModel.Parent then return end
+		if not bombModel.Parent then
+			return
+		end
 
 		local rng = math.random(1, 100)
 		local explosionType = "Normal"
 
-		if rng <= 10 then explosionType = "Dud"
-		elseif rng <= 40 then explosionType = "Smoke" end
+		if rng <= 10 then
+			explosionType = "Dud"
+		elseif rng <= 40 then
+			explosionType = "Smoke"
+		end
 
 		if explosionType == "Dud" then
 			-- Fail
@@ -1617,8 +2003,11 @@ function RacialSkills.Grob(player: Player, character: Model)
 			playSound(bombPart, SoundFolder:FindFirstChild("Dud"))
 
 			-- Cleanup Model after a delay so they see the dud
-			task.delay(2, function() if bombModel then bombModel:Destroy() end end)
-
+			task.delay(2, function()
+				if bombModel then
+					bombModel:Destroy()
+				end
+			end)
 		elseif explosionType == "Smoke" then
 			-- Smoke Screen
 			playSound(bombPart, SoundFolder:FindFirstChild("Explosion"))
@@ -1628,7 +2017,11 @@ function RacialSkills.Grob(player: Player, character: Model)
 			smoke.Parent = bombPart
 
 			-- Destroy MODEL after smoke clears
-			task.delay(5, function() if bombModel then bombModel:Destroy() end end)
+			task.delay(5, function()
+				if bombModel then
+					bombModel:Destroy()
+				end
+			end)
 		else
 			-- Explosion
 			playSound(bombPart, SoundFolder:FindFirstChild("Explosion"))
@@ -1637,7 +2030,7 @@ function RacialSkills.Grob(player: Player, character: Model)
 				InitialPosition = bombPart.CFrame,
 				SpatialOption = "InRadius",
 				LookingFor = "Humanoid",
-				Blacklist = {character}
+				Blacklist = { character },
 			}
 			local hitbox = HitboxClass.new(params)
 			local hitList = {}
@@ -1663,7 +2056,9 @@ end
 
 function RacialSkills.Aegir(player: Player, character: Model)
 	local hrp = character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
+	if not hrp then
+		return
+	end
 
 	StateHandler.SetState(character, "CantAnything", true, 1)
 
@@ -1671,11 +2066,23 @@ function RacialSkills.Aegir(player: Player, character: Model)
 	local NewShield2 = ReplicatedStorage.assets.FX.danger:Clone()
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = character
-	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+	NewShield2.CFrame = character.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = character.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	game.TweenService:Create(NewShield2,TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut), {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
+	game.TweenService
+		:Create(
+			NewShield2,
+			TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirection.InOut),
+			{ Transparency = 1, Color = Color3.fromRGB(255, 0, 0) }
+		)
+		:Play()
 	game.Debris:AddItem(NewShield2, 0.5)
 
 	local anim = Instance.new("Animation")
@@ -1716,8 +2123,8 @@ function RacialSkills.Aegir(player: Player, character: Model)
 		SizeOrPart = Vector3.new(7, 6, 8),
 		LookingFor = "Humanoid",
 		Debug = false,
-		Blacklist = {character},
-		WeldTo = hrp
+		Blacklist = { character },
+		WeldTo = hrp,
 	}
 
 	local hitbox = HitboxClass.new(params)
@@ -1727,7 +2134,7 @@ function RacialSkills.Aegir(player: Player, character: Model)
 	local startPos = hrp.Position + (hrp.CFrame.LookVector * 5)
 	local direction = Vector3.new(0, -15, 0) -- Check 15 studs down
 	local params = RaycastParams.new()
-	params.FilterDescendantsInstances = {character} -- Ignore the player
+	params.FilterDescendantsInstances = { character } -- Ignore the player
 	params.FilterType = Enum.RaycastFilterType.Exclude
 
 	local result = workspace:Raycast(startPos, direction, params)
@@ -1743,7 +2150,6 @@ function RacialSkills.Aegir(player: Player, character: Model)
 		end
 		Debris:AddItem(slamEff, 3)
 	end
-
 
 	hitbox.HitSomeone:Connect(function(hitChars)
 		-- Knockback Up and Back

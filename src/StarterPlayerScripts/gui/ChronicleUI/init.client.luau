@@ -9,13 +9,13 @@ local weaponData = playerStats:WaitForChild("WeaponData", 10)
 
 -- [[ UI CONFIGURATION: NIER DARK STYLE ]] --
 local UI_THEME = {
-	BackgroundColor = Color3.fromRGB(15, 15, 15),    -- Dark Void
-	ItemColor = Color3.fromRGB(30, 30, 30),          -- Slightly lighter for list items
-	TextColor = Color3.fromRGB(220, 220, 220),       -- Pale White/Bone
-	BarBackground = Color3.fromRGB(60, 60, 60),      -- Dark Grey
-	BarFill = Color3.fromRGB(200, 180, 120),         -- Vellum Gold (Matches Leaderboard Accents)
-	Accent = Color3.fromRGB(200, 180, 120),          -- Gold Accent
-	Transparency = 0.6                               -- The "Glass" feel
+	BackgroundColor = Color3.fromRGB(15, 15, 15), -- Dark Void
+	ItemColor = Color3.fromRGB(30, 30, 30), -- Slightly lighter for list items
+	TextColor = Color3.fromRGB(220, 220, 220), -- Pale White/Bone
+	BarBackground = Color3.fromRGB(60, 60, 60), -- Dark Grey
+	BarFill = Color3.fromRGB(200, 180, 120), -- Vellum Gold (Matches Leaderboard Accents)
+	Accent = Color3.fromRGB(200, 180, 120), -- Gold Accent
+	Transparency = 0.6, -- The "Glass" feel
 }
 
 -- 1. CREATE THE SCREEN GUI
@@ -32,7 +32,7 @@ mainFrame.Position = UDim2.new(0.9, -175, 0.5, -225) -- Centered
 mainFrame.BackgroundColor3 = UI_THEME.BackgroundColor
 mainFrame.BackgroundTransparency = UI_THEME.Transparency
 mainFrame.BorderSizePixel = 0 -- Clean edges, no default border
-mainFrame.Visible = false 
+mainFrame.Visible = false
 mainFrame.Parent = screenGui
 
 -- Decorative Top Line (Like the Leaderboard Header)
@@ -47,7 +47,7 @@ local title = Instance.new("TextLabel")
 title.Text = "WEAPON MASTERY"
 title.Size = UDim2.new(1, 0, 0, 50)
 title.BackgroundTransparency = 1
-title.Font = Enum.Font.Fantasy 
+title.Font = Enum.Font.Fantasy
 title.TextSize = 22
 title.TextColor3 = UI_THEME.TextColor
 title.Parent = mainFrame
@@ -126,7 +126,7 @@ local function createWeaponEntry(weaponFolder)
 	barFill.Name = "Fill"
 	barFill.BackgroundColor3 = UI_THEME.BarFill
 	barFill.BorderSizePixel = 0
-	barFill.Size = UDim2.new(0, 0, 1, 0) 
+	barFill.Size = UDim2.new(0, 0, 1, 0)
 	barFill.Parent = barBg
 
 	-- XP Text Overlay (Small numbers next to bar)
@@ -156,7 +156,7 @@ local function createWeaponEntry(weaponFolder)
 		end
 
 		TweenService:Create(barFill, TweenInfo.new(0.5, Enum.EasingStyle.Quint), {
-			Size = UDim2.new(percent, 0, 1, 0)
+			Size = UDim2.new(percent, 0, 1, 0),
 		}):Play()
 	end
 
@@ -184,7 +184,9 @@ end
 
 -- Key Input
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end 
+	if gameProcessed then
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.M then
 		ToggleUI()
 	end

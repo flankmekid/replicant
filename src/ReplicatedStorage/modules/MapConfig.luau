@@ -34,8 +34,14 @@ function MapConfig.getBounds(): (number, number, number, number)
 
 	local minPart = folder:FindFirstChild(MapConfig.BOUND_MIN)
 	local maxPart = folder:FindFirstChild(MapConfig.BOUND_MAX)
-	assert(minPart and minPart:IsA("BasePart"), "[MapConfig] Missing/invalid " .. MapConfig.BOUND_MIN)
-	assert(maxPart and maxPart:IsA("BasePart"), "[MapConfig] Missing/invalid " .. MapConfig.BOUND_MAX)
+	assert(
+		minPart and minPart:IsA("BasePart"),
+		"[MapConfig] Missing/invalid " .. MapConfig.BOUND_MIN
+	)
+	assert(
+		maxPart and maxPart:IsA("BasePart"),
+		"[MapConfig] Missing/invalid " .. MapConfig.BOUND_MAX
+	)
 
 	local a = (minPart :: BasePart).Position
 	local b = (maxPart :: BasePart).Position

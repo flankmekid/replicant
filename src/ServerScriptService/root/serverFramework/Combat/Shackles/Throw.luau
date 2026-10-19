@@ -27,7 +27,7 @@ local RECOVERY_TIME = 1.5 -- Long punishment time if you miss
 local RAGDOLL_DURATION = 2.5
 -- The force applied relative to the attacker's facing direction.
 -- This tosses them Up (Y=60) and Backward (Z=-80)
-local FLING_FORCE_RELATIVE = Vector3.new(0, 15, -30) 
+local FLING_FORCE_RELATIVE = Vector3.new(0, 15, -30)
 
 local danger = RP.assets.FX.danger
 
@@ -38,22 +38,30 @@ local InfoTween = TweenInfo.new(0.1, Enum.EasingStyle.Cubic, Enum.EasingDirectio
 
 local hitboxParams = {
 	-- VERY SMALL HITBOX
-	SizeOrPart = Vector3.new(3, 4, 3), 
-	SpatialOption = ("InBox"),
-	Debug = false, 
+	SizeOrPart = Vector3.new(3, 4, 3),
+	SpatialOption = "InBox",
+	Debug = false,
 	-- Debounce isn't strictly needed as we destroy on first hit, but good practice
-	DebounceTime = 0.5, 
+	DebounceTime = 0.5,
 } :: HitboxTypes.HitboxParams
 
 local playerThrowDebounces = {}
 
 function module.ServerCheck(plr)
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
+	if
+		not char
+		or not char:FindFirstChild("HumanoidRootPart")
+		or not char:FindFirstChild("Humanoid")
+	then
+		return
+	end
 
 	local function getEquippedTool()
 		local currentCharacter = plr.Character
-		if not currentCharacter then return nil end
+		if not currentCharacter then
+			return nil
+		end
 
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
@@ -66,13 +74,15 @@ function module.ServerCheck(plr)
 
 	-- 1. Busy Check
 	local isBusy = false
-	if playerThrowDebounces[plr] or
-		StateHandler.GetState(char, "M1") or
-		StateHandler.GetState(char, "M2") or
-		StateHandler.GetState(char, "CantAnything") or 
-		StateHandler.GetState(char, "Sliding") or 
-		StateHandler.GetState(char, "Stunned") or 
-		StateHandler.GetState(char, "Dodging") then
+	if
+		playerThrowDebounces[plr]
+		or StateHandler.GetState(char, "M1")
+		or StateHandler.GetState(char, "M2")
+		or StateHandler.GetState(char, "CantAnything")
+		or StateHandler.GetState(char, "Sliding")
+		or StateHandler.GetState(char, "Stunned")
+		or StateHandler.GetState(char, "Dodging")
+	then
 		isBusy = true
 	end
 
@@ -80,10 +90,11 @@ function module.ServerCheck(plr)
 		-- Optional: Fire "Declined" back to client
 		return
 	end
-	
+
 	-- FX handling
-local NewShield2 = danger:Clone()
-	game.Debris:AddItem(NewShield2, 1)	local WeldCon = Instance.new("WeldConstraint", NewShield2)
+	local NewShield2 = danger:Clone()
+	game.Debris:AddItem(NewShield2, 1)
+	local WeldCon = Instance.new("WeldConstraint", NewShield2)
 	NewShield2.Parent = char
 	v[plr] = NewShield2
 	local parrysfx = Instance.new("Sound")
@@ -93,13 +104,17 @@ local NewShield2 = danger:Clone()
 	parrysfx.RollOffMaxDistance = 60
 	parrysfx.RollOffMinDistance = 10
 	parrysfx.RollOffMode = Enum.RollOffMode.Inverse
-	
-	NewShield2.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0,5,0)
+
+	NewShield2.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
 	WeldCon.Part0 = char.HumanoidRootPart
 	WeldCon.Part1 = NewShield2
-	
-	TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
-	TweenService:Create(NewShield2,InfoTween, {Transparency = 1, Color = Color3.fromRGB(255, 0, 0);}):Play()
+
+	TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
+	TweenService
+		:Create(NewShield2, InfoTween, { Transparency = 1, Color = Color3.fromRGB(255, 0, 0) })
+		:Play()
 	parrysfx:Play()
 	task.delay(0.1, function()
 		local BV = Instance.new("BodyVelocity", char.HumanoidRootPart)
@@ -114,13 +129,13 @@ local NewShield2 = danger:Clone()
 			v[plr] = nil
 		end
 	end)
-	
+
 	Helper.SetSpeed(char, 2, 16)
 
 	-- EXECUTION START
 	playerThrowDebounces[plr] = true
 
-	-- Set state to Attacking immediately. The duration is initially set to 
+	-- Set state to Attacking immediately. The duration is initially set to
 	-- cover the active frames + recovery. It will be shortened if a hit occurs.
 	StateHandler.SetState(char, "Attacking", true, ACTIVE_FRAMES + RECOVERY_TIME)
 	-- Also set CantAnything so they can't move during the attempt
@@ -128,35 +143,41 @@ local NewShield2 = danger:Clone()
 
 	local humrp = char.HumanoidRootPart
 	local Hitbox, connected = HitboxClass.new(hitboxParams)
-	
+
 	task.wait(0.2)
 	-- Weld very close in front of the player
-	Hitbox:WeldTo(humrp, CFrame.new(0, 0, -2.5)) 
+	Hitbox:WeldTo(humrp, CFrame.new(0, 0, -2.5))
 	Hitbox:Start()
 
 	local hasHit = false
 
 	Hitbox.HitSomeone:Connect(function(hitCharsTable)
-		if hasHit then return end -- Throws only grab one person
+		if hasHit then
+			return
+		end -- Throws only grab one person
 
 		for _, hit in pairs(hitCharsTable) do
 			local targetHum = hit:FindFirstChild("Humanoid")
 			local targetChar = targetHum and targetHum.Parent
-			if not targetChar or targetChar == char then continue end
+			if not targetChar or targetChar == char then
+				continue
+			end
 
 			local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-			if not targetHRP then continue end
+			if not targetHRP then
+				continue
+			end
 
 			-- FIGHTING GAME CHECKS:
 			-- 1. Can they be grabbed? (Not iframed/dodging)
-			if StateHandler.GetState(targetChar, "Dodging") then 
+			if StateHandler.GetState(targetChar, "Dodging") then
 				print("iframed lawl :p")
-					
-					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
-					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
-						targetPlrData.Mana.Value += 8
-					end
+
+				local _tp = game.Players:GetPlayerFromCharacter(targetChar)
+				local targetPlrData = _tp and _tp.PlayerStats
+				if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					targetPlrData.Mana.Value += 8
+				end
 
 				local sound = RP.assets.sounds.Dodged:Clone()
 				sound.Parent = targetHRP
@@ -169,7 +190,12 @@ local NewShield2 = danger:Clone()
 
 				if targetChar.Torso then
 					for _, part in pairs(targetChar:GetChildren()) do
-						if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+						if
+							part:IsA("BasePart")
+							and part ~= targetHRP
+							and part.Name ~= "Head"
+							and part.Name ~= "Left Arm"
+						then
 							part.Transparency = 0.7
 							task.delay(0.3, function()
 								part.Transparency = 0
@@ -181,12 +207,17 @@ local NewShield2 = danger:Clone()
 				return
 			end
 			-- 2. Are they already being thrown or deeply stunned? (Prevent infinite throw loops)
-			if StateHandler.GetState(targetChar, "BeingThrown") or StateHandler.GetState(targetChar, "Stunned") then continue end
+			if
+				StateHandler.GetState(targetChar, "BeingThrown")
+				or StateHandler.GetState(targetChar, "Stunned")
+			then
+				continue
+			end
 
 			-- SUCCESSFUL THROW!
 			hasHit = true
 			Hitbox:Destroy() -- Stop hitbox immediately
-			
+
 			Helper.ResetSpeed(char)
 
 			-- A. Update Attacker State (Shorten recovery on success)
@@ -194,14 +225,14 @@ local NewShield2 = danger:Clone()
 			StateHandler.SetState(char, "M1", true, 1)
 			StateHandler.SetState(char, "CantAnything", true, 1)
 			-- Play success animation on attacker, overwriting the whiff animation
-			
+
 			--AnimationHandler.LoadAnim(char, "Action", ANIM_ATTACKER_SUCCESS, nil, false)
 
 			-- B. Update Victim State
 			-- Set a specific state so they can't be grabbed again immediately
-			StateHandler.SetState(targetChar, "BeingThrown", true, 1) 
+			StateHandler.SetState(targetChar, "BeingThrown", true, 1)
 			-- Hard stun them so they can't act while being thrown
-			StateHandler.SetStun(targetChar, true, 1.5, 0) 
+			StateHandler.SetStun(targetChar, true, 1.5, 0)
 			-- Play being thrown animation
 			AnimationHandler.LoadAnim(targetChar, "Reaction", ANIM_VICTIM_THROWN, nil, false)
 
@@ -210,7 +241,10 @@ local NewShield2 = danger:Clone()
 
 			-- C. Replicate Effects
 			ReplicateRemote:FireAllClients({
-				Type = "Combat", Action = "Throw", Func = "ExecuteEffect", FolderName = getEquippedTool()
+				Type = "Combat",
+				Action = "Throw",
+				Func = "ExecuteEffect",
+				FolderName = getEquippedTool(),
 			}, char, "Hit")
 
 			-- D. Apply Physics (Fling & Ragdoll)
@@ -223,7 +257,7 @@ local NewShield2 = danger:Clone()
 					-- This converts the relative vector (Up and Back) into world space based on where the attacker is looking
 					local flingVelocityWorld = humrp.CFrame:VectorToWorldSpace(FLING_FORCE_RELATIVE)
 
-					-- Apply velocity. We use a generic BodyVelocity approach here. 
+					-- Apply velocity. We use a generic BodyVelocity approach here.
 					-- If your HelperModule has a specific velocity setter, use that instead.
 					local bv = Instance.new("BodyVelocity")
 					bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
@@ -245,7 +279,10 @@ local NewShield2 = danger:Clone()
 			Hitbox:Destroy()
 			-- Replicate whiff sound/effect
 			ReplicateRemote:FireAllClients({
-				Type = "Combat", Action = "Throw", Func = "ExecuteEffect", FolderName = getEquippedTool()
+				Type = "Combat",
+				Action = "Throw",
+				Func = "ExecuteEffect",
+				FolderName = getEquippedTool(),
 			}, char, "Whiff")
 			-- The Attacking/CantAnything states will naturally expire after RECOVERY_TIME
 			-- because we set them for (ACTIVE_FRAMES + RECOVERY_TIME) initially.

@@ -2,14 +2,14 @@
 -- Location: ServerScriptService
 -- Handles attunement saving and teleportation.
 
-local Players             = game:GetService("Players")
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local SpireConfig  = require(ReplicatedStorage.SpireSystem.SpireConfig)
-local DataManager  = require(ServerScriptService.modules.dataManager)
-local SpireRemote  = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
-local SpireUpdate  = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
+local SpireConfig = require(ReplicatedStorage.SpireSystem.SpireConfig)
+local DataManager = require(ServerScriptService.modules.dataManager)
+local SpireRemote = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
+local SpireUpdate = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
 local StateHandler = require(ReplicatedStorage.modules:WaitForChild("stateHandler"))
 
 -- Forward-declared so the rest helpers below can reference it.
@@ -22,14 +22,20 @@ local restingPlayers = {}
 -- Restore HP + Mana to full (matches the spawn-time full-restore pattern).
 local function fullRestore(player)
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 	local hum = character:FindFirstChild("Humanoid")
-	if hum and hum.Health > 0 then hum.Health = hum.MaxHealth end
+	if hum and hum.Health > 0 then
+		hum.Health = hum.MaxHealth
+	end
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
 		local mana = stats:FindFirstChild("Mana")
 		local maxMana = stats:FindFirstChild("MaxMana")
-		if mana and maxMana then mana.Value = maxMana.Value end
+		if mana and maxMana then
+			mana.Value = maxMana.Value
+		end
 	end
 end
 
@@ -37,25 +43,32 @@ end
 -- noPVP, heal to full. Server-authoritative; refuses if in combat.
 local function beginRest(player, spireId)
 	local spireDef = getSpireDef(spireId)
-	if not spireDef then return false, "Invalid Spire." end
+	if not spireDef then
+		return false, "Invalid Spire."
+	end
 	if not DataManager.IsAttuned(player, spireId) then
 		return false, "You are not attuned to that Spire."
 	end
 
 	local character = player.Character
-	if not character then return false, "Character not found." end
+	if not character then
+		return false, "Character not found."
+	end
 	if character:GetAttribute("InCombat") then
 		return false, "You cannot rest while in combat."
 	end
 
 	local root = character:FindFirstChild("HumanoidRootPart")
 	local hum = character:FindFirstChild("Humanoid")
-	if not root or not hum or hum.Health <= 0 then return false, "Character not ready." end
+	if not root or not hum or hum.Health <= 0 then
+		return false, "Character not ready."
+	end
 
 	-- Must be on the ground to rest. Airborne states (jumping, mid-fall, ragdolled)
 	-- are refused so you cannot rest off a ledge / mid-jump / while knocked around.
 	local restHumState = hum:GetState()
-	if restHumState == Enum.HumanoidStateType.Jumping
+	if
+		restHumState == Enum.HumanoidStateType.Jumping
 		or restHumState == Enum.HumanoidStateType.Freefall
 		or restHumState == Enum.HumanoidStateType.FallingDown
 		or restHumState == Enum.HumanoidStateType.Ragdoll
@@ -82,17 +95,23 @@ end
 
 -- End resting: unlock, restore to the alive folder (which re-runs applyStats).
 local function endRest(player)
-	if not restingPlayers[player] then return end
+	if not restingPlayers[player] then
+		return
+	end
 	restingPlayers[player] = nil
 
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 	local root = character:FindFirstChild("HumanoidRootPart")
 
 	-- Clear the rest lock BEFORE moving back to alive, so applyStats runs clean.
 	StateHandler.RemoveStates(character, "CantAnything")
 	StateHandler.RemoveStates(character, "Resting")
-	if root then root.Anchored = false end
+	if root then
+		root.Anchored = false
+	end
 
 	if workspace:FindFirstChild("plrManager") and workspace.plrManager:FindFirstChild("alive") then
 		character.Parent = workspace.plrManager.alive
@@ -107,7 +126,9 @@ end)
 -- [[ VALIDATE SPIRE ID ]]
 getSpireDef = function(spireId)
 	for _, s in ipairs(SpireConfig.Spires) do
-		if s.Id == spireId then return s end
+		if s.Id == spireId then
+			return s
+		end
 	end
 	return nil
 end
@@ -125,7 +146,8 @@ local function teleportToSpire(player, spireId)
 
 	local success = DataManager.RemoveLiturgy(player, SpireConfig.TeleportCost)
 	if not success then
-		return false, "Not enough Liturgy. Teleportation costs " .. SpireConfig.TeleportCost .. " L."
+		return false,
+			"Not enough Liturgy. Teleportation costs " .. SpireConfig.TeleportCost .. " L."
 	end
 
 	local targetPart = workspace:FindFirstChild(spireDef.PartName, true)
@@ -139,7 +161,7 @@ local function teleportToSpire(player, spireId)
 		DataManager.AddLiturgy(player, SpireConfig.TeleportCost)
 		return false, "Character not found."
 	end
-	
+
 	if character:GetAttribute("InCombat") then
 		DataManager.AddLiturgy(player, SpireConfig.TeleportCost)
 		return false, "You cannot teleport while in combat."
@@ -174,7 +196,9 @@ end)
 -- [[ REMOTE HANDLER ]]
 SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 	if action == "Attune" then
-		if not getSpireDef(spireId) then return end
+		if not getSpireDef(spireId) then
+			return
+		end
 		local wasNew = DataManager.AddAttuned(player, spireId)
 		if wasNew then
 			print(player.Name .. " attuned to: " .. spireId)
@@ -187,10 +211,11 @@ SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 		else
 			-- Still tell the client about a brand-new attunement for the toast/effect,
 			-- even if resting was refused (e.g. in combat).
-			if wasNew then SpireUpdate:FireClient(player, "Attuned", spireId) end
+			if wasNew then
+				SpireUpdate:FireClient(player, "Attuned", spireId)
+			end
 			SpireUpdate:FireClient(player, "RestFailed", err)
 		end
-
 	elseif action == "Rest" then
 		local ok, err = beginRest(player, spireId)
 		if ok then
@@ -198,11 +223,9 @@ SpireRemote.OnServerEvent:Connect(function(player, action, spireId)
 		else
 			SpireUpdate:FireClient(player, "RestFailed", err)
 		end
-
 	elseif action == "EndRest" then
 		endRest(player)
 		SpireUpdate:FireClient(player, "RestEnded")
-
 	elseif action == "Teleport" then
 		-- Teleport between spires from within the rest menu. Set the destination
 		-- position first (works while anchored), then end the rest so the player
@@ -235,7 +258,11 @@ local function statSnapshot(player, ok, reason, extra)
 		maxSkillPoints = require(ReplicatedStorage.modules.StatScaling).MAX_SKILL_POINTS,
 		nextCost = DataManager.GetNextSkillPointCost(player),
 	}
-	if extra then for k, v in pairs(extra) do snap[k] = v end end
+	if extra then
+		for k, v in pairs(extra) do
+			snap[k] = v
+		end
+	end
 	return snap
 end
 
@@ -249,17 +276,14 @@ StatAction.OnServerInvoke = function(player, action, statName)
 		-- Buy one skill point with Liturgy (rising curve, capped at 150).
 		local ok, costOrReason = DataManager.BuySkillPoint(player)
 		return statSnapshot(player, ok, costOrReason, { cost = ok and costOrReason or nil })
-
 	elseif action == "Assign" then
 		-- Assign one available skill point to a stat (free, 1:1).
 		local ok, reason = DataManager.AssignStatPoint(player, statName)
 		return statSnapshot(player, ok, reason)
-
 	elseif action == "Respec" then
 		-- Free all assigned points back to the pool (no Liturgy involved).
 		local ok, reason = DataManager.RespecStats(player)
 		return statSnapshot(player, ok, reason)
-
 	elseif action == "Query" then
 		return statSnapshot(player, true, nil)
 	end
@@ -307,7 +331,9 @@ local ArmorAction = ReplicatedStorage.SpireSystem:WaitForChild("ArmorAction")
 
 -- Swap the character's shirt/pants to a given armor's clothing (visual only).
 local function applyArmorVisuals(character, armorName)
-	if not character then return end
+	if not character then
+		return
+	end
 	local data = ArmorConfig.Armors[armorName] or ArmorConfig.Armors["Rags"]
 	local shirt = character:FindFirstChildOfClass("Shirt")
 	if not shirt then
@@ -329,13 +355,23 @@ end
 -- .Changed listeners in mainGameHandler recompute HP/attributes live.
 local function applyArmorStats(player, armorName)
 	local stats = player:FindFirstChild("PlayerStats")
-	if not stats then return end
+	if not stats then
+		return
+	end
 	local buffs = stats:FindFirstChild("ArmorBuffs")
-	if not buffs then return end
+	if not buffs then
+		return
+	end
 	local data = ArmorConfig.Armors[armorName] or ArmorConfig.Armors["Rags"]
-	if buffs:FindFirstChild("HPBuff") then buffs.HPBuff.Value = data.HPBuff end
-	if buffs:FindFirstChild("DefenseBuff") then buffs.DefenseBuff.Value = data.DefBuff end
-	if buffs:FindFirstChild("DamageBuff") then buffs.DamageBuff.Value = data.DmgBuff end
+	if buffs:FindFirstChild("HPBuff") then
+		buffs.HPBuff.Value = data.HPBuff
+	end
+	if buffs:FindFirstChild("DefenseBuff") then
+		buffs.DefenseBuff.Value = data.DefBuff
+	end
+	if buffs:FindFirstChild("DamageBuff") then
+		buffs.DamageBuff.Value = data.DmgBuff
+	end
 end
 
 -- Read-only snapshot: owned armor names + their config stats, plus the current
@@ -351,8 +387,11 @@ local function armorSnapshot(player, ok, reason)
 				table.insert(owned, name)
 				armors[name] = {
 					DisplayName = cfg.DisplayName or name,
-					HPBuff = cfg.HPBuff, DefBuff = cfg.DefBuff, DmgBuff = cfg.DmgBuff,
-					ShirtID = cfg.ShirtID, PantsID = cfg.PantsID,
+					HPBuff = cfg.HPBuff,
+					DefBuff = cfg.DefBuff,
+					DmgBuff = cfg.DmgBuff,
+					ShirtID = cfg.ShirtID,
+					PantsID = cfg.PantsID,
 				}
 			end
 		end
@@ -374,7 +413,6 @@ ArmorAction.OnServerInvoke = function(player, action, armorName)
 
 	if action == "Query" then
 		return armorSnapshot(player, true, nil)
-
 	elseif action == "Equip" then
 		if type(armorName) ~= "string" or not DataManager.OwnsArmor(player, armorName) then
 			return { ok = false, reason = "NotOwned" }
@@ -385,7 +423,6 @@ ArmorAction.OnServerInvoke = function(player, action, armorName)
 		applyArmorVisuals(player.Character, armorName)
 		applyArmorStats(player, armorName)
 		return armorSnapshot(player, true, nil)
-
 	elseif action == "Transmog" then
 		if type(armorName) ~= "string" or not DataManager.OwnsArmor(player, armorName) then
 			return { ok = false, reason = "NotOwned" }

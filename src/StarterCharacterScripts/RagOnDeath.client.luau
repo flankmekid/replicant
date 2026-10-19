@@ -1,14 +1,12 @@
-
 local player = game.Players.LocalPlayer
 local Remote = game.ReplicatedStorage.remotes:WaitForChild("Ragdoll")
 local Char = player.Character or player.CharacterAdded:Wait()
 local Hum = Char:WaitForChild("Humanoid")
 local Root = Char:WaitForChild("HumanoidRootPart")
 
-
 Remote.OnClientEvent:Connect(function(duration)
 	if Hum.Health > 0 then
-		Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp,false)
+		Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
 		Hum:ChangeState(Enum.HumanoidStateType.Physics)
 		Hum.AutoRotate = false
 
@@ -20,12 +18,16 @@ Remote.OnClientEvent:Connect(function(duration)
 		-- them up. The server cannot cancel a task.delay living on the client, so
 		-- the check has to happen here, at fire time, not at schedule time.
 		if duration then
-			task.delay(duration,function()
-				if Char:GetAttribute("Downed") then return end
-				if Hum.Health <= 0 then return end
-				Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp,true)
+			task.delay(duration, function()
+				if Char:GetAttribute("Downed") then
+					return
+				end
+				if Hum.Health <= 0 then
+					return
+				end
+				Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
 				Hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-				Hum:SetStateEnabled(Enum.HumanoidStateType.Physics,false)
+				Hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
 				Hum.AutoRotate = true
 			end)
 		end
@@ -33,20 +35,18 @@ Remote.OnClientEvent:Connect(function(duration)
 end)
 
 game.ReplicatedStorage.remotes.RagdollForce.OnClientEvent:Connect(function()
-
-	local Force = Instance.new("LinearVelocity",Root:FindFirstChild("ForceAttachment"))
+	local Force = Instance.new("LinearVelocity", Root:FindFirstChild("ForceAttachment"))
 	Force.Attachment0 = Root:FindFirstAncestor("ForceAttachment")
 	Force.RelativeTo = Enum.ActuatorRelativeTo.World
 	Force.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
 	Force.MaxForce = math.huge
 	Force.VectorVelocity = Root.CFrame.LookVector * 5
 	Force.Enabled = true
-	game.Debris:AddItem(Force,0.1)	
-
+	game.Debris:AddItem(Force, 0.1)
 end)
 
 Hum.Died:Connect(function()
-    game.ReplicatedStorage.remotes.OnDeath:FireServer(Char)	 
+	game.ReplicatedStorage.remotes.OnDeath:FireServer(Char)
 end)
 
 Char:GetAttributeChangedSignal("Ragdolled"):Connect(function()
@@ -57,5 +57,3 @@ Char:GetAttributeChangedSignal("Ragdolled"):Connect(function()
 		Hum.AutoRotate = true
 	end
 end)
-
-

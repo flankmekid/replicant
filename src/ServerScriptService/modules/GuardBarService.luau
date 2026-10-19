@@ -25,8 +25,8 @@ local GuardBarService = {}
 -- ------------------------------------------------------------------ tuning ----
 local MAX = 100
 local BLOCK_BREAK_ANIM = "rbxassetid://131056155810963"
-local BLOCK_BREAK_DURATION = 1.0     -- hard stun + CantAnything lockout on break
-local BLOCK_BREAK_STUNSPEED = 2      -- WalkSpeed while guard-broken
+local BLOCK_BREAK_DURATION = 1.0 -- hard stun + CantAnything lockout on break
+local BLOCK_BREAK_STUNSPEED = 2 -- WalkSpeed while guard-broken
 
 -- After the stun ends, the guard is still "recovering": the bar sits full at the
 -- moment of break and drains full -> empty over this window, during which the
@@ -45,8 +45,8 @@ local FILL = {
 }
 
 -- Drain applied when the guarding player does something that relieves pressure.
-local DRAIN_ON_PARRY = 40   -- a successful parry
-local DRAIN_ON_HIT   = 12   -- landing your own hit while the bar is up
+local DRAIN_ON_PARRY = 40 -- a successful parry
+local DRAIN_ON_HIT = 12 -- landing your own hit while the bar is up
 
 -- Passive regen: after REGEN_DELAY seconds without taking a blocked hit, the bar
 -- bleeds down at REGEN_RATE/sec.
@@ -54,8 +54,8 @@ local REGEN_RATE = 8
 local REGEN_DELAY = 3
 
 -- ------------------------------------------------------------------ state -----
-local lastFillClock = {}   -- [char] = os.clock() of last fill, for regen gating
-local recoveryToken = {}   -- [char] = incrementing id, cancels stale break recoveries
+local lastFillClock = {} -- [char] = os.clock() of last fill, for regen gating
+local recoveryToken = {} -- [char] = incrementing id, cancels stale break recoveries
 
 local function get(char)
 	return char:GetAttribute("GuardBar") or 0
@@ -73,7 +73,9 @@ GuardBarService.MAX = MAX
 -- Call on spawn (mainGameHandler.HandleCharacterLoad). Establishes the attribute
 -- so the controller can read it and the regen loop will service this character.
 function GuardBarService.Init(char)
-	if not char then return end
+	if not char then
+		return
+	end
 	set(char, 0)
 	char:SetAttribute("GuardBroken", false)
 	recoveryToken[char] = nil
@@ -89,11 +91,15 @@ end
 -- Semantics (locked with author): break fires the moment the fill REACHES max
 -- (no grace hit). Returns true if this hit triggered a guard break.
 function GuardBarService.AddOnBlock(char, attackClass)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	lastFillClock[char] = os.clock()
 
 	-- Already recovering from a break: ignore (they shouldn't be blocking anyway).
-	if GuardBarService.IsGuardBroken(char) then return false end
+	if GuardBarService.IsGuardBroken(char) then
+		return false
+	end
 
 	local amount = FILL[attackClass] or FILL.Default
 	local cur = get(char)
@@ -107,7 +113,9 @@ function GuardBarService.AddOnBlock(char, attackClass)
 end
 
 function GuardBarService.Drain(char, amount)
-	if not char then return end
+	if not char then
+		return
+	end
 	set(char, get(char) - amount)
 end
 
@@ -124,7 +132,9 @@ end
 -- then leaves the bar FULL and drains it full -> empty over GUARD_RECOVERY_DURATION.
 -- Blocking is disabled for the whole recovery (see IsGuardBroken).
 function GuardBarService.Break(char)
-	if not char then return end
+	if not char then
+		return
+	end
 
 	StateHandler.RemoveStates(char, "Blocking")
 	StateHandler.SetStun(char, true, BLOCK_BREAK_DURATION, BLOCK_BREAK_STUNSPEED)
@@ -140,14 +150,16 @@ function GuardBarService.Break(char)
 	-- and against the char respawning mid-drain.
 	local token = (recoveryToken[char] or 0) + 1
 	recoveryToken[char] = token
-	lastFillClock[char] = nil   -- recovery owns the drain; keep passive regen off it
+	lastFillClock[char] = nil -- recovery owns the drain; keep passive regen off it
 
 	task.spawn(function()
 		local elapsed = 0
 		while elapsed < GUARD_RECOVERY_DURATION do
 			local dt = task.wait()
 			-- Bail if superseded (re-break) or the char is gone.
-			if recoveryToken[char] ~= token then return end
+			if recoveryToken[char] ~= token then
+				return
+			end
 			if not char.Parent then
 				recoveryToken[char] = nil
 				return
@@ -156,7 +168,9 @@ function GuardBarService.Break(char)
 			local ratio = math.clamp(1 - elapsed / GUARD_RECOVERY_DURATION, 0, 1)
 			set(char, MAX * ratio)
 		end
-		if recoveryToken[char] ~= token then return end
+		if recoveryToken[char] ~= token then
+			return
+		end
 		set(char, 0)
 		char:SetAttribute("GuardBroken", false)
 		recoveryToken[char] = nil
@@ -168,7 +182,11 @@ RunService.Heartbeat:Connect(function(dt)
 	for _, plr in ipairs(Players:GetPlayers()) do
 		local char = plr.Character
 		-- Skip broken chars: the recovery drain owns their bar for the window.
-		if char and char:GetAttribute("GuardBar") ~= nil and not GuardBarService.IsGuardBroken(char) then
+		if
+			char
+			and char:GetAttribute("GuardBar") ~= nil
+			and not GuardBarService.IsGuardBroken(char)
+		then
 			local v = get(char)
 			if v > 0 then
 				local last = lastFillClock[char]

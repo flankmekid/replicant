@@ -21,7 +21,9 @@ local canAttack = true
 
 local function getEquippedTool()
 	local currentCharacter = plr.Character
-	if not currentCharacter then return nil end
+	if not currentCharacter then
+		return nil
+	end
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
@@ -30,7 +32,9 @@ local function getEquippedTool()
 end
 
 local function resolveSound(path)
-	if not path then return nil end
+	if not path then
+		return nil
+	end
 	local node = Sounds
 	for part in path:gmatch("[^.]+") do
 		node = node and node:FindFirstChild(part)
@@ -48,7 +52,7 @@ local function soundsFor(char)
 end
 
 local function dashEff()
-	for _,v in pairs(plr.Character:GetChildren()) do
+	for _, v in pairs(plr.Character:GetChildren()) do
 		if v:IsA("BasePart") then
 			if v.Transparency ~= 1 then
 				local part = Instance.new("Part")
@@ -79,23 +83,51 @@ function module.OnEActivated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
 	local weapon = getEquippedTool()
-	if not weapon then return end
+	if not weapon then
+		return
+	end
 	local cfg = WeaponConfig[weapon]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	local e = cfg.client.e
-	if e.custom then return end -- custom throw weapons run their own E module
+	if e.custom then
+		return
+	end -- custom throw weapons run their own E module
 
-	if InputGate.IsLocked() then return end
-	if not canAttack then return end
-	if char:GetAttribute("CantAnything") then return end
-	if char:GetAttribute("Stunned") then return end
-	if char:GetAttribute("Blocking") then return end
-	if char:GetAttribute("Parrying") then return end
-	if char:GetAttribute("Dodging") then return end
-	if char:GetAttribute("M1") then return end
-	if char:GetAttribute("M2") then return end
-	if char:GetAttribute("Carried") then return end
-	if char:GetAttribute("Downed") then return end
+	if InputGate.IsLocked() then
+		return
+	end
+	if not canAttack then
+		return
+	end
+	if char:GetAttribute("CantAnything") then
+		return
+	end
+	if char:GetAttribute("Stunned") then
+		return
+	end
+	if char:GetAttribute("Blocking") then
+		return
+	end
+	if char:GetAttribute("Parrying") then
+		return
+	end
+	if char:GetAttribute("Dodging") then
+		return
+	end
+	if char:GetAttribute("M1") then
+		return
+	end
+	if char:GetAttribute("M2") then
+		return
+	end
+	if char:GetAttribute("Carried") then
+		return
+	end
+	if char:GetAttribute("Downed") then
+		return
+	end
 	canAttack = false
 	InputGate.Lock(cfg.server.e.windup + 0.2)
 	CooldownTracker.Register(e.cdKey, e.cdTag, e.cdTime)
@@ -103,7 +135,12 @@ function module.OnEActivated()
 	animationHndlr.StopAnim(char, "ALL")
 	animationHndlr.LoadAnim(char, "M1", e.animID, nil, false, e.eAnimSpeed)
 
-	ServerRemote:FireServer({Type = "Combat", Action = "E", Func = "ServerCheck", CombatType = weapon})
+	ServerRemote:FireServer({
+		Type = "Combat",
+		Action = "E",
+		Func = "ServerCheck",
+		CombatType = weapon,
+	})
 
 	task.wait(e.eWindupWait)
 
@@ -145,8 +182,12 @@ end
 
 module.Hitstop = function(ochar, echar)
 	-- freeze both attacker and victim animations on impact (client-side feel)
-	if ochar then animationHndlr.Hitstop(ochar, 0.12) end
-	if echar then animationHndlr.Hitstop(echar, 0.12) end
+	if ochar then
+		animationHndlr.Hitstop(ochar, 0.12)
+	end
+	if echar then
+		animationHndlr.Hitstop(echar, 0.12)
+	end
 end
 
 module.Swing = function(ochar)
@@ -170,7 +211,7 @@ module.Hit = function(ochar, echar)
 	end
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Blocked = function(ochar, echar)
@@ -179,7 +220,7 @@ module.Blocked = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.BlockFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.Parry = function(ochar, echar)
@@ -188,7 +229,7 @@ module.Parry = function(ochar, echar)
 	s:Play()
 	local hitFX = RP.assets.FX.ParryFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 module.GB = function(ochar, echar)
@@ -201,7 +242,7 @@ module.GB = function(ochar, echar)
 	end
 	local hitFX = RP.assets.FX.HitFX.Attachment:Clone()
 	hitFX.Parent = echar:FindFirstChild("Torso")
-	Debris:AddItem(hitFX, .5)
+	Debris:AddItem(hitFX, 0.5)
 end
 
 plr.CharacterAdded:Connect(function()

@@ -13,7 +13,7 @@ local AnimationHandler = require(RP.modules.animationHandler)
 
 function module.Equip(plr)
 	local char = plr.Character
-	
+
 	if StateHandler.GetState(char, "Equip") then
 		StateHandler.SetState(char, "Equip", false, 999999999)
 		print("unequipped")

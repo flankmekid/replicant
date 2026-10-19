@@ -38,10 +38,14 @@ local hovered = {}
 -- a hovered button only counts if it's actually on screen: itself visible,
 -- every GuiObject ancestor visible, and its ScreenGui still enabled.
 local function isOnScreen(button)
-	if not button.Parent then return false end
+	if not button.Parent then
+		return false
+	end
 	local inst = button
 	while inst and not inst:IsA("ScreenGui") do
-		if inst:IsA("GuiObject") and not inst.Visible then return false end
+		if inst:IsA("GuiObject") and not inst.Visible then
+			return false
+		end
 		inst = inst.Parent
 	end
 	if inst and inst:IsA("ScreenGui") then

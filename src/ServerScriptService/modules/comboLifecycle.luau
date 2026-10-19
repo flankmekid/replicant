@@ -19,13 +19,17 @@ end
 
 local function setActive(plr, tag, value)
 	if value then
-		if not active[plr] then active[plr] = {} end
+		if not active[plr] then
+			active[plr] = {}
+		end
 		active[plr][tag] = true
 	else
 		local t = active[plr]
 		if t then
 			t[tag] = nil
-			if next(t) == nil then active[plr] = nil end
+			if next(t) == nil then
+				active[plr] = nil
+			end
 		end
 	end
 end
@@ -55,7 +59,9 @@ function Lifecycle.Run(plr, opts)
 	local ctx = { plr = plr, char = char }
 	local cleaned = false
 	local function cleanup()
-		if cleaned then return end
+		if cleaned then
+			return
+		end
 		cleaned = true
 		setActive(plr, opts.tag, false)
 		if opts.onCleanup then

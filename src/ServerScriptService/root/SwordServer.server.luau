@@ -1,4 +1,4 @@
-game.Players.PlayerAdded:Connect(function(plr)          
+game.Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function(char)
 		local M6D = Instance.new("Motor6D")
 		M6D.Name = "ToolGrip"

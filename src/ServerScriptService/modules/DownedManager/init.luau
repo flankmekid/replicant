@@ -9,32 +9,32 @@ local RagdollManager = require(ServerScriptService.modules.ragdollManager)
 local SpeedService = require(ServerScriptService.modules.SpeedService)
 
 local DownedManager = {}
-local DownedData = {} 
+local DownedData = {}
 
 -- forward declarations: defined below, used by StopCarrying above their definition
 local pinDown
 local unpin
-local ActiveCarryTracks = {} 
+local ActiveCarryTracks = {}
 local ActiveCarriedTracks = {}
-local ActiveExecuteTracks = {} 
+local ActiveExecuteTracks = {}
 
 -- [[ CONFIGURATION ]] --
-local DOWNED_THRESHOLD_PCT = 0.01 
+local DOWNED_THRESHOLD_PCT = 0.01
 local REVIVE_TIMER = 30
-local REVIVE_HP_PCT = 0.30 
+local REVIVE_HP_PCT = 0.30
 local EXECUTE_RANGE = 5
-local CARRY_OFFSET = Vector3.new(2, 2, 0) 
+local CARRY_OFFSET = Vector3.new(2, 2, 0)
 
 -- [[ HELPER: STOP CARRYING ]] --
 local function StopCarrying(carrierChar, victimChar)
 	if ActiveCarryTracks[carrierChar] then
 		ActiveCarryTracks[carrierChar]:Stop()
-		ActiveCarryTracks[carrierChar] = nil 
+		ActiveCarryTracks[carrierChar] = nil
 	end
 
 	if ActiveCarriedTracks[victimChar] then
 		ActiveCarriedTracks[victimChar]:Stop()
-		ActiveCarriedTracks[victimChar] = nil 
+		ActiveCarriedTracks[victimChar] = nil
 	end
 
 	if DownedData[victimChar] then
@@ -75,17 +75,25 @@ local function StopCarrying(carrierChar, victimChar)
 	-- Clean up Align Constraints
 	if carrierChar and carrierChar:FindFirstChild("HumanoidRootPart") then
 		local att = carrierChar.HumanoidRootPart:FindFirstChild("CarryAtt")
-		if att then att:Destroy() end
+		if att then
+			att:Destroy()
+		end
 	end
 
 	if victimChar and victimChar:FindFirstChild("HumanoidRootPart") then
 		local root = victimChar.HumanoidRootPart
 		local att = root:FindFirstChild("CarryAtt")
-		if att then att:Destroy() end
+		if att then
+			att:Destroy()
+		end
 		local pos = root:FindFirstChild("CarryPos")
-		if pos then pos:Destroy() end
+		if pos then
+			pos:Destroy()
+		end
 		local ori = root:FindFirstChild("CarryOri")
-		if ori then ori:Destroy() end
+		if ori then
+			ori:Destroy()
+		end
 
 		-- [[ FIX: Return Network Ownership to Victim or Server ]]
 		if root:CanSetNetworkOwnership() then
@@ -101,9 +109,14 @@ local function StopCarrying(carrierChar, victimChar)
 	-- Restore Mass and Collisions safely
 	if victimChar then
 		for _, v in pairs(victimChar:GetDescendants()) do
-			if v:IsA("BasePart") then 
-				v.Massless = false 
-				if v.Name == "Head" or v.Name == "Torso" or v.Name == "UpperTorso" or v.Name == "LowerTorso" then
+			if v:IsA("BasePart") then
+				v.Massless = false
+				if
+					v.Name == "Head"
+					or v.Name == "Torso"
+					or v.Name == "UpperTorso"
+					or v.Name == "LowerTorso"
+				then
 					v.CanCollide = true
 				else
 					v.CanCollide = false
@@ -119,7 +132,9 @@ end
 -- player must be immovable until Revive / Execute / Carry says otherwise.
 function pinDown(char)
 	local hum = char and char:FindFirstChild("Humanoid")
-	if not hum then return end
+	if not hum then
+		return
+	end
 
 	-- PIN priority: the top of the stack. Once pushed, a stun-pop or hitstop-pop or
 	-- block-pop can't recompute a downed player back to a walkable speed. This replaces
@@ -138,7 +153,9 @@ end
 -- [[ HELPER: RELEASE A BODY FROM THE PIN ]] --
 function unpin(char)
 	local hum = char and char:FindFirstChild("Humanoid")
-	if not hum then return end
+	if not hum then
+		return
+	end
 
 	hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
 	hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
@@ -152,30 +169,42 @@ end
 -- someone who is already down keeps them down.
 function DownedManager.ResetReviveTimer(char)
 	local data = DownedData[char]
-	if not data then return end
+	if not data then
+		return
+	end
 	data.Timer = REVIVE_TIMER
 end
 
 -- [[ 1. MAIN CHECK ]] --
 function DownedManager.CheckDownedCondition(char, damage, isInstantKill)
-	if not char then return false end
+	if not char then
+		return false
+	end
 	local hum = char:FindFirstChild("Humanoid")
-	if not hum then return false end
+	if not hum then
+		return false
+	end
 
 	local player = Players:GetPlayerFromCharacter(char)
-	if not player then return false end
+	if not player then
+		return false
+	end
 
 	local potentialHealth = hum.Health - damage
 	local maxHealth = hum.MaxHealth
 	local threshold = maxHealth * DOWNED_THRESHOLD_PCT
 
-	if isInstantKill then return false end
-	if StateHandler.GetState(char, "Downed") then return false end
+	if isInstantKill then
+		return false
+	end
+	if StateHandler.GetState(char, "Downed") then
+		return false
+	end
 
 	if potentialHealth <= threshold then
 		DownedManager.KnockDown(char)
-		hum.Health = math.max(1, threshold) 
-		return true 
+		hum.Health = math.max(1, threshold)
+		return true
 	end
 
 	return false
@@ -208,14 +237,16 @@ function DownedManager.KnockDown(char)
 	DownedData[char] = {
 		Timer = REVIVE_TIMER,
 		Carrier = nil,
-		BeingExecuted = false
+		BeingExecuted = false,
 	}
 
 	task.spawn(function()
 		while DownedData[char] and StateHandler.GetState(char, "Downed") do
 			task.wait(1)
 			local data = DownedData[char]
-			if not data then break end
+			if not data then
+				break
+			end
 
 			-- Bail if the body is gone or dead.
 			--
@@ -249,7 +280,7 @@ function DownedManager.Revive(char)
 	local hum = char:FindFirstChild("Humanoid")
 
 	print("revived")
-	
+
 	if not char.Parent or not hum or hum.Health <= 0 then
 		DownedData[char] = nil
 		return
@@ -266,7 +297,7 @@ function DownedManager.Revive(char)
 	RagdollManager.UnRagdoll(char, true)
 	unpin(char)
 
-	if hum then 
+	if hum then
 		-- Restore movement. Pop the Downed PIN and let SpeedService recompute to the
 		-- live base (Stamina + race bonus): the Stun modifier was already dropped by the
 		-- SetStun(false) above, so with Downed gone the stack resolves to full speed.
@@ -276,7 +307,7 @@ function DownedManager.Revive(char)
 		hum.PlatformStand = false
 		hum.AutoRotate = true
 
-		hum.Health = hum.MaxHealth * REVIVE_HP_PCT 
+		hum.Health = hum.MaxHealth * REVIVE_HP_PCT
 
 		-- GettingUp is re-issued here, AFTER PlatformStand is down. Roblox ignores a
 		-- GettingUp request while PlatformStand is true, so the one fired inside
@@ -291,7 +322,7 @@ function DownedManager.Revive(char)
 			root.CFrame = CFrame.new(root.Position + Vector3.new(0, 2, 0)) * CFrame.Angles(0, y, 0)
 			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 			root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
-			
+
 			-- Briefly bouncing Sit triggers a replicated state reset for clients stuck in Freefall
 			hum.Sit = true
 			task.wait()
@@ -306,7 +337,9 @@ end
 
 -- [[ 4. STOP EXECUTION ]] --
 function DownedManager.StopExecution(executorChar)
-	if not executorChar then return end
+	if not executorChar then
+		return
+	end
 
 	if ActiveExecuteTracks[executorChar] then
 		ActiveExecuteTracks[executorChar]:Stop()
@@ -314,7 +347,7 @@ function DownedManager.StopExecution(executorChar)
 	end
 
 	StateHandler.RemoveStates(executorChar, "Executing")
-	StateHandler.SetStun(executorChar, false) 
+	StateHandler.SetStun(executorChar, false)
 	if executorChar:FindFirstChild("HumanoidRootPart") then
 		executorChar.HumanoidRootPart.Anchored = false
 	end
@@ -330,40 +363,59 @@ end
 
 -- [[ 5. PLAYER EXECUTION LOGIC ]] --
 function DownedManager.AttemptExecute(executorChar, victimChar)
-	if not DownedData[victimChar] then return end
-	if not StateHandler.GetState(victimChar, "Downed") then return end
+	if not DownedData[victimChar] then
+		return
+	end
+	if not StateHandler.GetState(victimChar, "Downed") then
+		return
+	end
 
 	-- Ensure executor is allowed to act
-	if StateHandler.GetState(executorChar, "Stunned") then return end
-	if StateHandler.GetState(executorChar, "CantAnything") then return end
-	if StateHandler.GetState(executorChar, "Downed") then return end
+	if StateHandler.GetState(executorChar, "Stunned") then
+		return
+	end
+	if StateHandler.GetState(executorChar, "CantAnything") then
+		return
+	end
+	if StateHandler.GetState(executorChar, "Downed") then
+		return
+	end
 
 	if StateHandler.GetState(executorChar, "Executing") then
 		DownedManager.StopExecution(executorChar)
 		return
 	end
 
-	if StateHandler.GetState(victimChar, "BeingExecuted") then return end
-	if DownedData[victimChar].Carrier == executorChar or StateHandler.GetState(victimChar, "Carried") then return end
+	if StateHandler.GetState(victimChar, "BeingExecuted") then
+		return
+	end
+	if
+		DownedData[victimChar].Carrier == executorChar
+		or StateHandler.GetState(victimChar, "Carried")
+	then
+		return
+	end
 
 	local dist = (executorChar.HumanoidRootPart.Position - victimChar.HumanoidRootPart.Position).Magnitude
-	if dist > EXECUTE_RANGE then return end
+	if dist > EXECUTE_RANGE then
+		return
+	end
 
 	StateHandler.SetState(executorChar, "Executing", true)
 	StateHandler.SetState(victimChar, "BeingExecuted", true)
-	StateHandler.SetStun(executorChar, true, 2.5, 0) 
+	StateHandler.SetStun(executorChar, true, 2.5, 0)
 
 	DownedData[victimChar].BeingExecuted = true
-	DownedData[victimChar].Executor = executorChar 
+	DownedData[victimChar].Executor = executorChar
 
 	local anim = executorChar.Humanoid:LoadAnimation(script.ExecuteAnim)
 	anim.Priority = Enum.AnimationPriority.Action4
 	anim:Play()
-	ActiveExecuteTracks[executorChar] = anim 
+	ActiveExecuteTracks[executorChar] = anim
 
 	executorChar.HumanoidRootPart.Anchored = true
 
-	task.wait(2) 
+	task.wait(2)
 
 	if StateHandler.GetState(executorChar, "Executing") then
 		local sound = game.ReplicatedStorage.assets.sounds.DeadSoundOLD:Clone()
@@ -382,7 +434,9 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 			executorChar.HumanoidRootPart.Anchored = false
 		end
 
-		if ActiveExecuteTracks[executorChar] then ActiveExecuteTracks[executorChar] = nil end
+		if ActiveExecuteTracks[executorChar] then
+			ActiveExecuteTracks[executorChar] = nil
+		end
 		StateHandler.RemoveStates(executorChar, "Executing")
 		StateHandler.SetStun(executorChar, false)
 	end
@@ -390,35 +444,49 @@ end
 
 -- [[ 6. FORCE DROP IF CARRYING ]] --
 function DownedManager.DropIfCarrying(carrierChar)
-	if not carrierChar then return false end
+	if not carrierChar then
+		return false
+	end
 
 	for vChar, data in pairs(DownedData) do
 		if data.Carrier == carrierChar then
 			StopCarrying(carrierChar, vChar)
-			return true 
+			return true
 		end
 	end
-	return false 
+	return false
 end
 
 -- [[ 7. CARRY LOGIC ]] --
 function DownedManager.AttemptCarry(carrierChar, victimChar)
 	if DownedManager.DropIfCarrying(carrierChar) then
-		return 
+		return
 	end
 
 	-- FIX 2: Validate the carrier's state before they try to pick someone up
-	if StateHandler.GetState(carrierChar, "CantAnything") then return end
-	if StateHandler.GetState(carrierChar, "Stunned") then return end
-	if StateHandler.GetState(carrierChar, "Downed") then return end
+	if StateHandler.GetState(carrierChar, "CantAnything") then
+		return
+	end
+	if StateHandler.GetState(carrierChar, "Stunned") then
+		return
+	end
+	if StateHandler.GetState(carrierChar, "Downed") then
+		return
+	end
 
-	if not victimChar or not DownedData[victimChar] then return end
-	if StateHandler.GetState(victimChar, "Downed") == nil then return end
+	if not victimChar or not DownedData[victimChar] then
+		return
+	end
+	if StateHandler.GetState(victimChar, "Downed") == nil then
+		return
+	end
 
 	-- A. PICK UP
 	if not DownedData[victimChar].Carrier then
 		local dist = (carrierChar.HumanoidRootPart.Position - victimChar.HumanoidRootPart.Position).Magnitude
-		if dist > EXECUTE_RANGE then return end
+		if dist > EXECUTE_RANGE then
+			return
+		end
 
 		local anim = carrierChar.Humanoid:LoadAnimation(script.CarryAnim)
 		anim.Priority = Enum.AnimationPriority.Action4
@@ -453,17 +521,24 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 		StateHandler.SetState(carrierChar, "CantAnything", true)
 		StateHandler.SetState(victimChar, "Carried", true)
 
-		DownedData[victimChar].StateGuardConn = carrierChar:GetAttributeChangedSignal("CantAnything"):Connect(function()
-			if not carrierChar:GetAttribute("CantAnything") and carrierChar:GetAttribute("Carrying") then
-				DownedManager.DropIfCarrying(carrierChar)
-			end
-		end)
+		DownedData[victimChar].StateGuardConn = carrierChar
+			:GetAttributeChangedSignal("CantAnything")
+			:Connect(function()
+				if
+					not carrierChar:GetAttribute("CantAnything")
+					and carrierChar:GetAttribute("Carrying")
+				then
+					DownedManager.DropIfCarrying(carrierChar)
+				end
+			end)
 
-		DownedData[victimChar].CarryGuardConn = carrierChar:GetAttributeChangedSignal("Carrying"):Connect(function()
-			if not carrierChar:GetAttribute("Carrying") then
-				DownedManager.DropIfCarrying(carrierChar)
-			end
-		end)
+		DownedData[victimChar].CarryGuardConn = carrierChar
+			:GetAttributeChangedSignal("Carrying")
+			:Connect(function()
+				if not carrierChar:GetAttribute("Carrying") then
+					DownedManager.DropIfCarrying(carrierChar)
+				end
+			end)
 
 		-- force = true: the victim IS Downed, and UnRagdoll refuses to disturb a
 		-- Downed body unless the teardown is deliberate. A pickup is deliberate.
@@ -488,7 +563,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 
 		local carrierAtt = Instance.new("Attachment")
 		carrierAtt.Name = "CarryAtt"
-		carrierAtt.CFrame = CFrame.new(CARRY_OFFSET) 
+		carrierAtt.CFrame = CFrame.new(CARRY_OFFSET)
 		carrierAtt.Parent = carrierRoot
 
 		local victimAtt = Instance.new("Attachment")
@@ -500,7 +575,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 		alignPos.Mode = Enum.PositionAlignmentMode.TwoAttachment
 		alignPos.Attachment0 = victimAtt
 		alignPos.Attachment1 = carrierAtt
-		alignPos.RigidityEnabled = true 
+		alignPos.RigidityEnabled = true
 		alignPos.Parent = victimRoot
 
 		local alignOri = Instance.new("AlignOrientation")
@@ -513,7 +588,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 
 		for _, v in pairs(victimChar:GetDescendants()) do
 			if v:IsA("BasePart") then
-				v.Massless = true 
+				v.Massless = true
 				v.CanCollide = false
 			end
 		end
@@ -525,22 +600,24 @@ end
 
 -- [[ 8. NPC EXECUTION LOGIC ]] --
 function DownedManager.NPCExecute(npcModel, victimChar)
-	if not DownedData[victimChar] then return end
+	if not DownedData[victimChar] then
+		return
+	end
 
 	StateHandler.SetState(npcModel, "Executing", true)
 	StateHandler.SetState(victimChar, "BeingExecuted", true)
 
 	DownedData[victimChar].BeingExecuted = true
-	DownedData[victimChar].Executor = npcModel 
+	DownedData[victimChar].Executor = npcModel
 
 	local anim = npcModel.Humanoid:LoadAnimation(script.ExecuteAnim)
 	anim.Priority = Enum.AnimationPriority.Action4
 	anim:Play()
-	ActiveExecuteTracks[npcModel] = anim 
+	ActiveExecuteTracks[npcModel] = anim
 
 	task.delay(2, function()
-		if not StateHandler.GetState(npcModel, "Executing") then 
-			return 
+		if not StateHandler.GetState(npcModel, "Executing") then
+			return
 		end
 
 		if victimChar and victimChar:FindFirstChild("Humanoid") then
@@ -558,13 +635,17 @@ function DownedManager.NPCExecute(npcModel, victimChar)
 		end
 
 		StateHandler.RemoveStates(npcModel, "Executing")
-		if ActiveExecuteTracks[npcModel] then ActiveExecuteTracks[npcModel] = nil end
+		if ActiveExecuteTracks[npcModel] then
+			ActiveExecuteTracks[npcModel] = nil
+		end
 	end)
 end
 
 Players.PlayerRemoving:Connect(function(player)
 	local char = player.Character
-	if not char then return end
+	if not char then
+		return
+	end
 
 	-- If they were carrying someone, drop them cleanly
 	DownedManager.DropIfCarrying(char)

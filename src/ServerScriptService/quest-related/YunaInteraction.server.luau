@@ -3,12 +3,12 @@
 -- Handles the ShardPickup remote, validates quest state,
 -- and increments progress to step 1.
 
-local Players             = game:GetService("Players")
-local ReplicatedStorage   = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local QuestManager  = _G.QuestManager
-local DataManager   = require(ServerScriptService.modules.dataManager)
+local QuestManager = _G.QuestManager
+local DataManager = require(ServerScriptService.modules.dataManager)
 
 -- Ensure remotes folder exists
 local remotes = ReplicatedStorage:FindFirstChild("remotes")
@@ -21,15 +21,23 @@ end
 local PickupRemote = remotes:FindFirstChild("YunaInteraction")
 
 PickupRemote.OnServerEvent:Connect(function(player, questId)
-	if questId ~= "Lantern" then return end
+	if questId ~= "Lantern" then
+		return
+	end
 
 	-- Validate quest is active and at progress 0
 	local questData = DataManager.GetQuestData(player)
-	if not questData then return end
+	if not questData then
+		return
+	end
 
 	local entry = DataManager.GetActiveQuestEntry(player, questId)
-	if not entry then return end
-	if entry.Progress ~= 0 then return end
+	if not entry then
+		return
+	end
+	if entry.Progress ~= 0 then
+		return
+	end
 
 	-- Wait for QuestManager to be available via _G
 	local attempts = 0
@@ -54,14 +62,16 @@ PickupRemote.OnServerEvent:Connect(function(player, questId)
 
 	if def then
 		local updatedDef = {}
-		for k, v in pairs(def) do updatedDef[k] = v end
+		for k, v in pairs(def) do
+			updatedDef[k] = v
+		end
 		updatedDef.TargetPartName = "SaruMarker2"
 
 		QuestUpdateRemote:FireClient(player, "Update", {
-			Id       = questId,
+			Id = questId,
 			Progress = 1,
-			Max      = def.MaxProgress,
-			Data     = updatedDef,
+			Max = def.MaxProgress,
+			Data = updatedDef,
 		})
 	end
 

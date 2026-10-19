@@ -14,9 +14,10 @@ local HitboxTypes = require(RP.modules.hitboxClass.Types)
 local ragdollManager = require(SSS.modules.ragdollManager)
 
 local hitboxParams = {
-	SizeOrPart = Vector3.new(5,4,5),
-	SpatialOption = ("InBox"),
-	Debug = false, DebounceTime = 0.5,
+	SizeOrPart = Vector3.new(5, 4, 5),
+	SpatialOption = "InBox",
+	Debug = false,
+	DebounceTime = 0.5,
 } :: HitboxTypes.HitboxParams
 
 local DataManager = require(game.ServerScriptService.modules.dataManager)
@@ -39,7 +40,7 @@ local function rightSwing(char)
 			v:Emit(v:GetAttribute("EmitCount") or 10)
 		end
 	end
-	game.Debris:AddItem(attachment,2)
+	game.Debris:AddItem(attachment, 2)
 end
 
 local function leftSwing(char)
@@ -76,14 +77,18 @@ end
 
 function module.ServerCheck(plr)
 	local char = plr.Character
-	if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+	if not char or not char:FindFirstChild("HumanoidRootPart") then
+		return
+	end
 
 	local decision
 	local isBusy = false
-	
+
 	local function getEquippedTool()
 		local currentCharacter = plr.Character
-		if not currentCharacter then return nil end
+		if not currentCharacter then
+			return nil
+		end
 
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
@@ -100,10 +105,10 @@ function module.ServerCheck(plr)
 			Type = "Combat",
 			Action = "M1",
 			Func = "ServerResponse",
-			FolderName = getEquippedTool()
+			FolderName = getEquippedTool(),
 		}, plr, decision)
 		return
-	end 
+	end
 
 	-- SET DEBOUNCE AND STATE IMMEDIATELY
 	StateHandler.SetState(char, "CantAnything", true, 0.8)
@@ -116,15 +121,15 @@ function module.ServerCheck(plr)
 		ReplicateRemote:FireAllClients({
 			Type = "Combat",
 			Action = "M1",
-			Func = "Swing", 
-			FolderName = getEquippedTool()
+			Func = "Swing",
+			FolderName = getEquippedTool(),
 		}, char)
 	end)
 
 	task.wait(windupDelay - 0.1)
-	
+
 	rightSwing(char)
-	
+
 	task.wait(0.1)
 
 	Helper.ResetSpeed(char)
@@ -138,7 +143,7 @@ function module.ServerCheck(plr)
 
 	local humrp = char.HumanoidRootPart
 	local Hitbox, connected = HitboxClass.new(hitboxParams)
-	Hitbox:WeldTo(humrp, CFrame.new(1,-1,-4))
+	Hitbox:WeldTo(humrp, CFrame.new(1, -1, -4))
 	Hitbox:Start()
 
 	StateHandler.SetState(char, "M1", true, 0.2)
@@ -149,28 +154,39 @@ function module.ServerCheck(plr)
 		for _, hit in pairs(hitCharsTable) do
 			local humanoid = hit:FindFirstChild("Humanoid")
 			local targetChar = humanoid and humanoid.Parent
-			if not targetChar or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid") then continue end
+			if
+				not targetChar
+				or targetChar:IsA("Model") and not targetChar:FindFirstChild("Humanoid")
+			then
+				continue
+			end
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
 			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
-
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
-				if not targetHRP or not attackerHRP then return end
+				if not targetHRP or not attackerHRP then
+					return
+				end
 
-				if StateHandler.GetState(char, "Stunned") then continue end
+				if StateHandler.GetState(char, "Stunned") then
+					continue
+				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
 					print("iframed lawl :p")
-					
+
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
-					
+
 					local sound = RP.assets.sounds.Dodged:Clone()
 					sound.Parent = targetHRP
 					sound:Play()
@@ -179,10 +195,15 @@ function module.ServerCheck(plr)
 					effect.Enabled = true
 					game.Debris:AddItem(sound, 3)
 					game.Debris:AddItem(effect, 0.3)
-					
+
 					if targetChar.Torso then
 						for _, part in pairs(targetChar:GetChildren()) do
-							if part:IsA("BasePart") and part ~= targetHRP and part.Name ~= "Head" and part.Name ~= "Left Arm" then
+							if
+								part:IsA("BasePart")
+								and part ~= targetHRP
+								and part.Name ~= "Head"
+								and part.Name ~= "Left Arm"
+							then
 								local oldTrans = part.Transparency
 								part.Transparency = 0.7
 								task.delay(0.3, function()
@@ -191,7 +212,7 @@ function module.ServerCheck(plr)
 							end
 						end
 					end
-					
+
 					continue
 				end
 
@@ -206,19 +227,27 @@ function module.ServerCheck(plr)
 
 					local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 					dmgModule.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
-					
+
 					--targetChar:FindFirstChild("Humanoid"):TakeDamage(dmg + extraDmg)
-					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then DataManager.AddWeaponXP(game.Players:GetPlayerFromCharacter(char), getEquippedTool(), dmg + extraDmg) end
+					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then
+						DataManager.AddWeaponXP(
+							game.Players:GetPlayerFromCharacter(char),
+							getEquippedTool(),
+							dmg + extraDmg
+						)
+					end
 
 					local highlight = game.ReplicatedStorage.assets.FX.h1:Clone()
 					highlight.Parent = humanoid.Parent
 					game.Debris:AddItem(highlight, 0.1)
-					
-					local hitEff = game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment:Clone()
+
+					local hitEff =
+						game:GetService("ReplicatedStorage").assets.FX.BloodHitEff.Attachment
+							:Clone()
 					hitEff.Parent = targetChar:FindFirstChild("Torso")
 					game:GetService("Debris"):AddItem(hitEff, 1)
 					task.delay(0.5, function()
-						for _,v in pairs(hitEff:GetChildren()) do
+						for _, v in pairs(hitEff:GetChildren()) do
 							if v:IsA("ParticleEmitter") then
 								v.Enabled = false
 							end
@@ -227,16 +256,26 @@ function module.ServerCheck(plr)
 
 					alreadyHit[targetChar] = true
 				end
-				
+
 				if StateHandler.GetState(targetChar, "Parrying") then
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = "M1", Func = "Parry", FolderName = getEquippedTool() -- FIXED Action to M2
+						Type = "Combat",
+						Action = "M1",
+						Func = "Parry",
+						FolderName = getEquippedTool(), -- FIXED Action to M2
 					}, char, targetChar)
-					
-					local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-					local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
-					local clash =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
-					local clash2 =  game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash:Clone()
+
+					local parryE =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+							:Clone()
+					local effect2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+					local clash =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
+					local clash2 =
+						game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].Clash
+							:Clone()
 					clash2.Parent = targetChar:WaitForChild("Right Arm")
 					clash2:Emit(30)
 					game.Debris:AddItem(clash2, 0.7)
@@ -250,24 +289,34 @@ function module.ServerCheck(plr)
 					effect2.Enabled = true
 					clash:Emit(30)
 					game.Debris:AddItem(clash, 0.7)
-					game.Debris:AddItem(parryE,0.7)
+					game.Debris:AddItem(parryE, 0.7)
 					game.Debris:AddItem(effect2, 0.7)
 
 					StateHandler.SetStun(char, true, 0.5, 2)
 					StateHandler.SetState(char, "CantAnything", true, 0.5)
 					ParryService.ResetParry(game.Players:GetPlayerFromCharacter(targetChar))
-					
+
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if targetPlrData and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8 then
+					if
+						targetPlrData
+						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
+					then
 						targetPlrData.Mana.Value += 8
 					end
-					
-					
-					AnimationHandler.StopAnim(char, "ALL")
-					AnimationHandler.LoadAnim(char, "Parried", "rbxassetid://74891530644094", nil, false)
 
-				elseif StateHandler.GetState(targetChar, "M1") or StateHandler.GetState(targetChar, "M2") then
+					AnimationHandler.StopAnim(char, "ALL")
+					AnimationHandler.LoadAnim(
+						char,
+						"Parried",
+						"rbxassetid://74891530644094",
+						nil,
+						false
+					)
+				elseif
+					StateHandler.GetState(targetChar, "M1")
+					or StateHandler.GetState(targetChar, "M2")
+				then
 					Hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
@@ -290,29 +339,53 @@ function module.ServerCheck(plr)
 						if verdict.broke then
 							doAttack(extra, verdict.knockback)
 						else
-							local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
-							dmgModule.CalculateDamage(char, targetChar, dmg, verdict.knockback, false, "Weapon")
+							local dmgModule =
+								require(game.ServerScriptService.modules.damageCalculator)
+							dmgModule.CalculateDamage(
+								char,
+								targetChar,
+								dmg,
+								verdict.knockback,
+								false,
+								"Weapon"
+							)
 						end
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M1", Func = "GB", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M1",
+							Func = "GB",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "Block", Func = "GB", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "Block",
+							Func = "GB",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 					elseif verdict.outcome == "Bypass" then
 						AnimationHandler.StopAnim(targetChar, "", "rbxassetid://96311777205911")
 						doAttack(extra, verdict.knockback)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M1", Func = "Blocked", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M1",
+							Func = "Blocked",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
 					else
 						BlockResolver.OnAttackerLandedHit(char)
 						doAttack(extra, verdict.knockback)
 						ReplicateRemote:FireAllClients({
-							Type = "Combat", Action = "M1", Func = "Blocked", FolderName = getEquippedTool()
+							Type = "Combat",
+							Action = "M1",
+							Func = "Blocked",
+							FolderName = getEquippedTool(),
 						}, char, targetChar)
-						local parryE = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry:Clone()
-						local effect2 = game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit:Clone()
+						local parryE =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].parry
+								:Clone()
+						local effect2 =
+							game:GetService("ReplicatedStorage").assets.FX["parry/blocked"].hit
+								:Clone()
 						local h1 = game.ReplicatedStorage.assets.FX.h1:Clone()
 						h1.Parent = targetChar
 						game.Debris:AddItem(h1, 0.1)
@@ -320,13 +393,16 @@ function module.ServerCheck(plr)
 						effect2.Parent = targetChar:WaitForChild("Torso")
 						parryE.Enabled = true
 						effect2.Enabled = true
-						game.Debris:AddItem(parryE,0.7)
+						game.Debris:AddItem(parryE, 0.7)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
 					-- Normal Hit
 					ReplicateRemote:FireAllClients({
-						Type = "Combat", Action = "M1", Func = "Hit", FolderName = getEquippedTool()
+						Type = "Combat",
+						Action = "M1",
+						Func = "Hit",
+						FolderName = getEquippedTool(),
 					}, char, targetChar)
 					doAttack(0, 5)
 				end

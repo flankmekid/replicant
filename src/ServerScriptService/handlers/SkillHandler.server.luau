@@ -6,7 +6,7 @@ local RaceConfig = require(ReplicatedStorage.modules.RaceConfig)
 local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 
 -- Logic Modules
-local SkillFunctions = require(ServerScriptService.modules.SkillFunctions) 
+local SkillFunctions = require(ServerScriptService.modules.SkillFunctions)
 local BuffService = require(ServerScriptService.modules.BuffService)
 local RacialSkills = require(ServerScriptService.modules.RacialSkills) -- [NEW] Require the racial module
 
@@ -34,7 +34,9 @@ end
 CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 	-- Guard against the client receiving its own reply table echoed back up. The client
 	-- only ever fires (skillName: string, mouseHit). A table here is not a cast request.
-	if type(skillName) ~= "string" then return end
+	if type(skillName) ~= "string" then
+		return
+	end
 
 	local char = player.Character
 	if not char or not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then
@@ -43,7 +45,11 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 	end
 
 	-- 0. State Check (Prevent casting if stunned/etc on server side too for safety)
-	if char:GetAttribute("Stunned") or char:GetAttribute("CantAnything") or char:GetAttribute("Downed") then
+	if
+		char:GetAttribute("Stunned")
+		or char:GetAttribute("CantAnything")
+		or char:GetAttribute("Downed")
+	then
 		reply(player, skillName, "Declined")
 		return
 	end
@@ -59,7 +65,9 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 	local isVerified = false
 
 	-- A: Check if it's a Racial Skill
-	local playerRace = player:FindFirstChild("PlayerStats") and player.PlayerStats:FindFirstChild("Race") and player.PlayerStats.Race.Value
+	local playerRace = player:FindFirstChild("PlayerStats")
+		and player.PlayerStats:FindFirstChild("Race")
+		and player.PlayerStats.Race.Value
 	if playerRace and SkillConfig.RaceSkills[playerRace] == skillName then
 		isVerified = true
 	else
@@ -70,19 +78,21 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 		end
 	end
 
-	if not isVerified then 
+	if not isVerified then
 		warn(player.Name .. " attempted to cast unowned skill: " .. skillName)
 		reply(player, skillName, "Declined")
-		return 
+		return
 	end
 
 	-- 3. Check Server Cooldown
-	if not serverCooldowns[player] then serverCooldowns[player] = {} end
+	if not serverCooldowns[player] then
+		serverCooldowns[player] = {}
+	end
 	local lastUse = serverCooldowns[player][skillName] or 0
 	if os.time() < lastUse then
 		reply(player, skillName, "Declined")
 		return
-	end 
+	end
 
 	-- 4. Resource Check
 	local manaCost = skillInfo.Mana or 0
@@ -115,8 +125,8 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 	-- 7. EXECUTE LOGIC
 	-- Remove spaces (e.g., "Solar Flare" -> "SolarFlare")
 	local funcName = string.gsub(skillName, "%s+", "")
-	
-	print(funcName)  
+
+	print(funcName)
 
 	-- Buff skills: activate the centralized, weapon-independent buff. BuffService
 	-- only knows weapon buffs (Monastic Stance / Mystic Eyes / Berserker Armor);
@@ -138,7 +148,9 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 		char:SetAttribute("HyperArmor", true)
 		local armorWindow = skillInfo.HyperArmorDuration or 1.0
 		task.delay(armorWindow, function()
-			if char then char:SetAttribute("HyperArmor", nil) end
+			if char then
+				char:SetAttribute("HyperArmor", nil)
+			end
 		end)
 	end
 
@@ -149,7 +161,7 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 			SkillFunctions[funcName](player)
 		end)
 	elseif RacialSkills[funcName] or RacialSkills[playerRace] then
-		task.spawn(function() 
+		task.spawn(function()
 			RacialSkills[playerRace](player, char, mouseHit)
 		end)
 	else

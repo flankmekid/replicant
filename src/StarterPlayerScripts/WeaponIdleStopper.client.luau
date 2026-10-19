@@ -17,7 +17,9 @@ local function sweepOnce()
 	local char = plr.Character
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	local animator = humanoid and humanoid:FindFirstChildOfClass("Animator")
-	if not animator then return end
+	if not animator then
+		return
+	end
 
 	for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
 		if track.Name == "Idle" then

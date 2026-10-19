@@ -32,11 +32,11 @@ local SpeedService = {}
 
 -- Priority bands. Higher wins. Leave gaps so new effects can slot between.
 SpeedService.Priority = {
-	PIN     = 100, -- Downed / hard root: absolute, speed 0
-	STUN    = 80,  -- stun + hitstop: can't-walk-out hit reactions
-	SKILL   = 60,  -- self-slow during a cast / skill windup
-	BLOCK   = 50,  -- holding block
-	DEBUFF  = 40,  -- external slows (Null Gaze etc.)
+	PIN = 100, -- Downed / hard root: absolute, speed 0
+	STUN = 80, -- stun + hitstop: can't-walk-out hit reactions
+	SKILL = 60, -- self-slow during a cast / skill windup
+	BLOCK = 50, -- holding block
+	DEBUFF = 40, -- external slows (Null Gaze etc.)
 }
 
 -- [char] = { [sourceKey] = { speed = n, priority = n, seq = n } }
@@ -61,15 +61,19 @@ end
 -- changes) to re-settle a character to the correct value.
 function SpeedService.Resolve(char)
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
-	if not hum then return end
+	if not hum then
+		return
+	end
 
 	local winner = nil
 	local stack = stacks[char]
 	if stack then
 		for _, mod in pairs(stack) do
-			if not winner
+			if
+				not winner
 				or mod.priority > winner.priority
-				or (mod.priority == winner.priority and mod.seq > winner.seq) then
+				or (mod.priority == winner.priority and mod.seq > winner.seq)
+			then
 				winner = mod
 			end
 		end
@@ -86,9 +90,15 @@ end
 -- "Stun", "Hitstop", "NullGaze", ...). Re-pushing the same source updates it in place
 -- and bumps its recency, which is exactly the refresh semantics the beam ticks want.
 function SpeedService.Push(char, source, speed, priority)
-	if not char or not source then return end
-	if not char:FindFirstChildOfClass("Humanoid") then return end
-	if not stacks[char] then stacks[char] = {} end
+	if not char or not source then
+		return
+	end
+	if not char:FindFirstChildOfClass("Humanoid") then
+		return
+	end
+	if not stacks[char] then
+		stacks[char] = {}
+	end
 
 	seqCounter += 1
 	stacks[char][source] = { speed = speed, priority = priority, seq = seqCounter }
@@ -98,11 +108,15 @@ end
 -- Pop a modifier and re-settle. Popping a source that isn't present is a safe no-op,
 -- so a double-clear (e.g. a timer firing after a manual clear) can't drive speed wrong.
 function SpeedService.Pop(char, source)
-	if not char or not source then return end
+	if not char or not source then
+		return
+	end
 	local stack = stacks[char]
 	if stack then
 		stack[source] = nil
-		if next(stack) == nil then stacks[char] = nil end
+		if next(stack) == nil then
+			stacks[char] = nil
+		end
 	end
 	SpeedService.Resolve(char)
 end
@@ -120,7 +134,9 @@ function SpeedService.Clear(char)
 end
 
 Players.PlayerRemoving:Connect(function(plr)
-	if plr.Character then SpeedService.Clear(plr.Character) end
+	if plr.Character then
+		SpeedService.Clear(plr.Character)
+	end
 end)
 
 return SpeedService

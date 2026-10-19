@@ -6,16 +6,18 @@ local TweenService = game:GetService("TweenService")
 local camera = game.Workspace.CurrentCamera
 
 -- // FOV CONFIGURATION //
-local BaseFOV = 80 
-local SprintFOV = 85 
+local BaseFOV = 80
+local SprintFOV = 85
 local FOVTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
 
 local player = game.Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local hum = char:WaitForChild("Humanoid")
 local rs = game:GetService("ReplicatedStorage")
-local stateHandler = require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("stateHandler"))
-local StatScaling = require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("StatScaling"))
+local stateHandler =
+	require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("stateHandler"))
+local StatScaling =
+	require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("StatScaling"))
 
 -- Canonical base walk speed (16 + stamina bonus). Used for both the stop-sprint
 -- speed and the sprint floor so the stamina walkspeed bonus flows through.
@@ -43,7 +45,9 @@ local function getAccelerationTime()
 	local stats = player:FindFirstChild("PlayerStats")
 	if stats then
 		local sf = stats:FindFirstChild("Stats")
-		if sf and sf:FindFirstChild("Stamina") then stam = sf.Stamina.Value end
+		if sf and sf:FindFirstChild("Stamina") then
+			stam = sf.Stamina.Value
+		end
 	end
 	local progress = StatScaling.GetVelocityProgress(stam) -- 0..1, soft-capped at 20
 	return 0.5 - (0.5 - FAST_ACCEL) * progress
@@ -57,8 +61,14 @@ local leftParticle, rightParticle = nil, nil
 local particlesSpawned = false
 
 local function cleanupParticles()
-	if leftParticle then leftParticle:Destroy(); leftParticle = nil end
-	if rightParticle then rightParticle:Destroy(); rightParticle = nil end
+	if leftParticle then
+		leftParticle:Destroy()
+		leftParticle = nil
+	end
+	if rightParticle then
+		rightParticle:Destroy()
+		rightParticle = nil
+	end
 	particlesSpawned = false
 end
 
@@ -70,31 +80,47 @@ local function stopSprint()
 	-- blindly wrote getBaseSpeed() here we'd stomp that pin locally. The classic case:
 	-- sprint -> block. The RenderStepped loop calls stopSprint() on seeing Blocking, and
 	-- the old base-speed write left the player walking at full speed while blocking.
-	if not char:GetAttribute("Blocking")
+	if
+		not char:GetAttribute("Blocking")
 		and not char:GetAttribute("Stunned")
 		and not char:GetAttribute("Downed")
-		and not char:GetAttribute("CantAnything") then
+		and not char:GetAttribute("CantAnything")
+	then
 		hum.WalkSpeed = getBaseSpeed()
 	end
 	stateHandler.SetState(char, "Running", false, 999999999)
 
-	if Track1 then Track1:Stop() end
-	if conn then conn:Disconnect() end
+	if Track1 then
+		Track1:Stop()
+	end
+	if conn then
+		conn:Disconnect()
+	end
 
-	cleanupParticles() 
+	cleanupParticles()
 
 	-- // TWEEN CAMERA BACK TO NORMAL //
-	TweenService:Create(hum, TweenInfo.new(0.3), {CameraOffset = Vector3.new(0, 0, 0)}):Play()
-	TweenService:Create(camera, FOVTweenInfo, {FieldOfView = BaseFOV}):Play()
+	TweenService:Create(hum, TweenInfo.new(0.3), { CameraOffset = Vector3.new(0, 0, 0) }):Play()
+	TweenService:Create(camera, FOVTweenInfo, { FieldOfView = BaseFOV }):Play()
 end
 
 UIS.InputBegan:Connect(function(input, isTyping)
-	if isTyping then return end
+	if isTyping then
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.W and hum.WalkSpeed ~= 0 then
-		if char:GetAttribute("CantAnything") and not char:GetAttribute("Carrying") then return end
-		if char:GetAttribute("Blocking") then return end
-		if char:GetAttribute("Stunned") then return end 
-		if char:GetAttribute("Carried") and not char:GetAttribute("Carrying") then return end 
+		if char:GetAttribute("CantAnything") and not char:GetAttribute("Carrying") then
+			return
+		end
+		if char:GetAttribute("Blocking") then
+			return
+		end
+		if char:GetAttribute("Stunned") then
+			return
+		end
+		if char:GetAttribute("Carried") and not char:GetAttribute("Carrying") then
+			return
+		end
 
 		if Tapped == false then
 			Tapped = true
@@ -105,29 +131,43 @@ UIS.InputBegan:Connect(function(input, isTyping)
 			Tapped = false
 
 			-- // TWEEN CAMERA TO SPRINT FOV //
-			TweenService:Create(camera, FOVTweenInfo, {FieldOfView = SprintFOV}):Play()
+			TweenService:Create(camera, FOVTweenInfo, { FieldOfView = SprintFOV }):Play()
 
 			Track1 = hum:LoadAnimation(script.Regular)
 			Track1.Priority = Enum.AnimationPriority.Movement
 			Track1:Play(0.25)
 
-			local sprintTimer = 0 
+			local sprintTimer = 0
 			local thisAccelTime = getAccelerationTime() -- stamina-scaled momentum build-up
 
 			-- We removed the static calculation of "Normal" here.
 
 			conn = RunService.RenderStepped:Connect(function(dt)
 				if hum.MoveDirection.Magnitude > 0 then
-
-					if char:GetAttribute("CantAnything") then stopSprint() return end
-					if char:GetAttribute("Blocking") then stopSprint() return end
-					if char:GetAttribute("Stunned") then stopSprint() return end 
-					if char:GetAttribute("Downed") then stopSprint() return end 
+					if char:GetAttribute("CantAnything") then
+						stopSprint()
+						return
+					end
+					if char:GetAttribute("Blocking") then
+						stopSprint()
+						return
+					end
+					if char:GetAttribute("Stunned") then
+						stopSprint()
+						return
+					end
+					if char:GetAttribute("Downed") then
+						stopSprint()
+						return
+					end
 
 					-- // DYNAMIC SPEED CHECK //
 					-- NEW: Calculate health multiplier dynamically every frame
 					local hpPercentage = hum.Health / hum.MaxHealth
-					local healthMultiplier = ((hpPercentage <= 0.7) and 0.9)  or ((hpPercentage <= 0.5) and 0.85) or ((hpPercentage <= 0.3) and 0.75) or 1
+					local healthMultiplier = ((hpPercentage <= 0.7) and 0.9)
+						or ((hpPercentage <= 0.5) and 0.85)
+						or ((hpPercentage <= 0.3) and 0.75)
+						or 1
 
 					-- Apply the health multiplier to whatever the max speed is.
 					-- Sprint cap builds on the canonical base (so stamina bonus carries through).
@@ -144,7 +184,7 @@ UIS.InputBegan:Connect(function(input, isTyping)
 					-- Walkspeed scales from Walk to the DYNAMIC CurrentMaxSpeed
 					hum.WalkSpeed = baseNow + ((CurrentMaxSpeed - baseNow) * alpha)
 
-					-- 2. ANIMATION SPEED LOGIC 
+					-- 2. ANIMATION SPEED LOGIC
 					if airborneStates[hum:GetState()] then
 						Track1:AdjustSpeed(0.25)
 					else
@@ -159,36 +199,40 @@ UIS.InputBegan:Connect(function(input, isTyping)
 
 						-- Left Arm Particles
 						leftParticle = dashEff:Clone()
-						leftParticle.Parent = char:FindFirstChild("Left Arm") or char:FindFirstChild("LeftHand")
-						leftParticle.Position = Vector3.new(-.5,-1,0)
+						leftParticle.Parent = char:FindFirstChild("Left Arm")
+							or char:FindFirstChild("LeftHand")
+						leftParticle.Position = Vector3.new(-0.5, -1, 0)
 						if leftParticle.Parent:FindFirstChild("LeftGripAttachment") then
 							leftParticle.Trail.Attachment1 = leftParticle.Parent.LeftGripAttachment
 						end
 
 						-- Right Arm Particles
 						rightParticle = dashEff:Clone()
-						rightParticle.Parent = char:FindFirstChild("Right Arm") or char:FindFirstChild("RightHand")
-						rightParticle.Position = Vector3.new(.5,-1,0)
+						rightParticle.Parent = char:FindFirstChild("Right Arm")
+							or char:FindFirstChild("RightHand")
+						rightParticle.Position = Vector3.new(0.5, -1, 0)
 						if rightParticle.Parent:FindFirstChild("RightGripAttachment") then
-							rightParticle.Trail.Attachment1 = rightParticle.Parent.RightGripAttachment
+							rightParticle.Trail.Attachment1 =
+								rightParticle.Parent.RightGripAttachment
 						end
 					end
 
 					-- 4. CAMERA BOBBING
 					bobTick = bobTick + dt * bobbingSpeed
-					local currentIntensity = bobbingIntensity * alpha 
+					local currentIntensity = bobbingIntensity * alpha
 					local x = math.cos(bobTick * 0.5) * currentIntensity
 					local y = math.abs(math.sin(bobTick)) * currentIntensity
 					hum.CameraOffset = hum.CameraOffset:Lerp(Vector3.new(x, y, 0), 0.1)
-
 				else
 					stopSprint()
 				end
 			end)
 		end
 
-		delay(.3, function()
-			if Tapped then Tapped = false end
+		delay(0.3, function()
+			if Tapped then
+				Tapped = false
+			end
 		end)
 	end
 end)

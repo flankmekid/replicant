@@ -35,13 +35,13 @@ local GuardBarService = require(SSS.modules.GuardBarService)
 local BlockResolver = {}
 
 -- ------------------------------------------------------------------ tuning ----
-local BLOCK_ANGLE_THRESHOLD = 0.5   -- dot(forward, toAttacker) above this = facing
+local BLOCK_ANGLE_THRESHOLD = 0.5 -- dot(forward, toAttacker) above this = facing
 
 -- Chip fractions of the attack's damage that leak through a successful block.
 local CHIP_FRACTION = {
 	M1 = 0.10,
 	E = 0.10,
-	M2 = 0,      -- guardbreaks; never chips (handled as full damage)
+	M2 = 0, -- guardbreaks; never chips (handled as full damage)
 	Skill = 0.15,
 	Default = 0.10,
 }
@@ -49,19 +49,21 @@ local CHIP_FRACTION = {
 -- Frame advantage. Blocked E punishes the attacker (defender plus); blocked M1 is
 -- neutral (no stun on either). Values are the attacker's recovery-stun duration.
 local ATTACKER_RECOVERY = {
-	E = 0.45,    -- defender comes out plus
-	M1 = 0,      -- neutral
-	Skill = 0,   -- neutral by default
+	E = 0.45, -- defender comes out plus
+	M1 = 0, -- neutral
+	Skill = 0, -- neutral by default
 	Default = 0,
 }
 local ATTACKER_RECOVERY_STUNSPEED = 6
 
-local BLOCK_KNOCKBACK = 5   -- small shove on a normal blocked hit
+local BLOCK_KNOCKBACK = 5 -- small shove on a normal blocked hit
 
 -- ------------------------------------------------------------------ helpers ---
 -- attackerPos may be a Vector3 (projectile / skill origin) OR derived from an HRP.
 local function isFacing(attackerPos, targetHRP)
-	if not attackerPos or not targetHRP then return false end
+	if not attackerPos or not targetHRP then
+		return false
+	end
 	local toAttacker = (attackerPos - targetHRP.Position).Unit
 	local forward = targetHRP.CFrame.LookVector
 	return forward:Dot(toAttacker) > BLOCK_ANGLE_THRESHOLD

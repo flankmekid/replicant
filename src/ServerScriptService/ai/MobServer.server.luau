@@ -1,12 +1,12 @@
 -- 0xdawid (discord) | flankmekid (github & roblox)
 
-local RunService          = game:GetService("RunService")
-local PhysicsService      = game:GetService("PhysicsService")
-local Players             = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local PhysicsService = game:GetService("PhysicsService")
+local Players = game:GetService("Players")
 
 local MobConfig = require(script.Parent.MobConfig)
-local MobAI     = require(script.Parent.MobAI)
-local BossAI    = require(script.Parent.BossAI)
+local MobAI = require(script.Parent.MobAI)
+local BossAI = require(script.Parent.BossAI)
 
 -- mob setups
 
@@ -27,17 +27,15 @@ local ActiveMobs = {} -- array of mob objects
 local function randomPositionInPart(part)
 	local sx = part.Size.X / 2
 	local sz = part.Size.Z / 2
-	local offset = Vector3.new(
-		math.random(-sx * 10, sx * 10) / 10,
-		0,
-		math.random(-sz * 10, sz * 10) / 10
-	)
+	local offset =
+		Vector3.new(math.random(-sx * 10, sx * 10) / 10, 0, math.random(-sz * 10, sz * 10) / 10)
 	local worldPos = part.CFrame * CFrame.new(offset)
 
 	local params = RaycastParams.new()
 	params.FilterDescendantsInstances = { part }
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	local result = workspace:Raycast(worldPos.Position + Vector3.new(0, 5, 0), Vector3.new(0, -50, 0), params)
+	local result =
+		workspace:Raycast(worldPos.Position + Vector3.new(0, 5, 0), Vector3.new(0, -50, 0), params)
 	if result then
 		return CFrame.new(result.Position + Vector3.new(0, 2, 0))
 			* CFrame.fromEulerAnglesXYZ(0, math.random(0, 628) / 100, 0)
@@ -47,7 +45,9 @@ end
 
 local function spawnFromZone(mobName, zone)
 	local cfg = MobConfig.Mobs[mobName]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 
 	local quantity = zone:FindFirstChild("Quantity") and zone.Quantity.Value or 1
 
@@ -95,7 +95,9 @@ local function spawnFromZone(mobName, zone)
 end
 
 for _, categoryFolder in ipairs(SpawnersFolder:GetChildren()) do
-	if not categoryFolder:IsA("Folder") then continue end
+	if not categoryFolder:IsA("Folder") then
+		continue
+	end
 	local mobName = categoryFolder.Name
 	if not MobConfig.Mobs[mobName] then
 		warn("[MobServer] No config entry for spawner: " .. mobName)

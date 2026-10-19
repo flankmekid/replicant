@@ -6,7 +6,7 @@ local player = Players.LocalPlayer
 local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 
 -- Remotes
-local CastSkillRemote = ReplicatedStorage.remotes:WaitForChild("CastSkill") 
+local CastSkillRemote = ReplicatedStorage.remotes:WaitForChild("CastSkill")
 local serverRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("server")
 local TriggerCooldownEvent = ReplicatedStorage.remotes:WaitForChild("TriggerCooldown")
 
@@ -14,10 +14,10 @@ local mouse = player:GetMouse()
 
 -- 1 = Z, 2 = X, 3 = C, 4 = V (Race)
 local KEYS = {
-	[Enum.KeyCode.Z] = 1, 
-	[Enum.KeyCode.X] = 2, 
+	[Enum.KeyCode.Z] = 1,
+	[Enum.KeyCode.X] = 2,
 	[Enum.KeyCode.C] = 3,
-	[Enum.KeyCode.V] = 4, 
+	[Enum.KeyCode.V] = 4,
 }
 
 -- [[ COOLDOWNS ARE SERVER-CONFIRMED ]] --
@@ -38,7 +38,9 @@ local function GetCurrentWeapon()
 	local char = player.Character
 	if char then
 		local tool = char:FindFirstChildWhichIsA("Tool")
-		if tool then return tool.Name end
+		if tool then
+			return tool.Name
+		end
 	end
 	return nil
 end
@@ -55,16 +57,36 @@ local function GetRaceSkill()
 end
 
 local function CanCast(char)
-	if char:GetAttribute("CantAnything") then return false end
-	if char:GetAttribute("Stunned") then return false end
-	if char:GetAttribute("Blocking") then return false end
-	if char:GetAttribute("Parrying") then return false end
-	if char:GetAttribute("Dodging") then return false end
-	if char:GetAttribute("M1") then return false end
-	if char:GetAttribute("M2") then return false end
-	if char:GetAttribute("Carried") then return false end
-	if char:GetAttribute("Downed") then return false end
-	if char:GetAttribute("Carrying") then return false end
+	if char:GetAttribute("CantAnything") then
+		return false
+	end
+	if char:GetAttribute("Stunned") then
+		return false
+	end
+	if char:GetAttribute("Blocking") then
+		return false
+	end
+	if char:GetAttribute("Parrying") then
+		return false
+	end
+	if char:GetAttribute("Dodging") then
+		return false
+	end
+	if char:GetAttribute("M1") then
+		return false
+	end
+	if char:GetAttribute("M2") then
+		return false
+	end
+	if char:GetAttribute("Carried") then
+		return false
+	end
+	if char:GetAttribute("Downed") then
+		return false
+	end
+	if char:GetAttribute("Carrying") then
+		return false
+	end
 	return true
 end
 
@@ -72,12 +94,18 @@ end
 -- The server tells us whether the cast actually happened. Only an accepted cast arms
 -- the real cooldown + HUD; a declined cast releases the short pending lock.
 CastSkillRemote.OnClientEvent:Connect(function(data)
-	if type(data) ~= "table" or data.Func ~= "CastResponse" then return end
+	if type(data) ~= "table" or data.Func ~= "CastResponse" then
+		return
+	end
 	local skillName = data.Skill
-	if not skillName then return end
+	if not skillName then
+		return
+	end
 
 	if data.Decision == "Accepted" then
-		local cdDuration = data.Cooldown or (SkillConfig.Skills[skillName] and SkillConfig.Skills[skillName].Cooldown) or 1
+		local cdDuration = data.Cooldown
+			or (SkillConfig.Skills[skillName] and SkillConfig.Skills[skillName].Cooldown)
+			or 1
 		cooldowns[skillName] = os.time() + cdDuration
 		TriggerCooldownEvent:Fire(skillName, cdDuration)
 	elseif data.Decision == "Declined" then
@@ -88,14 +116,22 @@ CastSkillRemote.OnClientEvent:Connect(function(data)
 end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
+	if gameProcessed then
+		return
+	end
 
 	local slot = KEYS[input.KeyCode]
-	if not slot then return end 
+	if not slot then
+		return
+	end
 
 	local char = player.Character
-	if not char then return end
-	if not CanCast(char) then return end
+	if not char then
+		return
+	end
+	if not CanCast(char) then
+		return
+	end
 
 	local skillName = nil
 
@@ -121,10 +157,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		end
 	end
 
-	if not skillName then return end 
+	if not skillName then
+		return
+	end
 
 	local skillData = SkillConfig.Skills[skillName]
-	if not skillData then return end -- Logic safety
+	if not skillData then
+		return
+	end -- Logic safety
 
 	-- Check unlock (Weapons only) or inherent (Race)
 	local stats = player:FindFirstChild("PlayerStats")
@@ -132,11 +172,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 
 	if not isRaceSkill then
 		-- If it's a weapon skill, verify we unlocked it in inventory
-		if not stats or not stats:WaitForChild("UnlockedSkills"):FindFirstChild(skillName) then return end
+		if not stats or not stats:WaitForChild("UnlockedSkills"):FindFirstChild(skillName) then
+			return
+		end
 	end
 
 	-- Cooldown Check (covers both the real cooldown and the short pending lock)
-	if cooldowns[skillName] and os.time() < cooldowns[skillName] then return end
+	if cooldowns[skillName] and os.time() < cooldowns[skillName] then
+		return
+	end
 
 	-- [[ MANA CHECK (NEW) ]] --
 	local manaCost = skillData.Mana or 0
@@ -144,18 +188,20 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		local currentMana = stats and stats:FindFirstChild("Mana") and stats.Mana.Value or 0
 		if currentMana < manaCost then
 			-- Optional: Play a "No Mana" sound or UI shake here
-			return 
+			return
 		end
 	end
 
 	-- Special HP Conditions
-	if skillName == "Messatsu" and char.Humanoid.Health >= (char.Humanoid.MaxHealth) / 2 then return end
+	if skillName == "Messatsu" and char.Humanoid.Health >= char.Humanoid.MaxHealth / 2 then
+		return
+	end
 
 	if skillName == "Silk Grasp" then
 		local hrp = char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			local dist = (mouse.Hit.Position - hrp.Position).Magnitude
-			if dist > 77.5 then 
+			if dist > 77.5 then
 				return
 			end
 		end

@@ -1,83 +1,83 @@
-local Players           = game:GetService("Players")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService      = game:GetService("TweenService")
-local UserInputService  = game:GetService("UserInputService")
-local Workspace         = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
 
-local SpireConfig  = require(ReplicatedStorage.SpireSystem.SpireConfig)
-local SkillConfig  = require(ReplicatedStorage.modules.SkillConfig)
+local SpireConfig = require(ReplicatedStorage.SpireSystem.SpireConfig)
+local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 local EquipSkillAction = ReplicatedStorage.SpireSystem:WaitForChild("EquipSkillAction")
-local SpireRemote  = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
-local SpireUpdate  = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
-local ArmorAction  = ReplicatedStorage.SpireSystem:WaitForChild("ArmorAction")
-local ArmorConfig  = require(ReplicatedStorage.modules:WaitForChild("ArmorConfig"))
+local SpireRemote = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
+local SpireUpdate = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
+local ArmorAction = ReplicatedStorage.SpireSystem:WaitForChild("ArmorAction")
+local ArmorConfig = require(ReplicatedStorage.modules:WaitForChild("ArmorConfig"))
 
-local player    = Players.LocalPlayer
+local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
 
 -- ── GUI REFERENCES ────────────────────────────────────────────────────────────
-local SpireGui       = PlayerGui:WaitForChild("SpireGui")
-local MapFrame       = SpireGui:WaitForChild("MapFrame")
-local SpireList      = MapFrame:WaitForChild("SpireList")
-local CloseButton    = MapFrame:WaitForChild("Header"):WaitForChild("CloseButton")
-local Footer         = MapFrame:WaitForChild("Footer")
+local SpireGui = PlayerGui:WaitForChild("SpireGui")
+local MapFrame = SpireGui:WaitForChild("MapFrame")
+local SpireList = MapFrame:WaitForChild("SpireList")
+local CloseButton = MapFrame:WaitForChild("Header"):WaitForChild("CloseButton")
+local Footer = MapFrame:WaitForChild("Footer")
 local TeleportButton = Footer:WaitForChild("TeleportButton")
-local SelectedLabel  = Footer:WaitForChild("SelectedLabel")
-local CostLabel      = Footer:WaitForChild("CostLabel")
-local ErrorLabel     = Footer:WaitForChild("ErrorLabel")
+local SelectedLabel = Footer:WaitForChild("SelectedLabel")
+local CostLabel = Footer:WaitForChild("CostLabel")
+local ErrorLabel = Footer:WaitForChild("ErrorLabel")
 local AttunementToast = SpireGui:WaitForChild("AttunementToast")
-local ToastLabel     = AttunementToast:WaitForChild("Inner"):WaitForChild("ToastLabel")
+local ToastLabel = AttunementToast:WaitForChild("Inner"):WaitForChild("ToastLabel")
 
 -- ── COLOURS ───────────────────────────────────────────────────────────────────
-local COLOR_GOLD       = Color3.fromRGB(212, 175, 55)
-local COLOR_GOLD_DIM   = Color3.fromRGB(140, 110, 35)
-local COLOR_WHITE      = Color3.fromRGB(235, 225, 205)
-local COLOR_MUTED      = Color3.fromRGB(140, 128, 108)
-local COLOR_UNATTUNED  = Color3.fromRGB(60, 55, 48)
+local COLOR_GOLD = Color3.fromRGB(212, 175, 55)
+local COLOR_GOLD_DIM = Color3.fromRGB(140, 110, 35)
+local COLOR_WHITE = Color3.fromRGB(235, 225, 205)
+local COLOR_MUTED = Color3.fromRGB(140, 128, 108)
+local COLOR_UNATTUNED = Color3.fromRGB(60, 55, 48)
 local COLOR_BTN_NORMAL = Color3.fromRGB(38, 30, 18)
 local COLOR_BTN_SELECT = Color3.fromRGB(60, 50, 30)
-local COLOR_BTN_HOVER  = Color3.fromRGB(48, 40, 24)
+local COLOR_BTN_HOVER = Color3.fromRGB(48, 40, 24)
 
 -- ── TWEENS ────────────────────────────────────────────────────────────────────
-local FADE_IN   = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local FADE_OUT  = TweenInfo.new(0.2,  Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local TOAST_IN  = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
-local TOAST_OUT = TweenInfo.new(0.4,  Enum.EasingStyle.Quad,  Enum.EasingDirection.In)
+local FADE_IN = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local FADE_OUT = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local TOAST_IN = TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+local TOAST_OUT = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 -- ── STATE ─────────────────────────────────────────────────────────────────────
-local attunedSpires   = {}
+local attunedSpires = {}
 local selectedSpireId = nil
-local mapOpen         = false
-local listButtons     = {}
-local toastPlaying    = false
-local toastQueue      = {}
+local mapOpen = false
+local listButtons = {}
+local toastPlaying = false
+local toastQueue = {}
 
 -- ── REST / STAT MENU ──────────────────────────────────────────────────────────
 local StatAction = ReplicatedStorage.SpireSystem:WaitForChild("StatAction")
 
-local character   = player.Character or player.CharacterAdded:Wait()
-local resting     = false
+local character = player.Character or player.CharacterAdded:Wait()
+local resting = false
 local currentRestSpireId = nil
 
 -- Stat metadata for the level-up panel.
-local STAT_ORDER = {"Vitality","Stamina","Strength","Dexterity","Magic"}
+local STAT_ORDER = { "Vitality", "Stamina", "Strength", "Dexterity", "Magic" }
 local STAT_DESC = {
-	Vitality  = "Max HP",
-	Stamina   = "Movement & dashes",
-	Strength  = "Weapon damage",
+	Vitality = "Max HP",
+	Stamina = "Movement & dashes",
+	Strength = "Weapon damage",
 	Dexterity = "Skill damage",
-	Magic     = "Mana & racial power",
+	Magic = "Mana & racial power",
 }
 -- Player-facing wording for server reason codes.
 local REASON_TEXT = {
 	NotEnoughLiturgy = "Not enough Liturgy",
-	MaxStat          = "Stat is maxed",
-	NothingToRespec  = "No points to respec",
-	MustRest         = "You must rest first",
-	BadStat          = "Invalid stat",
-	BadAction        = "Invalid action",
-	NoProfile        = "Data not loaded",
-	NoStats          = "No stats found",
+	MaxStat = "Stat is maxed",
+	NothingToRespec = "No points to respec",
+	MustRest = "You must rest first",
+	BadStat = "Invalid stat",
+	BadAction = "Invalid action",
+	NoProfile = "Data not loaded",
+	NoStats = "No stats found",
 }
 local function reasonText(code)
 	return REASON_TEXT[code] or tostring(code)
@@ -89,7 +89,9 @@ local restTrack = nil
 local function loadRestAnim()
 	local hum = character and character:FindFirstChild("Humanoid")
 	local animator = hum and hum:FindFirstChild("Animator")
-	if not animator then return end
+	if not animator then
+		return
+	end
 	local anim = Instance.new("Animation")
 	anim.AnimationId = REST_ANIM_ID
 	restTrack = animator:LoadAnimation(anim)
@@ -123,14 +125,22 @@ local function makeButton(parent, text, order)
 	b.Font = Enum.Font.Merriweather
 	b.LayoutOrder = order or 0
 	b.Parent = parent
-	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 6); c.Parent = b
-	b.MouseEnter:Connect(function() b.BackgroundColor3 = COLOR_BTN_HOVER end)
-	b.MouseLeave:Connect(function() b.BackgroundColor3 = COLOR_BTN_NORMAL end)
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 6)
+	c.Parent = b
+	b.MouseEnter:Connect(function()
+		b.BackgroundColor3 = COLOR_BTN_HOVER
+	end)
+	b.MouseLeave:Connect(function()
+		b.BackgroundColor3 = COLOR_BTN_NORMAL
+	end)
 	return b
 end
 
 local function buildRestGui()
-	if restGui then return end
+	if restGui then
+		return
+	end
 	restGui = Instance.new("ScreenGui")
 	restGui.Name = "RestMenuGui"
 	restGui.ResetOnSpawn = false
@@ -159,11 +169,18 @@ local function buildRestGui()
 	restPanel.BackgroundTransparency = 0.08
 	restPanel.BorderSizePixel = 0
 	restPanel.Parent = restGui
-	local rc = Instance.new("UICorner"); rc.CornerRadius = UDim.new(0, 10); rc.Parent = restPanel
-	local rstroke = Instance.new("UIStroke"); rstroke.Color = COLOR_GOLD_DIM; rstroke.Thickness = 1; rstroke.Parent = restPanel
+	local rc = Instance.new("UICorner")
+	rc.CornerRadius = UDim.new(0, 10)
+	rc.Parent = restPanel
+	local rstroke = Instance.new("UIStroke")
+	rstroke.Color = COLOR_GOLD_DIM
+	rstroke.Thickness = 1
+	rstroke.Parent = restPanel
 	local rpad = Instance.new("UIPadding")
-	rpad.PaddingTop = UDim.new(0, 16); rpad.PaddingBottom = UDim.new(0, 16)
-	rpad.PaddingLeft = UDim.new(0, 16); rpad.PaddingRight = UDim.new(0, 16)
+	rpad.PaddingTop = UDim.new(0, 16)
+	rpad.PaddingBottom = UDim.new(0, 16)
+	rpad.PaddingLeft = UDim.new(0, 16)
+	rpad.PaddingRight = UDim.new(0, 16)
 	rpad.Parent = restPanel
 
 	local title = Instance.new("TextLabel")
@@ -183,35 +200,47 @@ local function buildRestGui()
 	list.BackgroundTransparency = 1
 	list.Parent = restPanel
 	local ll = Instance.new("UIListLayout")
-	ll.Padding = UDim.new(0, 10); ll.SortOrder = Enum.SortOrder.LayoutOrder
+	ll.Padding = UDim.new(0, 10)
+	ll.SortOrder = Enum.SortOrder.LayoutOrder
 	ll.Parent = list
 
-	local travelBtn   = makeButton(list, "Travel", 1)
-	local levelBtn    = makeButton(list, "Level Up", 2)
-	local spellbookBtn= makeButton(list, "Spellbook", 3)
-	local armoryBtn   = makeButton(list, "Armory", 4)
-	local respecBtn   = makeButton(list, "Respec", 5)
-	local leaveBtn    = makeButton(list, "Leave", 6)
+	local travelBtn = makeButton(list, "Travel", 1)
+	local levelBtn = makeButton(list, "Level Up", 2)
+	local spellbookBtn = makeButton(list, "Spellbook", 3)
+	local armoryBtn = makeButton(list, "Armory", 4)
+	local respecBtn = makeButton(list, "Respec", 5)
+	local leaveBtn = makeButton(list, "Leave", 6)
 	leaveBtn.BackgroundColor3 = Color3.fromRGB(50, 24, 18)
 
-	travelBtn.MouseButton1Click:Connect(function() openMap() end)
-	levelBtn.MouseButton1Click:Connect(function() openStatPanel() end)
-	spellbookBtn.MouseButton1Click:Connect(function() openSpellbookPanel() end)
-	armoryBtn.MouseButton1Click:Connect(function() openArmoryPanel() end)
-	respecBtn.MouseButton1Click:Connect(function() doRespec() end)
-	leaveBtn.MouseButton1Click:Connect(function() requestEndRest() end)
+	travelBtn.MouseButton1Click:Connect(function()
+		openMap()
+	end)
+	levelBtn.MouseButton1Click:Connect(function()
+		openStatPanel()
+	end)
+	spellbookBtn.MouseButton1Click:Connect(function()
+		openSpellbookPanel()
+	end)
+	armoryBtn.MouseButton1Click:Connect(function()
+		openArmoryPanel()
+	end)
+	respecBtn.MouseButton1Click:Connect(function()
+		doRespec()
+	end)
+	leaveBtn.MouseButton1Click:Connect(function()
+		requestEndRest()
+	end)
 
 	buildStatPanel()
 	buildSpellbookPanel()
 	buildArmoryPanel()
 end
 
-
 -- ── ATTUNEMENT SOUND ──────────────────────────────────────────────────────────
 local attunementSound = Instance.new("Sound")
 attunementSound.SoundId = "rbxassetid://6895079185"
-attunementSound.Volume  = 0.8
-attunementSound.Parent  = PlayerGui
+attunementSound.Volume = 0.8
+attunementSound.Parent = PlayerGui
 
 -- ── TOAST ─────────────────────────────────────────────────────────────────────
 local function playToast(text)
@@ -226,7 +255,9 @@ local function playToast(text)
 	}):Play()
 
 	task.wait(0.35 + 2.2)
-	if not AttunementToast.Parent then return end
+	if not AttunementToast.Parent then
+		return
+	end
 
 	local out = TweenService:Create(AttunementToast, TOAST_OUT, {
 		GroupTransparency = 1,
@@ -238,7 +269,9 @@ end
 
 local function queueToast(text)
 	table.insert(toastQueue, text)
-	if toastPlaying then return end
+	if toastPlaying then
+		return
+	end
 	toastPlaying = true
 	task.spawn(function()
 		while #toastQueue > 0 do
@@ -252,25 +285,35 @@ end
 -- ── SPIRE WORLD EFFECT ────────────────────────────────────────────────────────
 local function playAttunementEffect(spirePartName)
 	local part = Workspace:FindFirstChild(spirePartName, true)
-	if not part then return end
+	if not part then
+		return
+	end
 
 	attunementSound:Play()
 
 	local light = Instance.new("PointLight")
 	light.Brightness = 0
-	light.Color      = Color3.fromRGB(180, 220, 255)
-	light.Range      = 0
-	light.Parent     = part
+	light.Color = Color3.fromRGB(180, 220, 255)
+	light.Range = 0
+	light.Parent = part
 
-	TweenService:Create(light, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Brightness = 5, Range = 30,
-	}):Play()
+	TweenService
+		:Create(light, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Brightness = 5,
+			Range = 30,
+		})
+		:Play()
 
 	task.wait(0.4)
 
-	local out = TweenService:Create(light, TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-		Brightness = 0, Range = 0,
-	})
+	local out = TweenService:Create(
+		light,
+		TweenInfo.new(0.8, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+		{
+			Brightness = 0,
+			Range = 0,
+		}
+	)
 	out:Play()
 	out.Completed:Wait()
 	light:Destroy()
@@ -286,16 +329,19 @@ local function selectEntry(spireId)
 
 	local spireDef = nil
 	for _, s in ipairs(SpireConfig.Spires) do
-		if s.Id == spireId then spireDef = s break end
+		if s.Id == spireId then
+			spireDef = s
+			break
+		end
 	end
 
 	if spireDef then
-		SelectedLabel.Text       = spireDef.Name
+		SelectedLabel.Text = spireDef.Name
 		SelectedLabel.TextColor3 = COLOR_GOLD
-		CostLabel.Text           = SpireConfig.TeleportCost .. " L"
-		CostLabel.Visible        = true
-		ErrorLabel.Visible       = false
-		TeleportButton.Visible   = true
+		CostLabel.Text = SpireConfig.TeleportCost .. " L"
+		CostLabel.Visible = true
+		ErrorLabel.Visible = false
+		TeleportButton.Visible = true
 	end
 end
 
@@ -311,15 +357,16 @@ local function buildList()
 		local isAttuned = attunedSpires[spire.Id] == true
 
 		local btn = Instance.new("TextButton")
-		btn.Name             = spire.Id
-		btn.Size             = UDim2.new(1, 0, 0, 52)
-		btn.BackgroundColor3 = (spire.Id == selectedSpireId) and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
-		btn.BorderSizePixel  = 0
-		btn.Text             = ""
-		btn.AutoButtonColor  = false
-		btn.LayoutOrder      = i
-		btn.Active           = isAttuned
-		btn.Parent           = SpireList
+		btn.Name = spire.Id
+		btn.Size = UDim2.new(1, 0, 0, 52)
+		btn.BackgroundColor3 = (spire.Id == selectedSpireId) and COLOR_BTN_SELECT
+			or COLOR_BTN_NORMAL
+		btn.BorderSizePixel = 0
+		btn.Text = ""
+		btn.AutoButtonColor = false
+		btn.LayoutOrder = i
+		btn.Active = isAttuned
+		btn.Parent = SpireList
 
 		local btnCorner = Instance.new("UICorner")
 		btnCorner.CornerRadius = UDim.new(0, 6)
@@ -327,51 +374,51 @@ local function buildList()
 
 		-- Attunement pip
 		local pip = Instance.new("Frame")
-		pip.Size             = UDim2.new(0, 6, 0, 6)
-		pip.Position         = UDim2.new(0, 14, 0.5, -3)
+		pip.Size = UDim2.new(0, 6, 0, 6)
+		pip.Position = UDim2.new(0, 14, 0.5, -3)
 		pip.BackgroundColor3 = isAttuned and COLOR_GOLD or COLOR_UNATTUNED
-		pip.BorderSizePixel  = 0
-		pip.Parent           = btn
+		pip.BorderSizePixel = 0
+		pip.Parent = btn
 		local pipCorner = Instance.new("UICorner")
 		pipCorner.CornerRadius = UDim.new(1, 0)
 		pipCorner.Parent = pip
 
 		-- Location name
 		local nameLbl = Instance.new("TextLabel")
-		nameLbl.Size             = UDim2.new(1, -40, 0, 26)
-		nameLbl.Position         = UDim2.new(0, 30, 0, 8)
+		nameLbl.Size = UDim2.new(1, -40, 0, 26)
+		nameLbl.Position = UDim2.new(0, 30, 0, 8)
 		nameLbl.BackgroundTransparency = 1
-		nameLbl.Text             = spire.Name
-		nameLbl.TextColor3       = isAttuned and COLOR_WHITE or COLOR_UNATTUNED
-		nameLbl.TextSize         = 13
-		nameLbl.Font             = Enum.Font.Merriweather
-		nameLbl.TextXAlignment   = Enum.TextXAlignment.Left
-		nameLbl.TextTruncate     = Enum.TextTruncate.AtEnd
-		nameLbl.Parent           = btn
+		nameLbl.Text = spire.Name
+		nameLbl.TextColor3 = isAttuned and COLOR_WHITE or COLOR_UNATTUNED
+		nameLbl.TextSize = 13
+		nameLbl.Font = Enum.Font.Merriweather
+		nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+		nameLbl.TextTruncate = Enum.TextTruncate.AtEnd
+		nameLbl.Parent = btn
 
 		-- Zone subtitle
 		local zoneLbl = Instance.new("TextLabel")
-		zoneLbl.Size             = UDim2.new(1, -40, 0, 16)
-		zoneLbl.Position         = UDim2.new(0, 30, 0, 30)
+		zoneLbl.Size = UDim2.new(1, -40, 0, 16)
+		zoneLbl.Position = UDim2.new(0, 30, 0, 30)
 		zoneLbl.BackgroundTransparency = 1
-		zoneLbl.Text             = spire.Zone
-		zoneLbl.TextColor3       = isAttuned and COLOR_MUTED or COLOR_UNATTUNED
-		zoneLbl.TextSize         = 11
-		zoneLbl.Font             = Enum.Font.Merriweather
-		zoneLbl.TextXAlignment   = Enum.TextXAlignment.Left
-		zoneLbl.Parent           = btn
+		zoneLbl.Text = spire.Zone
+		zoneLbl.TextColor3 = isAttuned and COLOR_MUTED or COLOR_UNATTUNED
+		zoneLbl.TextSize = 11
+		zoneLbl.Font = Enum.Font.Merriweather
+		zoneLbl.TextXAlignment = Enum.TextXAlignment.Left
+		zoneLbl.Parent = btn
 
 		-- Lock icon for unattuned
 		if not isAttuned then
 			local lockLbl = Instance.new("TextLabel")
-			lockLbl.Size             = UDim2.new(0, 20, 0, 20)
-			lockLbl.Position         = UDim2.new(1, -28, 0.5, -10)
+			lockLbl.Size = UDim2.new(0, 20, 0, 20)
+			lockLbl.Position = UDim2.new(1, -28, 0.5, -10)
 			lockLbl.BackgroundTransparency = 1
-			lockLbl.Text             = "X"
-			lockLbl.TextSize         = 14
-			lockLbl.TextColor3       = COLOR_UNATTUNED
-			lockLbl.Font             = Enum.Font.Merriweather
-			lockLbl.Parent           = btn
+			lockLbl.Text = "X"
+			lockLbl.TextSize = 14
+			lockLbl.TextColor3 = COLOR_UNATTUNED
+			lockLbl.Font = Enum.Font.Merriweather
+			lockLbl.Parent = btn
 		end
 
 		if isAttuned then
@@ -398,7 +445,9 @@ end
 
 -- ── STAT PANEL (Level Up) ──────────────────────────────────────────────────────
 buildStatPanel = function()
-	if statPanel then return end
+	if statPanel then
+		return
+	end
 	statPanel = Instance.new("Frame")
 	statPanel.Name = "StatPanel"
 	statPanel.AnchorPoint = Vector2.new(0, 0.5)
@@ -409,11 +458,18 @@ buildStatPanel = function()
 	statPanel.BorderSizePixel = 0
 	statPanel.Visible = false
 	statPanel.Parent = restGui
-	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 10); c.Parent = statPanel
-	local st = Instance.new("UIStroke"); st.Color = COLOR_GOLD_DIM; st.Thickness = 1; st.Parent = statPanel
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 10)
+	c.Parent = statPanel
+	local st = Instance.new("UIStroke")
+	st.Color = COLOR_GOLD_DIM
+	st.Thickness = 1
+	st.Parent = statPanel
 	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0,16); pad.PaddingBottom = UDim.new(0,16)
-	pad.PaddingLeft = UDim.new(0,16); pad.PaddingRight = UDim.new(0,16)
+	pad.PaddingTop = UDim.new(0, 16)
+	pad.PaddingBottom = UDim.new(0, 16)
+	pad.PaddingLeft = UDim.new(0, 16)
+	pad.PaddingRight = UDim.new(0, 16)
 	pad.Parent = statPanel
 
 	local hdr = Instance.new("TextLabel")
@@ -453,7 +509,9 @@ buildStatPanel = function()
 	rows.Size = UDim2.new(1, 0, 1, -160)
 	rows.BackgroundTransparency = 1
 	rows.Parent = statPanel
-	local rl = Instance.new("UIListLayout"); rl.Padding = UDim.new(0, 8); rl.Parent = rows
+	local rl = Instance.new("UIListLayout")
+	rl.Padding = UDim.new(0, 8)
+	rl.Parent = rows
 
 	for i, stat in ipairs(STAT_ORDER) do
 		local row = Instance.new("Frame")
@@ -462,7 +520,9 @@ buildStatPanel = function()
 		row.BorderSizePixel = 0
 		row.LayoutOrder = i
 		row.Parent = rows
-		local rcc = Instance.new("UICorner"); rcc.CornerRadius = UDim.new(0,6); rcc.Parent = row
+		local rcc = Instance.new("UICorner")
+		rcc.CornerRadius = UDim.new(0, 6)
+		rcc.Parent = row
 
 		local nameLbl = Instance.new("TextLabel")
 		nameLbl.Size = UDim2.new(0.55, 0, 0, 22)
@@ -507,7 +567,9 @@ buildStatPanel = function()
 		plus.TextSize = 20
 		plus.Font = Enum.Font.Merriweather
 		plus.Parent = row
-		local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(0,6); pc.Parent = plus
+		local pc = Instance.new("UICorner")
+		pc.CornerRadius = UDim.new(0, 6)
+		pc.Parent = plus
 
 		plus.MouseButton1Click:Connect(function()
 			-- Assigning a stat point is FREE; it just spends an available skill point.
@@ -532,10 +594,14 @@ buildStatPanel = function()
 	bottom.BackgroundColor3 = Color3.fromRGB(28, 23, 14)
 	bottom.BorderSizePixel = 0
 	bottom.Parent = statPanel
-	local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 8); bc.Parent = bottom
+	local bc = Instance.new("UICorner")
+	bc.CornerRadius = UDim.new(0, 8)
+	bc.Parent = bottom
 	local bpad = Instance.new("UIPadding")
-	bpad.PaddingTop = UDim.new(0,8); bpad.PaddingBottom = UDim.new(0,8)
-	bpad.PaddingLeft = UDim.new(0,10); bpad.PaddingRight = UDim.new(0,10)
+	bpad.PaddingTop = UDim.new(0, 8)
+	bpad.PaddingBottom = UDim.new(0, 8)
+	bpad.PaddingLeft = UDim.new(0, 10)
+	bpad.PaddingRight = UDim.new(0, 10)
 	bpad.Parent = bottom
 
 	skillPointLabel = Instance.new("TextLabel")
@@ -572,7 +638,9 @@ buildStatPanel = function()
 	buySkillBtn.TextSize = 13
 	buySkillBtn.Font = Enum.Font.Merriweather
 	buySkillBtn.Parent = bottom
-	local bbc = Instance.new("UICorner"); bbc.CornerRadius = UDim.new(0, 6); bbc.Parent = buySkillBtn
+	local bbc = Instance.new("UICorner")
+	bbc.CornerRadius = UDim.new(0, 6)
+	bbc.Parent = buySkillBtn
 
 	buySkillBtn.MouseButton1Click:Connect(function()
 		local result = StatAction:InvokeServer("BuySkill")
@@ -594,7 +662,9 @@ local spellHeader, spellSubHeader, spellSlotsFrame, spellEmptyLabel
 local spellRowRefs = {} -- [slotKey] = { options = {[skillName]=button}, container = frame }
 
 buildSpellbookPanel = function()
-	if spellPanel then return end
+	if spellPanel then
+		return
+	end
 	spellPanel = Instance.new("Frame")
 	spellPanel.Name = "SpellbookPanel"
 	spellPanel.AnchorPoint = Vector2.new(0, 0.5)
@@ -605,11 +675,18 @@ buildSpellbookPanel = function()
 	spellPanel.BorderSizePixel = 0
 	spellPanel.Visible = false
 	spellPanel.Parent = restGui
-	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 10); c.Parent = spellPanel
-	local st = Instance.new("UIStroke"); st.Color = COLOR_GOLD_DIM; st.Thickness = 1; st.Parent = spellPanel
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 10)
+	c.Parent = spellPanel
+	local st = Instance.new("UIStroke")
+	st.Color = COLOR_GOLD_DIM
+	st.Thickness = 1
+	st.Parent = spellPanel
 	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0,16); pad.PaddingBottom = UDim.new(0,16)
-	pad.PaddingLeft = UDim.new(0,16); pad.PaddingRight = UDim.new(0,16)
+	pad.PaddingTop = UDim.new(0, 16)
+	pad.PaddingBottom = UDim.new(0, 16)
+	pad.PaddingLeft = UDim.new(0, 16)
+	pad.PaddingRight = UDim.new(0, 16)
 	pad.Parent = spellPanel
 
 	spellHeader = Instance.new("TextLabel")
@@ -657,7 +734,8 @@ buildSpellbookPanel = function()
 	spellSlotsFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	spellSlotsFrame.Parent = spellPanel
 	local sl = Instance.new("UIListLayout")
-	sl.Padding = UDim.new(0, 12); sl.SortOrder = Enum.SortOrder.LayoutOrder
+	sl.Padding = UDim.new(0, 12)
+	sl.SortOrder = Enum.SortOrder.LayoutOrder
 	sl.Parent = spellSlotsFrame
 end
 
@@ -667,12 +745,16 @@ end
 local expandedSlot = nil
 
 refreshSpellbookPanel = function(snap)
-	if not spellPanel then return end
+	if not spellPanel then
+		return
+	end
 	currentSnapshot = snap
 	expandedSlot = nil
 
 	for _, child in ipairs(spellSlotsFrame:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
 	end
 	spellRowRefs = {}
 
@@ -689,15 +771,17 @@ refreshSpellbookPanel = function(snap)
 	spellSlotsFrame.Visible = true
 	spellEmptyLabel.Visible = false
 
-	local OPT_H = 32      -- height of one option button
-	local OPT_PAD = 4     -- padding between options
+	local OPT_H = 32 -- height of one option button
+	local OPT_PAD = 4 -- padding between options
 	local EXPAND_TW = TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 	-- Collapse any currently-open slot, optionally skipping one.
 	local collapseFns = {}
 	local function collapseAllExcept(keep)
 		for k, fn in pairs(collapseFns) do
-			if k ~= keep then fn() end
+			if k ~= keep then
+				fn()
+			end
 		end
 	end
 
@@ -716,7 +800,8 @@ refreshSpellbookPanel = function(snap)
 		group.LayoutOrder = slotIdx
 		group.Parent = spellSlotsFrame
 		local gl = Instance.new("UIListLayout")
-		gl.Padding = UDim.new(0, OPT_PAD); gl.SortOrder = Enum.SortOrder.LayoutOrder
+		gl.Padding = UDim.new(0, OPT_PAD)
+		gl.SortOrder = Enum.SortOrder.LayoutOrder
 		gl.Parent = group
 
 		-- Header button: "Z   <equipped skill>" + a chevron.
@@ -728,7 +813,9 @@ refreshSpellbookPanel = function(snap)
 		header.Text = ""
 		header.LayoutOrder = 0
 		header.Parent = group
-		local hc = Instance.new("UICorner"); hc.CornerRadius = UDim.new(0, 6); hc.Parent = header
+		local hc = Instance.new("UICorner")
+		hc.CornerRadius = UDim.new(0, 6)
+		hc.Parent = header
 
 		local slotTag = Instance.new("TextLabel")
 		slotTag.Size = UDim2.new(0, 28, 1, 0)
@@ -772,16 +859,21 @@ refreshSpellbookPanel = function(snap)
 		optWrap.LayoutOrder = 1
 		optWrap.Parent = group
 		local owl = Instance.new("UIListLayout")
-		owl.Padding = UDim.new(0, OPT_PAD); owl.SortOrder = Enum.SortOrder.LayoutOrder
+		owl.Padding = UDim.new(0, OPT_PAD)
+		owl.SortOrder = Enum.SortOrder.LayoutOrder
 		owl.Parent = optWrap
 
 		spellRowRefs[slotKey] = { options = {}, header = eqLbl }
 
 		header.MouseEnter:Connect(function()
-			if expandedSlot ~= slotKey then header.BackgroundColor3 = COLOR_BTN_HOVER end
+			if expandedSlot ~= slotKey then
+				header.BackgroundColor3 = COLOR_BTN_HOVER
+			end
 		end)
 		header.MouseLeave:Connect(function()
-			if expandedSlot ~= slotKey then header.BackgroundColor3 = COLOR_BTN_NORMAL end
+			if expandedSlot ~= slotKey then
+				header.BackgroundColor3 = COLOR_BTN_NORMAL
+			end
 		end)
 
 		if #owned == 0 then
@@ -806,7 +898,9 @@ refreshSpellbookPanel = function(snap)
 				optBtn.TextXAlignment = Enum.TextXAlignment.Left
 				optBtn.LayoutOrder = i
 				optBtn.Parent = optWrap
-				local oc = Instance.new("UICorner"); oc.CornerRadius = UDim.new(0, 6); oc.Parent = optBtn
+				local oc = Instance.new("UICorner")
+				oc.CornerRadius = UDim.new(0, 6)
+				oc.Parent = optBtn
 
 				local pip = Instance.new("Frame")
 				pip.Size = UDim2.new(0, 6, 0, 6)
@@ -815,32 +909,46 @@ refreshSpellbookPanel = function(snap)
 				pip.BorderSizePixel = 0
 				pip.Visible = isEq
 				pip.Parent = optBtn
-				local pc = Instance.new("UICorner"); pc.CornerRadius = UDim.new(1, 0); pc.Parent = pip
+				local pc = Instance.new("UICorner")
+				pc.CornerRadius = UDim.new(1, 0)
+				pc.Parent = pip
 
 				spellRowRefs[slotKey].options[skillName] = { button = optBtn, pip = pip }
 
 				local function isEquipped()
-					local sd = currentSnapshot and currentSnapshot.slots and currentSnapshot.slots[slotKey]
+					local sd = currentSnapshot
+						and currentSnapshot.slots
+						and currentSnapshot.slots[slotKey]
 					return sd and sd.equipped == skillName
 				end
 				optBtn.MouseEnter:Connect(function()
-					if not isEquipped() then optBtn.BackgroundColor3 = COLOR_BTN_HOVER end
+					if not isEquipped() then
+						optBtn.BackgroundColor3 = COLOR_BTN_HOVER
+					end
 				end)
 				optBtn.MouseLeave:Connect(function()
-					if not isEquipped() then optBtn.BackgroundColor3 = COLOR_BTN_NORMAL end
+					if not isEquipped() then
+						optBtn.BackgroundColor3 = COLOR_BTN_NORMAL
+					end
 				end)
 
 				local capturedSkill = skillName
 				optBtn.MouseButton1Click:Connect(function()
-					local result = EquipSkillAction:InvokeServer("Equip", family, slotKey, capturedSkill)
+					local result =
+						EquipSkillAction:InvokeServer("Equip", family, slotKey, capturedSkill)
 					if result and result.ok then
-						if currentSnapshot and currentSnapshot.slots and currentSnapshot.slots[slotKey] then
+						if
+							currentSnapshot
+							and currentSnapshot.slots
+							and currentSnapshot.slots[slotKey]
+						then
 							currentSnapshot.slots[slotKey].equipped = capturedSkill
 						end
 						-- Repaint options in this slot.
 						for name, refs in pairs(spellRowRefs[slotKey].options) do
 							local on = (name == capturedSkill)
-							refs.button.BackgroundColor3 = on and COLOR_BTN_SELECT or COLOR_BTN_NORMAL
+							refs.button.BackgroundColor3 = on and COLOR_BTN_SELECT
+								or COLOR_BTN_NORMAL
 							refs.button.TextColor3 = on and COLOR_GOLD or COLOR_WHITE
 							refs.pip.Visible = on
 						end
@@ -854,7 +962,9 @@ refreshSpellbookPanel = function(snap)
 			end
 
 			local function collapse()
-				if expandedSlot == slotKey then expandedSlot = nil end
+				if expandedSlot == slotKey then
+					expandedSlot = nil
+				end
 				chevron.Text = "v"
 				header.BackgroundColor3 = COLOR_BTN_NORMAL
 				TweenService:Create(optWrap, EXPAND_TW, { Size = UDim2.new(1, 0, 0, 0) }):Play()
@@ -866,27 +976,40 @@ refreshSpellbookPanel = function(snap)
 				expandedSlot = slotKey
 				chevron.Text = "^"
 				header.BackgroundColor3 = COLOR_BTN_SELECT
-				TweenService:Create(optWrap, EXPAND_TW, { Size = UDim2.new(1, 0, 0, fullHeight) }):Play()
+				TweenService:Create(optWrap, EXPAND_TW, { Size = UDim2.new(1, 0, 0, fullHeight) })
+					:Play()
 			end
 
 			header.MouseButton1Click:Connect(function()
-				if expandedSlot == slotKey then collapse() else expand() end
+				if expandedSlot == slotKey then
+					collapse()
+				else
+					expand()
+				end
 			end)
 		end
 	end
 end
 
 openSpellbookPanel = function()
-	if not spellPanel then buildSpellbookPanel() end
-	if statPanel then statPanel.Visible = false end
-	if armoryPanel then armoryPanel.Visible = false end
+	if not spellPanel then
+		buildSpellbookPanel()
+	end
+	if statPanel then
+		statPanel.Visible = false
+	end
+	if armoryPanel then
+		armoryPanel.Visible = false
+	end
 	local snap = EquipSkillAction:InvokeServer("Query")
 	refreshSpellbookPanel(snap)
 	spellPanel.Visible = true
 	spellPanel.Position = UDim2.new(0.04, 180, 0.5, 0)
-	TweenService:Create(spellPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.04, 256, 0.5, 0)
-	}):Play()
+	TweenService
+		:Create(spellPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.04, 256, 0.5, 0),
+		})
+		:Play()
 end
 
 -- ── ARMORY PANEL ───────────────────────────────────────────────────────────────
@@ -896,19 +1019,23 @@ end
 local armoryListFrame, armoryDetail, armoryCurrentLbl
 local armoryViewport, armoryWorldModel
 local armoryDetailTitle, armoryDetailStats, armoryEquipBtn, armoryTransmogBtn
-local armorySnapshot = nil          -- last server snapshot
-local armorySelected = nil          -- currently selected armor name in the detail view
-local armoryListButtons = {}        -- [armorName] = button
+local armorySnapshot = nil -- last server snapshot
+local armorySelected = nil -- currently selected armor name in the detail view
+local armoryListButtons = {} -- [armorName] = button
 
-local ARM_LIST_W = 150              -- width of the list compartment
+local ARM_LIST_W = 150 -- width of the list compartment
 local ARM_TW = TweenInfo.new(0.28, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
 
 -- Build (once) the armor stand inside the viewport: clone the template rig and
 -- park a camera in front of it. Clothing gets swapped per-selection.
 local function ensureArmoryStand()
-	if armoryWorldModel and armoryWorldModel.Parent then return end
+	if armoryWorldModel and armoryWorldModel.Parent then
+		return
+	end
 	local template = ReplicatedStorage.assets:FindFirstChild("ArmorTemplate")
-	if not template then return end
+	if not template then
+		return
+	end
 	armoryWorldModel = template:Clone()
 	armoryWorldModel.Parent = armoryViewport
 
@@ -930,30 +1057,42 @@ end
 
 -- Apply an armor's clothing to the stand's Armor model.
 local function dressStand(armorName)
-	if not armoryWorldModel then return end
+	if not armoryWorldModel then
+		return
+	end
 	local cfg = ArmorConfig.Armors[armorName]
-	if not cfg then return end
+	if not cfg then
+		return
+	end
 	local armorModel = armoryWorldModel:FindFirstChild("Armor")
 	local target = armorModel or armoryWorldModel
 	local shirt = target:FindFirstChildOfClass("Shirt")
 	if not shirt then
-		shirt = Instance.new("Shirt"); shirt.Parent = target
+		shirt = Instance.new("Shirt")
+		shirt.Parent = target
 	end
 	shirt.ShirtTemplate = cfg.ShirtID
 	local pants = target:FindFirstChildOfClass("Pants")
 	if not pants then
-		pants = Instance.new("Pants"); pants.Parent = target
+		pants = Instance.new("Pants")
+		pants.Parent = target
 	end
 	pants.PantsTemplate = cfg.PantsID
 end
 
 -- Refresh the small "current" readout (stats-armor + vanity-armor names).
 local function refreshArmoryCurrent()
-	if not armoryCurrentLbl or not armorySnapshot then return end
+	if not armoryCurrentLbl or not armorySnapshot then
+		return
+	end
 	local statsName = armorySnapshot.currentArmor or "Rags"
 	local vanityName = armorySnapshot.currentVanity or statsName
-	local statsDisp = (armorySnapshot.armors[statsName] and armorySnapshot.armors[statsName].DisplayName) or statsName
-	local vanDisp = (armorySnapshot.armors[vanityName] and armorySnapshot.armors[vanityName].DisplayName) or vanityName
+	local statsDisp = (
+		armorySnapshot.armors[statsName] and armorySnapshot.armors[statsName].DisplayName
+	) or statsName
+	local vanDisp = (
+		armorySnapshot.armors[vanityName] and armorySnapshot.armors[vanityName].DisplayName
+	) or vanityName
 	if vanityName == statsName then
 		armoryCurrentLbl.Text = "Worn: " .. statsDisp
 	else
@@ -963,9 +1102,11 @@ end
 
 -- Repaint Equip/Transmog enabled/greyed state for the selected armor.
 local function refreshArmoryButtons()
-	if not armorySelected or not armorySnapshot then return end
-	local isStats  = (armorySnapshot.currentArmor == armorySelected)
-	local vanity   = armorySnapshot.currentVanity or armorySnapshot.currentArmor
+	if not armorySelected or not armorySnapshot then
+		return
+	end
+	local isStats = (armorySnapshot.currentArmor == armorySelected)
+	local vanity = armorySnapshot.currentVanity or armorySnapshot.currentArmor
 	local isVanity = (vanity == armorySelected)
 
 	-- Equip is redundant only when this armor is BOTH the stats-armor and the
@@ -1000,7 +1141,9 @@ end
 local function selectArmor(armorName)
 	armorySelected = armorName
 	local info = armorySnapshot and armorySnapshot.armors[armorName]
-	if not info then return end
+	if not info then
+		return
+	end
 
 	-- Highlight the chosen list row.
 	for name, btn in pairs(armoryListButtons) do
@@ -1010,7 +1153,9 @@ local function selectArmor(armorName)
 	armoryDetailTitle.Text = info.DisplayName or armorName
 	armoryDetailStats.Text = string.format(
 		"HP   x%.2f\nDef  x%.2f\nDmg  x%.2f",
-		info.HPBuff or 1, info.DefBuff or 1, info.DmgBuff or 1
+		info.HPBuff or 1,
+		info.DefBuff or 1,
+		info.DmgBuff or 1
 	)
 	ensureArmoryStand()
 	dressStand(armorName)
@@ -1024,7 +1169,9 @@ local function selectArmor(armorName)
 end
 
 buildArmoryPanel = function()
-	if armoryPanel then return end
+	if armoryPanel then
+		return
+	end
 	armoryPanel = Instance.new("Frame")
 	armoryPanel.Name = "ArmoryPanel"
 	armoryPanel.AnchorPoint = Vector2.new(0, 0.5)
@@ -1035,11 +1182,18 @@ buildArmoryPanel = function()
 	armoryPanel.BorderSizePixel = 0
 	armoryPanel.Visible = false
 	armoryPanel.Parent = restGui
-	local c = Instance.new("UICorner"); c.CornerRadius = UDim.new(0, 10); c.Parent = armoryPanel
-	local st = Instance.new("UIStroke"); st.Color = COLOR_GOLD_DIM; st.Thickness = 1; st.Parent = armoryPanel
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 10)
+	c.Parent = armoryPanel
+	local st = Instance.new("UIStroke")
+	st.Color = COLOR_GOLD_DIM
+	st.Thickness = 1
+	st.Parent = armoryPanel
 	local pad = Instance.new("UIPadding")
-	pad.PaddingTop = UDim.new(0,16); pad.PaddingBottom = UDim.new(0,16)
-	pad.PaddingLeft = UDim.new(0,16); pad.PaddingRight = UDim.new(0,16)
+	pad.PaddingTop = UDim.new(0, 16)
+	pad.PaddingBottom = UDim.new(0, 16)
+	pad.PaddingLeft = UDim.new(0, 16)
+	pad.PaddingRight = UDim.new(0, 16)
 	pad.Parent = armoryPanel
 
 	local hdr = Instance.new("TextLabel")
@@ -1078,7 +1232,8 @@ buildArmoryPanel = function()
 	armoryListFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	armoryListFrame.Parent = armoryPanel
 	local ll = Instance.new("UIListLayout")
-	ll.Padding = UDim.new(0, 6); ll.SortOrder = Enum.SortOrder.LayoutOrder
+	ll.Padding = UDim.new(0, 6)
+	ll.SortOrder = Enum.SortOrder.LayoutOrder
 	ll.Parent = armoryListFrame
 
 	-- Right detail compartment (hidden until an armor is picked).
@@ -1109,7 +1264,9 @@ buildArmoryPanel = function()
 	armoryViewport.BackgroundTransparency = 0.2
 	armoryViewport.BorderSizePixel = 0
 	armoryViewport.Parent = armoryDetail
-	local vc = Instance.new("UICorner"); vc.CornerRadius = UDim.new(0, 8); vc.Parent = armoryViewport
+	local vc = Instance.new("UICorner")
+	vc.CornerRadius = UDim.new(0, 8)
+	vc.Parent = armoryViewport
 
 	-- Stats block.
 	armoryDetailStats = Instance.new("TextLabel")
@@ -1136,7 +1293,9 @@ buildArmoryPanel = function()
 	armoryEquipBtn.TextSize = 14
 	armoryEquipBtn.Font = Enum.Font.Merriweather
 	armoryEquipBtn.Parent = armoryDetail
-	local ec = Instance.new("UICorner"); ec.CornerRadius = UDim.new(0, 6); ec.Parent = armoryEquipBtn
+	local ec = Instance.new("UICorner")
+	ec.CornerRadius = UDim.new(0, 6)
+	ec.Parent = armoryEquipBtn
 
 	armoryTransmogBtn = Instance.new("TextButton")
 	armoryTransmogBtn.AnchorPoint = Vector2.new(1, 1)
@@ -1149,10 +1308,14 @@ buildArmoryPanel = function()
 	armoryTransmogBtn.TextSize = 14
 	armoryTransmogBtn.Font = Enum.Font.Merriweather
 	armoryTransmogBtn.Parent = armoryDetail
-	local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0, 6); tc.Parent = armoryTransmogBtn
+	local tc = Instance.new("UICorner")
+	tc.CornerRadius = UDim.new(0, 6)
+	tc.Parent = armoryTransmogBtn
 
 	armoryEquipBtn.MouseButton1Click:Connect(function()
-		if not armorySelected then return end
+		if not armorySelected then
+			return
+		end
 		local snap = ArmorAction:InvokeServer("Equip", armorySelected)
 		if snap and snap.ok then
 			armorySnapshot = snap
@@ -1161,7 +1324,9 @@ buildArmoryPanel = function()
 		end
 	end)
 	armoryTransmogBtn.MouseButton1Click:Connect(function()
-		if not armorySelected then return end
+		if not armorySelected then
+			return
+		end
 		local snap = ArmorAction:InvokeServer("Transmog", armorySelected)
 		if snap and snap.ok then
 			armorySnapshot = snap
@@ -1173,18 +1338,22 @@ end
 
 -- Rebuild the owned-armor list from a snapshot.
 refreshArmoryPanel = function(snap)
-	if not armoryPanel then return end
+	if not armoryPanel then
+		return
+	end
 	armorySnapshot = snap
 	armorySelected = nil
 	armoryListButtons = {}
 
 	for _, child in ipairs(armoryListFrame:GetChildren()) do
-		if child:IsA("TextButton") then child:Destroy() end
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
 	end
 
 	-- Detail hidden until a pick; list sits at full width, centred under header.
 	armoryDetail.Visible = false
-	armoryListFrame.Position = UDim2.new(0.5, -ARM_LIST_W/2, 0, 40)
+	armoryListFrame.Position = UDim2.new(0.5, -ARM_LIST_W / 2, 0, 40)
 
 	refreshArmoryCurrent()
 
@@ -1205,46 +1374,68 @@ refreshArmoryPanel = function(snap)
 		btn.TextTruncate = Enum.TextTruncate.AtEnd
 		btn.LayoutOrder = i
 		btn.Parent = armoryListFrame
-		local bc = Instance.new("UICorner"); bc.CornerRadius = UDim.new(0, 6); bc.Parent = btn
+		local bc = Instance.new("UICorner")
+		bc.CornerRadius = UDim.new(0, 6)
+		bc.Parent = btn
 
 		btn.MouseEnter:Connect(function()
-			if armorySelected ~= name then btn.BackgroundColor3 = COLOR_BTN_HOVER end
+			if armorySelected ~= name then
+				btn.BackgroundColor3 = COLOR_BTN_HOVER
+			end
 		end)
 		btn.MouseLeave:Connect(function()
-			if armorySelected ~= name then btn.BackgroundColor3 = COLOR_BTN_NORMAL end
+			if armorySelected ~= name then
+				btn.BackgroundColor3 = COLOR_BTN_NORMAL
+			end
 		end)
-		btn.MouseButton1Click:Connect(function() selectArmor(name) end)
+		btn.MouseButton1Click:Connect(function()
+			selectArmor(name)
+		end)
 
 		armoryListButtons[name] = btn
 	end
 end
 
 openArmoryPanel = function()
-	if not armoryPanel then buildArmoryPanel() end
-	if statPanel then statPanel.Visible = false end
-	if spellPanel then spellPanel.Visible = false end
+	if not armoryPanel then
+		buildArmoryPanel()
+	end
+	if statPanel then
+		statPanel.Visible = false
+	end
+	if spellPanel then
+		spellPanel.Visible = false
+	end
 	local snap = ArmorAction:InvokeServer("Query")
 	refreshArmoryPanel(snap)
 	armoryPanel.Visible = true
 	armoryPanel.Position = UDim2.new(0.04, 180, 0.5, 0)
-	TweenService:Create(armoryPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.04, 256, 0.5, 0)
-	}):Play()
+	TweenService
+		:Create(armoryPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.04, 256, 0.5, 0),
+		})
+		:Play()
 end
 
 -- Apply a full server snapshot to every part of the panel.
 applySnapshot = function(snap)
-	if not statPanel or not snap then return end
-	if snap.stats then localStats = snap.stats end
-	localOwned     = snap.owned or localOwned
+	if not statPanel or not snap then
+		return
+	end
+	if snap.stats then
+		localStats = snap.stats
+	end
+	localOwned = snap.owned or localOwned
 	localAvailable = snap.available or 0
-	localMaxSP     = snap.maxSkillPoints or localMaxSP
-	localNextCost  = snap.nextCost or localNextCost
+	localMaxSP = snap.maxSkillPoints or localMaxSP
+	localNextCost = snap.nextCost or localNextCost
 
 	for stat, lbl in pairs(statRows) do
 		lbl.Text = tostring(localStats[stat] or 0)
 	end
-	if snap.liturgy then liturgyLabel.Text = "Liturgy: " .. tostring(snap.liturgy) end
+	if snap.liturgy then
+		liturgyLabel.Text = "Liturgy: " .. tostring(snap.liturgy)
+	end
 
 	if skillPointLabel then
 		skillPointLabel.Text = string.format("Skill Points: %d / %d", localOwned, localMaxSP)
@@ -1275,9 +1466,15 @@ refreshStatPanel = function(liturgy, nextCost)
 end
 
 openStatPanel = function()
-	if not statPanel then buildStatPanel() end
-	if spellPanel then spellPanel.Visible = false end
-	if armoryPanel then armoryPanel.Visible = false end
+	if not statPanel then
+		buildStatPanel()
+	end
+	if spellPanel then
+		spellPanel.Visible = false
+	end
+	if armoryPanel then
+		armoryPanel.Visible = false
+	end
 	-- pull a fresh snapshot
 	local result = StatAction:InvokeServer("Query")
 	if result and result.ok then
@@ -1286,16 +1483,20 @@ openStatPanel = function()
 	-- slide + fade the stat panel in from just behind the rest panel
 	statPanel.Visible = true
 	statPanel.Position = UDim2.new(0.04, 180, 0.5, 0)
-	TweenService:Create(statPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.04, 256, 0.5, 0)
-	}):Play()
+	TweenService
+		:Create(statPanel, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.04, 256, 0.5, 0),
+		})
+		:Play()
 end
 
 -- Performs the actual respec after confirmation.
 local function performRespec()
 	local result = StatAction:InvokeServer("Respec")
 	if result and result.ok then
-		if not statPanel then buildStatPanel() end
+		if not statPanel then
+			buildStatPanel()
+		end
 		statPanel.Visible = true
 		applySnapshot(result)
 		nextCostLabel.Text = "All skill points freed"
@@ -1309,7 +1510,10 @@ end
 -- Yes/No confirmation modal before respeccing.
 local respecConfirm
 doRespec = function()
-	if respecConfirm then respecConfirm:Destroy() respecConfirm = nil end
+	if respecConfirm then
+		respecConfirm:Destroy()
+		respecConfirm = nil
+	end
 	respecConfirm = Instance.new("Frame")
 	respecConfirm.AnchorPoint = Vector2.new(0.5, 0.5)
 	respecConfirm.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -1318,14 +1522,20 @@ doRespec = function()
 	respecConfirm.BorderSizePixel = 0
 	respecConfirm.ZIndex = 50
 	respecConfirm.Parent = restGui
-	local cc = Instance.new("UICorner"); cc.CornerRadius = UDim.new(0, 10); cc.Parent = respecConfirm
-	local cs = Instance.new("UIStroke"); cs.Color = COLOR_GOLD_DIM; cs.Thickness = 1; cs.Parent = respecConfirm
+	local cc = Instance.new("UICorner")
+	cc.CornerRadius = UDim.new(0, 10)
+	cc.Parent = respecConfirm
+	local cs = Instance.new("UIStroke")
+	cs.Color = COLOR_GOLD_DIM
+	cs.Thickness = 1
+	cs.Parent = respecConfirm
 
 	local msg = Instance.new("TextLabel")
 	msg.Size = UDim2.new(1, -24, 0, 70)
 	msg.Position = UDim2.new(0, 12, 0, 14)
 	msg.BackgroundTransparency = 1
-	msg.Text = "Respec all stats? This frees every assigned skill point so you can redistribute them. You keep all the skill points you've bought."
+	msg.Text =
+		"Respec all stats? This frees every assigned skill point so you can redistribute them. You keep all the skill points you've bought."
 	msg.TextWrapped = true
 	msg.TextColor3 = COLOR_WHITE
 	msg.TextSize = 14
@@ -1344,7 +1554,9 @@ doRespec = function()
 	yes.Font = Enum.Font.Merriweather
 	yes.ZIndex = 51
 	yes.Parent = respecConfirm
-	local yc = Instance.new("UICorner"); yc.CornerRadius = UDim.new(0,6); yc.Parent = yes
+	local yc = Instance.new("UICorner")
+	yc.CornerRadius = UDim.new(0, 6)
+	yc.Parent = yes
 
 	local no = Instance.new("TextButton")
 	no.Size = UDim2.new(0.5, -18, 0, 38)
@@ -1357,14 +1569,18 @@ doRespec = function()
 	no.Font = Enum.Font.Merriweather
 	no.ZIndex = 51
 	no.Parent = respecConfirm
-	local nc = Instance.new("UICorner"); nc.CornerRadius = UDim.new(0,6); nc.Parent = no
+	local nc = Instance.new("UICorner")
+	nc.CornerRadius = UDim.new(0, 6)
+	nc.Parent = no
 
 	yes.MouseButton1Click:Connect(function()
-		respecConfirm:Destroy() respecConfirm = nil
+		respecConfirm:Destroy()
+		respecConfirm = nil
 		performRespec()
 	end)
 	no.MouseButton1Click:Connect(function()
-		respecConfirm:Destroy() respecConfirm = nil
+		respecConfirm:Destroy()
+		respecConfirm = nil
 	end)
 end
 
@@ -1375,7 +1591,9 @@ local REST_DIM = 0.45
 local function playRestFX()
 	local char = character
 	local root = char and char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
+	if not root then
+		return
+	end
 	local template = ReplicatedStorage.assets.FX:FindFirstChild("LevelUpParticle")
 	if template then
 		local fx = template:Clone()
@@ -1400,11 +1618,21 @@ beginRestLocal = function(spireId)
 	resting = true
 	currentRestSpireId = spireId
 	buildRestGui()
-	if not restTrack then loadRestAnim() end
-	if restTrack then restTrack:Play(0.2) end
-	if statPanel then statPanel.Visible = false end
-	if spellPanel then spellPanel.Visible = false end
-	if armoryPanel then armoryPanel.Visible = false end
+	if not restTrack then
+		loadRestAnim()
+	end
+	if restTrack then
+		restTrack:Play(0.2)
+	end
+	if statPanel then
+		statPanel.Visible = false
+	end
+	if spellPanel then
+		spellPanel.Visible = false
+	end
+	if armoryPanel then
+		armoryPanel.Visible = false
+	end
 
 	restGui.Enabled = true
 
@@ -1413,9 +1641,11 @@ beginRestLocal = function(spireId)
 	TweenService:Create(restDim, FADE_IN, { BackgroundTransparency = REST_DIM }):Play()
 
 	restPanel.Position = UDim2.new(-0.3, 0, 0.5, 0)
-	TweenService:Create(restPanel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0.04, 0, 0.5, 0)
-	}):Play()
+	TweenService
+		:Create(restPanel, TweenInfo.new(0.35, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+			Position = UDim2.new(0.04, 0, 0.5, 0),
+		})
+		:Play()
 
 	playRestFX()
 end
@@ -1423,17 +1653,29 @@ end
 endRestLocal = function()
 	resting = false
 	currentRestSpireId = nil
-	if restTrack then restTrack:Stop(0.2) end
-	if statPanel then statPanel.Visible = false end
-	if spellPanel then spellPanel.Visible = false end
-	if armoryPanel then armoryPanel.Visible = false end
-	if mapOpen then closeMap() end
+	if restTrack then
+		restTrack:Stop(0.2)
+	end
+	if statPanel then
+		statPanel.Visible = false
+	end
+	if spellPanel then
+		spellPanel.Visible = false
+	end
+	if armoryPanel then
+		armoryPanel.Visible = false
+	end
+	if mapOpen then
+		closeMap()
+	end
 	if restGui then
 		local out = TweenService:Create(restDim, FADE_OUT, { BackgroundTransparency = 1 })
 		out:Play()
 		TweenService:Create(restPanel, FADE_OUT, { Position = UDim2.new(-0.3, 0, 0.5, 0) }):Play()
 		out.Completed:Connect(function()
-			if not resting then restGui.Enabled = false end
+			if not resting then
+				restGui.Enabled = false
+			end
 		end)
 	end
 end
@@ -1444,28 +1686,28 @@ end
 
 -- ── MAP OPEN / CLOSE ──────────────────────────────────────────────────────────
 openMap = function()
-	mapOpen              = true
-	selectedSpireId      = nil
+	mapOpen = true
+	selectedSpireId = nil
 	TeleportButton.Visible = false
-	SelectedLabel.Text   = "Select a destination."
+	SelectedLabel.Text = "Select a destination."
 	SelectedLabel.TextColor3 = COLOR_MUTED
-	CostLabel.Visible    = false
-	ErrorLabel.Visible   = false
+	CostLabel.Visible = false
+	ErrorLabel.Visible = false
 
 	buildList()
 
 	MapFrame.GroupTransparency = 1
-	MapFrame.Visible           = true
+	MapFrame.Visible = true
 
 	TweenService:Create(MapFrame, FADE_IN, {
-		GroupTransparency = 0
+		GroupTransparency = 0,
 	}):Play()
 end
 
 closeMap = function()
 	mapOpen = false
 	local out = TweenService:Create(MapFrame, FADE_OUT, {
-		GroupTransparency = 1
+		GroupTransparency = 1,
 	})
 	out:Play()
 	out.Completed:Wait()
@@ -1486,7 +1728,9 @@ end
 
 -- ── BUTTONS ───────────────────────────────────────────────────────────────────
 TeleportButton.MouseButton1Click:Connect(function()
-	if not selectedSpireId then return end
+	if not selectedSpireId then
+		return
+	end
 	ErrorLabel.Visible = false
 	SpireRemote:FireServer("Teleport", selectedSpireId)
 end)
@@ -1506,7 +1750,9 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		return
 	end
 
-	if gameProcessed then return end
+	if gameProcessed then
+		return
+	end
 	if input.KeyCode == Enum.KeyCode.Escape and mapOpen then
 		closeMap()
 	end
@@ -1516,18 +1762,20 @@ end)
 local function setupSpirePrompts()
 	for _, spire in ipairs(SpireConfig.Spires) do
 		local part = Workspace:FindFirstChild(spire.PartName, true)
-		if not part then continue end
+		if not part then
+			continue
+		end
 
 		local existing = part:FindFirstChild("AttunePrompt")
 		if not existing then
 			local prompt = Instance.new("ProximityPrompt")
-			prompt.Name                  = "AttunePrompt"
-			prompt.ObjectText            = spire.Zone
+			prompt.Name = "AttunePrompt"
+			prompt.ObjectText = spire.Zone
 			--prompt.ActionText            = attunedSpires[spire.Id] --and "Travel" or "Attune"
-			prompt.KeyboardKeyCode       = Enum.KeyCode.E
+			prompt.KeyboardKeyCode = Enum.KeyCode.E
 			prompt.MaxActivationDistance = 16
-			prompt.RequiresLineOfSight   = false
-			prompt.Parent                = part
+			prompt.RequiresLineOfSight = false
+			prompt.Parent = part
 
 			local spireId = spire.Id
 
@@ -1569,15 +1817,19 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 			attunedSpires[id] = true
 		end
 		refreshPromptLabels()
-		if mapOpen then buildList() end
-
+		if mapOpen then
+			buildList()
+		end
 	elseif action == "Attuned" then
 		local spireId = payload
 		attunedSpires[spireId] = true
 
 		local spireDef = nil
 		for _, s in ipairs(SpireConfig.Spires) do
-			if s.Id == spireId then spireDef = s break end
+			if s.Id == spireId then
+				spireDef = s
+				break
+			end
 		end
 
 		if spireDef then
@@ -1586,8 +1838,9 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 		end
 
 		refreshPromptLabels()
-		if mapOpen then buildList() end
-
+		if mapOpen then
+			buildList()
+		end
 	elseif action == "RestStarted" then
 		local spireId = payload and payload.spireId
 		local wasNew = payload and payload.wasNew
@@ -1595,7 +1848,10 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 			-- brand-new attunement: play the world effect + toast as before
 			local spireDef = nil
 			for _, sp in ipairs(SpireConfig.Spires) do
-				if sp.Id == spireId then spireDef = sp break end
+				if sp.Id == spireId then
+					spireDef = sp
+					break
+				end
 			end
 			if spireDef then
 				attunedSpires[spireId] = true
@@ -1604,13 +1860,10 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 			end
 		end
 		beginRestLocal(spireId)
-
 	elseif action == "RestFailed" then
 		queueToast(tostring(payload) or "Cannot rest right now.")
-
 	elseif action == "RestEnded" then
 		endRestLocal()
-
 	elseif action == "TeleportSuccess" then
 		-- Travelling leaves the old spire: the server ended the rest, so close the
 		-- whole rest UI and let the player arrive free.
@@ -1620,14 +1873,14 @@ SpireUpdate.OnClientEvent:Connect(function(action, payload)
 		sound.SoundId = "rbxassetid://133431816965147"
 		sound:Play()
 	elseif action == "TeleportFailed" then
-		ErrorLabel.Text    = payload or "Teleportation failed."
+		ErrorLabel.Text = payload or "Teleportation failed."
 		ErrorLabel.Visible = true
-		CostLabel.Visible  = false
+		CostLabel.Visible = false
 	end
 end)
 
 -- ── INIT ──────────────────────────────────────────────────────────────────────
-MapFrame.Visible        = false
+MapFrame.Visible = false
 AttunementToast.Visible = false
 
 task.spawn(setupSpirePrompts)
@@ -1636,5 +1889,7 @@ task.spawn(setupSpirePrompts)
 player.CharacterAdded:Connect(function(newChar)
 	character = newChar
 	restTrack = nil -- will be reloaded on next rest
-	if resting then endRestLocal() end
+	if resting then
+		endRestLocal()
+	end
 end)
