@@ -1,13 +1,15 @@
--- sliding
+-- SPDX-License-Identifier: MIT
+--
+-- The slide: a velocity along the ground that slows on flat ground and uphill and
+-- speeds up downhill, up to the race SlideDuration multiplier. Space cancels the slide,
+-- and a cancel inside the slide-jump window gives a bigger leap.
 
---// Services
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Debris = game:GetService("Debris")
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 local animationHandler = require(game.ReplicatedStorage.modules.animationHandler)
 
---// Players Stuff
 local Plr = game.Players.LocalPlayer
 local Char = Plr.Character
 if not Char then
@@ -20,17 +22,15 @@ local Humanoid = Char:FindFirstChildOfClass("Humanoid")
 local SlideAnim = Humanoid:LoadAnimation(script:WaitForChild("Anim"))
 local stateRemote = game:GetService("ReplicatedStorage").remotes.stateRepl
 
---// Varaibles
 local isSliding = false
 local CanSlide = true
 local PosCheck
 local CurrentMultiplier = 1
 local BaseSoundVolume = script.Slide_Loop.Volume
-local slideStartTime = 0 -- NEW: Tracks when the slide started
+local slideStartTime = 0
 
 local slidingAnimID = "rbxassetid://136848049831912"
 
---// Objects
 local SlideVelocity
 local AlignGyro
 
@@ -43,7 +43,7 @@ local Settings = {
 		Normal = 0,
 		Slide = -2,
 	},
-	MaxMultiplier = 2, -- This will be overwritten by Race Stats
+	MaxMultiplier = 2, -- The race SlideDuration replaces this.
 	SpeedChangeRate = {
 		Forward = 1,
 		Upward = 2,
@@ -84,7 +84,6 @@ function StopSlide()
 		AlignGyro:Destroy()
 	end
 	animationHandler.StopAnim(Char, "Sliding", slidingAnimID)
-	--SlideAnim:Stop(0.15)
 	script.Slide_Loop:Stop()
 	Humanoid.HipHeight = Settings.HipHeight.Normal
 
@@ -93,9 +92,8 @@ function StopSlide()
 	end)
 end
 
--- External cancel: the M1 uppercut fires this to end the slide cleanly (kills the
--- Heartbeat loop + SlideVelocity) before it takes over with its own launch. Synchronous
--- via BindableEvent so the velocity is gone before the uppercut mover goes on.
+-- The M1 uppercut fires this to end the slide before its own launch. The event is a
+-- BindableEvent, so the slide velocity is gone before the uppercut mover starts.
 game:GetService("ReplicatedStorage"):WaitForChild("UppercutStopSlide").Event:Connect(function()
 	if isSliding then
 		StopSlide()
@@ -139,7 +137,7 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			return
 		end
 
-		--// Cast a ray down to check if player's grounded or no
+		-- Only slide on the ground.
 		local RayDirection = -RootPart.CFrame.UpVector * 5
 		local GroundRay = workspace:Raycast(RootPart.Position, RayDirection, Params)
 
@@ -147,7 +145,7 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			return
 		end
 
-		-- [[ UPDATE MAX MULTIPLIER FROM STATS ]] --
+		-- The race SlideDuration sets the maximum speed multiplier.
 		local stats = Plr:FindFirstChild("PlayerStats")
 		if stats then
 			local durVal = stats:FindFirstChild("SlideDuration")
@@ -155,7 +153,6 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 				Settings.MaxMultiplier = durVal.Value
 			end
 		end
-		-- ====================================== --
 
 		debounce = true
 		task.delay(cdTime, function()
@@ -164,9 +161,8 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 
 		isSliding = true
 		CanSlide = false
-		slideStartTime = os.clock() -- NEW: Record exact time the slide started
+		slideStartTime = os.clock()
 
-		--SlideAnim:Play(0.15)
 		animationHandler.LoadAnim(Char, "Sliding", slidingAnimID, nil, false)
 		stateRemote:FireServer("SlideOn")
 		script.Effect:FireServer()
@@ -192,7 +188,7 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			local RayDirection = -RootPart.CFrame.UpVector * 10
 			local GroundRay = workspace:Raycast(RootPart.Position, RayDirection, Params)
 
-			--// Align Character to the slope
+			-- Align the character to the slope.
 			if GroundRay then
 				local CurrentRightVector = RootPart.CFrame.RightVector
 				local UpVector = GroundRay.Normal
@@ -208,8 +204,9 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			SlideVelocity.Velocity = RootPart.CFrame.LookVector
 				* (Settings.BaseSpeed * CurrentMultiplier)
 
-			if VerticalChange < 0.1 and VerticalChange > -0.1 then -- Slide Forward (decrease speed until 0)
-				if CurrentMultiplier > 1 then -- If too fast speed rate will multiply and speed will drop fastur!
+			-- On flat ground the slide slows down, and faster while above the base speed.
+			if VerticalChange < 0.1 and VerticalChange > -0.1 then
+				if CurrentMultiplier > 1 then
 					CurrentMultiplier = math.clamp(
 						CurrentMultiplier - (Settings.SpeedChangeRate.Forward * 2) * deltaTime,
 						0,
@@ -221,8 +218,9 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 					0,
 					Settings.MaxMultiplier
 				)
-			elseif VerticalChange > 0 then -- Slide Up (decrease speed until 0)
-				if CurrentMultiplier > 1 then -- If too fast speed rate will multiply and speed will drop fastur!
+			elseif VerticalChange > 0 then
+				-- Uphill the slide slows down faster.
+				if CurrentMultiplier > 1 then
 					CurrentMultiplier = math.clamp(
 						CurrentMultiplier - (Settings.SpeedChangeRate.Upward * 2) * deltaTime,
 						0,
@@ -234,7 +232,8 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 					0,
 					Settings.MaxMultiplier
 				)
-			else -- Slide Down (Add up speed until max)
+			else
+				-- Downhill the slide speeds up to the maximum.
 				CurrentMultiplier = math.clamp(
 					CurrentMultiplier + Settings.SpeedChangeRate.Downward * deltaTime,
 					0,
@@ -257,19 +256,13 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 		local isPerfectJump = (timeSinceSlide >= Settings.SlideJump.WindowStart)
 			and (timeSinceSlide <= Settings.SlideJump.WindowEnd)
 
-		-- // NEW: HEALTH THRESHOLD LOGIC //
+		-- At 50% HP or less, a cancel is always the standard push, never the slide jump.
 		local hpPercentage = Humanoid.Health / Humanoid.MaxHealth
 		local slideJumpHealthMultiplier = 1
 
 		if hpPercentage <= 0.5 then
-			-- Option A: Outright remove the perfect jump when low on health (Defaults to Standard Cancel)
 			isPerfectJump = false
-
-			-- Option B: If you decide you just want to heavily weaken it instead,
-			-- comment out `isPerfectJump = false` above, and uncomment the line below!
-			-- slideJumpHealthMultiplier = 0.5
 		end
-		-- ================================= --
 
 		script.Slide_Cancel:Play()
 		StopSlide()
@@ -279,7 +272,6 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			local BoostVelocity = Instance.new("BodyVelocity", RootPart)
 			BoostVelocity.MaxForce = Vector3.new(40000, 2000, 40000)
 
-			-- Applied the health multiplier to the final boost calculations
 			local finalForwardBoost = (Settings.SlideJump.BoostForward * CancelMultiplier)
 				* slideJumpHealthMultiplier
 			local finalUpBoost = Settings.SlideJump.BoostUp * slideJumpHealthMultiplier
@@ -292,7 +284,6 @@ UserInputService.InputBegan:Connect(function(Input, istyping)
 			local leapAnim = script.Leap
 			Humanoid:LoadAnimation(leapAnim):Play(0.05)
 		elseif Settings.PushOnCancel == true then
-			-- Original standard cancel jump
 			local PushVelocity = Instance.new("BodyVelocity", RootPart)
 			PushVelocity.MaxForce = Vector3.new(40000, 2000, 40000)
 			PushVelocity.Velocity = (
