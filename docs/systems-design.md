@@ -81,3 +81,21 @@ found in the world, hands over the weapon itself. The reconciler does not grant 
 a player who holds a Guandao has already done eight class quests and needs no marker.
 `UnlockSpell` does nothing for a skill the player already has, so the hybrid
 reconciler is safe to run any number of times.
+
+## Downed state
+
+A player whose HP would drop to `DOWNED_THRESHOLD_PCT` of max HP or lower goes down
+instead of dying. NPCs never go down. `DownedManager` owns the whole life cycle:
+
+- A downed body never gets up on its own. Its ragdoll has no duration and no stun
+  timer. Only a revive, an execution, or a carry changes it.
+- The revive timer (`REVIVE_TIMER`, 30 s) stands the player up with
+  `REVIVE_HP_PCT` of max HP. It pauses while the body is carried or being executed.
+- Hitting a downed body deals no damage but restarts the revive timer, so beating
+  on a downed player keeps them down.
+- The body is pinned with SpeedService `PIN` priority, the top of the stack, so no
+  other speed effect can make a downed player walk.
+- Anyone who goes down drops the body they carry.
+
+The knockdown ragdolls first and sets `Downed` after, so the body is on the floor
+before any other system sees it as downed.

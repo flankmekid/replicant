@@ -1,8 +1,12 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Owns the downed state: knockdown at low HP, the revive timer, execution by players
+-- and NPCs, and carrying. A downed body never gets up on its own. Only Revive,
+-- an execution, or a carry changes it. The design is in docs/systems-design.md.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
--- Load your existing modules
 local StateHandler = require(ReplicatedStorage.modules.stateHandler)
 local StatScaling = require(ReplicatedStorage.modules.StatScaling)
 local RagdollManager = require(ServerScriptService.modules.ragdollManager)
@@ -11,21 +15,19 @@ local SpeedService = require(ServerScriptService.modules.SpeedService)
 local DownedManager = {}
 local DownedData = {}
 
--- forward declarations: defined below, used by StopCarrying above their definition
+-- Defined below, but StopCarrying uses them first.
 local pinDown
 local unpin
 local ActiveCarryTracks = {}
 local ActiveCarriedTracks = {}
 local ActiveExecuteTracks = {}
 
--- [[ CONFIGURATION ]] --
 local DOWNED_THRESHOLD_PCT = 0.01
 local REVIVE_TIMER = 30
 local REVIVE_HP_PCT = 0.30
 local EXECUTE_RANGE = 5
 local CARRY_OFFSET = Vector3.new(2, 2, 0)
 
--- [[ HELPER: STOP CARRYING ]] --
 local function StopCarrying(carrierChar, victimChar)
 	if ActiveCarryTracks[carrierChar] then
 		ActiveCarryTracks[carrierChar]:Stop()
@@ -63,16 +65,13 @@ local function StopCarrying(carrierChar, victimChar)
 	StateHandler.RemoveStates(carrierChar, "CantAnything")
 	StateHandler.RemoveStates(victimChar, "Carried")
 
-	-- Put the dropped body back into a proper downed ragdoll. AttemptCarry called
-	-- UnRagdoll to pick them up, so Ragdolled is clear and this will actually run
-	-- (the re-entrancy guard would otherwise swallow it). No duration: a Downed
-	-- body never auto-recovers, so they stay on the floor. The revive countdown
-	-- resumes by itself, because the KnockDown loop only ticks while
-	-- data.Carrier is nil, and we clear Carrier just above.
+	-- Put the dropped body back into a downed ragdoll with no duration, so it stays on
+	-- the floor. AttemptCarry already removed the old ragdoll, so the re-entrancy guard
+	-- does not block this. The revive timer resumes, because it ticks only while the
+	-- body has no carrier.
 	RagdollManager.Ragdoll(victimChar)
 	pinDown(victimChar)
 
-	-- Clean up Align Constraints
 	if carrierChar and carrierChar:FindFirstChild("HumanoidRootPart") then
 		local att = carrierChar.HumanoidRootPart:FindFirstChild("CarryAtt")
 		if att then
@@ -95,18 +94,17 @@ local function StopCarrying(carrierChar, victimChar)
 			ori:Destroy()
 		end
 
-		-- [[ FIX: Return Network Ownership to Victim or Server ]]
+		-- Give network ownership back to the victim, or to the server for an NPC.
 		if root:CanSetNetworkOwnership() then
 			local victimPlayer = Players:GetPlayerFromCharacter(victimChar)
 			if victimPlayer then
 				root:SetNetworkOwner(victimPlayer)
 			else
-				root:SetNetworkOwner(nil) -- Give it to server if it's an NPC
+				root:SetNetworkOwner(nil)
 			end
 		end
 	end
 
-	-- Restore Mass and Collisions safely
 	if victimChar then
 		for _, v in pairs(victimChar:GetDescendants()) do
 			if v:IsA("BasePart") then
@@ -126,19 +124,15 @@ local function StopCarrying(carrierChar, victimChar)
 	end
 end
 
--- [[ HELPER: PIN A DOWNED BODY TO THE FLOOR ]] --
--- Called on knockdown and re-asserted whenever something else may have stomped
--- the humanoid (a ragdoll teardown, a client GettingUp, a carry drop). A downed
--- player must be immovable until Revive / Execute / Carry says otherwise.
+-- Holds a downed body on the floor. It runs on knockdown and again whenever something
+-- may have changed the humanoid: a ragdoll teardown, a client GettingUp, or a drop.
 function pinDown(char)
 	local hum = char and char:FindFirstChild("Humanoid")
 	if not hum then
 		return
 	end
 
-	-- PIN priority: the top of the stack. Once pushed, a stun-pop or hitstop-pop or
-	-- block-pop can't recompute a downed player back to a walkable speed. This replaces
-	-- the old "re-assert WalkSpeed = 0 whenever something might have stomped it" pattern.
+	-- PIN is the top priority, so no other speed modifier can make a downed player walk.
 	SpeedService.Push(char, "Downed", 0, SpeedService.Priority.PIN)
 	hum.JumpPower = 0
 	hum.JumpHeight = 0
@@ -150,7 +144,6 @@ function pinDown(char)
 	hum:ChangeState(Enum.HumanoidStateType.Physics)
 end
 
--- [[ HELPER: RELEASE A BODY FROM THE PIN ]] --
 function unpin(char)
 	local hum = char and char:FindFirstChild("Humanoid")
 	if not hum then
@@ -164,9 +157,13 @@ function unpin(char)
 	hum.AutoRotate = true
 end
 
--- [[ RESET THE REVIVE TIMER ]] --
--- Called from damageCalculator when a downed body takes another hit. Beating on
--- someone who is already down keeps them down.
+-- DownedManager.ResetReviveTimer() - restart the revive timer of a downed body
+-- @char: the downed character
+--
+-- damageCalculator calls this when a downed body is hit, so beating on a downed
+-- player keeps them down.
+--
+-- Return: nothing.
 function DownedManager.ResetReviveTimer(char)
 	local data = DownedData[char]
 	if not data then
@@ -175,7 +172,15 @@ function DownedManager.ResetReviveTimer(char)
 	data.Timer = REVIVE_TIMER
 end
 
--- [[ 1. MAIN CHECK ]] --
+-- DownedManager.CheckDownedCondition() - knock a player down instead of killing them
+-- @char: the character about to take damage
+-- @damage: the incoming damage
+-- @isInstantKill: true to skip the downed state
+--
+-- Only players go down. A hit that would leave them at or below
+-- DOWNED_THRESHOLD_PCT of max HP knocks them down instead.
+--
+-- Return: true if this hit knocked the character down.
 function DownedManager.CheckDownedCondition(char, damage, isInstantKill)
 	if not char then
 		return false
@@ -210,21 +215,22 @@ function DownedManager.CheckDownedCondition(char, damage, isInstantKill)
 	return false
 end
 
--- [[ 2. KNOCKDOWN LOGIC ]] --
+-- DownedManager.KnockDown() - put a character into the downed state
+-- @char: the character
+--
+-- Starts the revive timer. The timer pauses while the body is carried or executed.
+--
+-- Return: nothing.
 function DownedManager.KnockDown(char)
 	local player = Players:GetPlayerFromCharacter(char)
 	local hum = char:FindFirstChild("Humanoid")
 
-	-- Anyone going down drops whatever they were carrying. Covers every knockdown
-	-- path, not just the damage one (damageCalculator returns early on a fresh
-	-- knockdown, so a drop placed further down that function would be skipped).
+	-- Anyone who goes down drops what they carry. This covers every knockdown path,
+	-- because damageCalculator returns early on a fresh knockdown.
 	DownedManager.DropIfCarrying(char)
 
-	-- ORDER MATTERS. RagdollModule used to early-return on Downed, so setting
-	-- Downed before calling Ragdoll meant the knockdown ragdoll never ran. That
-	-- guard is now a Ragdolled re-entrancy check instead, but we still ragdoll
-	-- FIRST so the body is on the floor before anything can observe it as Downed.
-	-- Clear any prior ragdoll so the fresh one is not swallowed by the guard.
+	-- Ragdoll first, so the body is on the floor before anything sees it as Downed. Clear
+	-- any old ragdoll, or the re-entrancy guard swallows the new one.
 	RagdollManager.UnRagdoll(char, true)
 	RagdollManager.Ragdoll(char)
 
@@ -248,16 +254,8 @@ function DownedManager.KnockDown(char)
 				break
 			end
 
-			-- Bail if the body is gone or dead.
-			--
-			-- Only Revive and PlayerRemoving ever cleared DownedData, and the two
-			-- execution paths zero health and clear it themselves. Every OTHER way a
-			-- downed player can die (fall damage, a mob finishing them, a boss AoE,
-			-- ON_DEATH_EVENT) left the entry standing and this thread ticking. At T=0
-			-- it would call Revive on a corpse: UnRagdoll, unpin, ChangeState(GettingUp)
-			-- and Jump, all fighting the 10s death ragdoll, on a character that is
-			-- supposed to stay down. It also kept the loop spinning for up to 30s
-			-- against a character that may already be destroyed.
+			-- Stop if the body is gone or dead. A downed player can die in many ways (fall
+			-- damage, a mob, an AoE), and Revive must never run on a corpse.
 			local liveHum = char:FindFirstChild("Humanoid")
 			if not char.Parent or not liveHum or liveHum.Health <= 0 then
 				DownedData[char] = nil
@@ -275,11 +273,14 @@ function DownedManager.KnockDown(char)
 	end)
 end
 
--- [[ 3. REVIVE LOGIC ]] --
+-- DownedManager.Revive() - stand a downed character back up
+-- @char: the character
+--
+-- Restores REVIVE_HP_PCT of max HP. Does nothing to a dead body.
+--
+-- Return: nothing. Yields for one frame.
 function DownedManager.Revive(char)
 	local hum = char:FindFirstChild("Humanoid")
-
-	print("revived")
 
 	if not char.Parent or not hum or hum.Health <= 0 then
 		DownedData[char] = nil
@@ -288,8 +289,7 @@ function DownedManager.Revive(char)
 
 	DownedData[char] = nil
 
-	-- Clear Downed BEFORE tearing the ragdoll down, so the ragdoll module's
-	-- Downed guards do not block the teardown.
+	-- Clear Downed before the ragdoll teardown, so its Downed guards do not block it.
 	StateHandler.RemoveStates(char, "Downed")
 	StateHandler.RemoveStates(char, "CantAnything")
 	StateHandler.SetStun(char, false)
@@ -298,9 +298,8 @@ function DownedManager.Revive(char)
 	unpin(char)
 
 	if hum then
-		-- Restore movement. Pop the Downed PIN and let SpeedService recompute to the
-		-- live base (Stamina + race bonus): the Stun modifier was already dropped by the
-		-- SetStun(false) above, so with Downed gone the stack resolves to full speed.
+		-- Pop the Downed pin. The stun was already cleared, so SpeedService settles to full
+		-- speed.
 		SpeedService.Pop(char, "Downed")
 		hum.JumpPower = 50
 		hum.JumpHeight = 7.2
@@ -309,13 +308,12 @@ function DownedManager.Revive(char)
 
 		hum.Health = hum.MaxHealth * REVIVE_HP_PCT
 
-		-- GettingUp is re-issued here, AFTER PlatformStand is down. Roblox ignores a
-		-- GettingUp request while PlatformStand is true, so the one fired inside
-		-- UnRagdoll landed on a still-platform-standing humanoid and did nothing.
+		-- Roblox ignores GettingUp while PlatformStand is true, so request it again here,
+		-- after PlatformStand is off.
 		hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
 		hum:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
 
-		-- Force the client's network-owned Humanoid to recognize the ground
+		-- Make the client-owned Humanoid see the ground.
 		local root = char:FindFirstChild("HumanoidRootPart")
 		if root then
 			local _, y, _ = root.CFrame:ToEulerAnglesYXZ()
@@ -323,7 +321,7 @@ function DownedManager.Revive(char)
 			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 			root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
 
-			-- Briefly bouncing Sit triggers a replicated state reset for clients stuck in Freefall
+			-- A short Sit resets the replicated state of a client stuck in Freefall.
 			hum.Sit = true
 			task.wait()
 			hum.Sit = false
@@ -335,7 +333,10 @@ function DownedManager.Revive(char)
 	end
 end
 
--- [[ 4. STOP EXECUTION ]] --
+-- DownedManager.StopExecution() - cancel an execution
+-- @executorChar: the executing character
+--
+-- Return: nothing.
 function DownedManager.StopExecution(executorChar)
 	if not executorChar then
 		return
@@ -361,7 +362,14 @@ function DownedManager.StopExecution(executorChar)
 	end
 end
 
--- [[ 5. PLAYER EXECUTION LOGIC ]] --
+-- DownedManager.AttemptExecute() - start or cancel a player's execution of a downed body
+-- @executorChar: the executing character
+-- @victimChar: the downed character
+--
+-- Calling it again during an execution cancels it. The execution kills the victim
+-- after 2 seconds unless it is cancelled.
+--
+-- Return: nothing. Yields for 2 seconds.
 function DownedManager.AttemptExecute(executorChar, victimChar)
 	if not DownedData[victimChar] then
 		return
@@ -370,7 +378,6 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 		return
 	end
 
-	-- Ensure executor is allowed to act
 	if StateHandler.GetState(executorChar, "Stunned") then
 		return
 	end
@@ -442,7 +449,10 @@ function DownedManager.AttemptExecute(executorChar, victimChar)
 	end
 end
 
--- [[ 6. FORCE DROP IF CARRYING ]] --
+-- DownedManager.DropIfCarrying() - drop the body a character carries
+-- @carrierChar: the character
+--
+-- Return: true if the character was carrying someone.
 function DownedManager.DropIfCarrying(carrierChar)
 	if not carrierChar then
 		return false
@@ -457,13 +467,18 @@ function DownedManager.DropIfCarrying(carrierChar)
 	return false
 end
 
--- [[ 7. CARRY LOGIC ]] --
+-- DownedManager.AttemptCarry() - pick up a downed body, or drop it
+-- @carrierChar: the carrying character
+-- @victimChar: the downed character
+--
+-- A carrier who already carries someone drops them instead.
+--
+-- Return: nothing.
 function DownedManager.AttemptCarry(carrierChar, victimChar)
 	if DownedManager.DropIfCarrying(carrierChar) then
 		return
 	end
 
-	-- FIX 2: Validate the carrier's state before they try to pick someone up
 	if StateHandler.GetState(carrierChar, "CantAnything") then
 		return
 	end
@@ -481,7 +496,6 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 		return
 	end
 
-	-- A. PICK UP
 	if not DownedData[victimChar].Carrier then
 		local dist = (carrierChar.HumanoidRootPart.Position - victimChar.HumanoidRootPart.Position).Magnitude
 		if dist > EXECUTE_RANGE then
@@ -540,8 +554,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 				end
 			end)
 
-		-- force = true: the victim IS Downed, and UnRagdoll refuses to disturb a
-		-- Downed body unless the teardown is deliberate. A pickup is deliberate.
+		-- UnRagdoll leaves a Downed body alone unless forced. A pickup is deliberate.
 		RagdollManager.UnRagdoll(victimChar, true)
 
 		if vHum then
@@ -555,7 +568,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 
 		victimRoot.CFrame = carrierRoot.CFrame * CFrame.new(CARRY_OFFSET) * CFrame.Angles(0, 0, 0)
 
-		-- [[ FIX: Give Network Ownership to the Carrier so it doesn't lag ]]
+		-- The carrier owns the victim's physics, so the carry does not lag.
 		local carrierPlayer = Players:GetPlayerFromCharacter(carrierChar)
 		if carrierPlayer and victimRoot:CanSetNetworkOwnership() then
 			victimRoot:SetNetworkOwner(carrierPlayer)
@@ -593,12 +606,15 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 			end
 		end
 	elseif DownedData[victimChar].Carrier == carrierChar then
-		print("dropping player")
 		StopCarrying(carrierChar, victimChar)
 	end
 end
 
--- [[ 8. NPC EXECUTION LOGIC ]] --
+-- DownedManager.NPCExecute() - let an NPC execute a downed body
+-- @npcModel: the NPC
+-- @victimChar: the downed character
+--
+-- Return: nothing.
 function DownedManager.NPCExecute(npcModel, victimChar)
 	if not DownedData[victimChar] then
 		return
@@ -647,26 +663,21 @@ Players.PlayerRemoving:Connect(function(player)
 		return
 	end
 
-	-- If they were carrying someone, drop them cleanly
 	DownedManager.DropIfCarrying(char)
 
-	-- If they were being carried, stop the carry from the carrier's side
 	local data = DownedData[char]
 	if data and data.Carrier then
 		StopCarrying(data.Carrier, char)
 	end
 
-	-- If they were executing someone, cancel the execution
 	if ActiveExecuteTracks[char] then
 		DownedManager.StopExecution(char)
 	end
 
-	-- If they were being executed, cancel from the executor's side
 	if data and data.BeingExecuted and data.Executor then
 		DownedManager.StopExecution(data.Executor)
 	end
 
-	-- Clean up their DownedData entry last
 	DownedData[char] = nil
 end)
 
