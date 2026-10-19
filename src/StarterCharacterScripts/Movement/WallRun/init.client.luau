@@ -1,4 +1,8 @@
--- wall running
+-- SPDX-License-Identifier: MIT
+--
+-- Wall running: a space press in the air next to a wall runs along it while space is
+-- held. Two wall runs are allowed before the player touches the ground, three with
+-- Stamina 10. Ending a wall run arms the climb.
 
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -14,23 +18,21 @@ local animator = hum:WaitForChild("Animator")
 local stateRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("stateRepl")
 local StatScaling = require(ReplicatedStorage:WaitForChild("modules"):WaitForChild("StatScaling"))
 
--- Animation Setup
 local AnimsFolder = script:WaitForChild("Anims")
 local WallRunL = animator:LoadAnimation(AnimsFolder:WaitForChild("WallRunL"))
 local WallRunR = animator:LoadAnimation(AnimsFolder:WaitForChild("WallRunR"))
 
--- CONFIGS
 local WALL_RUN_DISTANCE = 3
 local WALL_RUN_SPEED = 30
 local WALL_RUN_Y_VELOCITY = 2
-local ANGLE_TOLERANCE = 0.45 -- Strict angle
+-- The wall must be nearly parallel to the facing direction.
+local ANGLE_TOLERANCE = 0.45
 local WALL_RUN_DURATION = 3
 local COOLDOWN = 0.5
 local LEDGE_THRESHOLD = 2
--- Input buffer window: a space tap this many seconds BEFORE entering freefall still
--- counts as a "pressed in air" intent once freefall begins.
+-- A space press this many seconds before freefall still counts as a press in the air.
 local BUFFER_WINDOW = 0.5
--- Max consecutive wall runs before needing to touch ground. Stamina >= 10 grants a 3rd.
+-- The wall runs allowed before the player touches the ground.
 local function getMaxWallRuns()
 	local stam = 0
 	local stats = player:FindFirstChild("PlayerStats")
@@ -40,23 +42,21 @@ local function getMaxWallRuns()
 			stam = sf.Stamina.Value
 		end
 	end
-	return StatScaling.GetWallRunCount(stam) -- 2, or 3 at stamina >= 10
+	return StatScaling.GetWallRunCount(stam)
 end
 
--- STATE
 local isWallRunning = false
 local wallRunBV = nil
 local startTime = 0
 local lastWallRunTime = 0
 local wallRunCount = 0
 
--- INPUT STATE
-local spacePressedInAir = false -- Tracks if space was pressed specifically while in freefall
--- Buffer: timestamp of a space press that happened while NOT yet in freefall. If freefall
--- begins within BUFFER_WINDOW and the key is still held, it promotes to spacePressedInAir.
+-- True when space was pressed while in freefall.
+local spacePressedInAir = false
+-- The time of a space press before freefall. If freefall starts within BUFFER_WINDOW
+-- and space is still held, it becomes a press in the air.
 local spaceBufferedAt = nil
 
--- VISUALS STATE
 local leftTrail = nil
 local rightTrail = nil
 
@@ -95,9 +95,7 @@ local function isNearLedge(hitPart, hitPos)
 	return false
 end
 
--- VISUAL EFFECTS FUNCTIONS
 local function createEffects()
-	-- Clean up old ones just in case
 	if leftTrail then
 		leftTrail:Destroy()
 	end
@@ -123,15 +121,13 @@ local function createEffects()
 
 	game.Debris:AddItem(eff, 5)
 
-	-- Left Arm Effect
 	leftTrail = dashEff:Clone()
-	leftTrail.Parent = char:FindFirstChild("Left Arm") or char:FindFirstChild("LeftHand") -- R6/R15 Fallback
+	leftTrail.Parent = char:FindFirstChild("Left Arm") or char:FindFirstChild("LeftHand")
 	leftTrail.Position = Vector3.new(-0.5, -1, 0)
 	if leftTrail.Parent and leftTrail.Parent:FindFirstChild("LeftGripAttachment") then
 		leftTrail.Trail.Attachment1 = leftTrail.Parent.LeftGripAttachment
 	end
 
-	-- Right Arm Effect
 	rightTrail = dashEff:Clone()
 	rightTrail.Parent = char:FindFirstChild("Right Arm") or char:FindFirstChild("RightHand")
 	rightTrail.Position = Vector3.new(0.5, -1, 0)
@@ -158,11 +154,10 @@ function startWallRun(WallHit, WallSide)
 	local forward = Root.CFrame.LookVector
 	local runDir = getWallRunDirection(forward, WallHit.Normal)
 
-	-- UPDATE EXISTING RUN
+	-- Already running: update the direction, and fall off after WALL_RUN_DURATION.
 	if isWallRunning and wallRunBV then
 		local elapsedTime = tick() - startTime
 
-		-- Gravity / Duration Logic
 		local currentY = WALL_RUN_Y_VELOCITY
 		if elapsedTime > WALL_RUN_DURATION then
 			currentY = -20
@@ -177,19 +172,16 @@ function startWallRun(WallHit, WallSide)
 		return
 	end
 
-	-- DEBOUNCE
 	if tick() - lastWallRunTime < COOLDOWN then
 		return
 	end
 
-	-- INITIALIZE NEW RUN
 	isWallRunning = true
 	wallRunCount = wallRunCount + 1
 	startTime = tick()
 	hum.AutoRotate = false
 	stateRemote:FireServer("StartWallR")
 
-	-- Trigger Visuals
 	createEffects()
 
 	if not wallRunBV then
@@ -202,7 +194,6 @@ function startWallRun(WallHit, WallSide)
 	wallRunBV.Velocity =
 		Vector3.new(runDir.X * WALL_RUN_SPEED, WALL_RUN_Y_VELOCITY, runDir.Z * WALL_RUN_SPEED)
 
-	-- Animations
 	if WallSide == "RightWall" then
 		if not WallRunR.IsPlaying then
 			WallRunR:Play(0.2)
@@ -226,11 +217,10 @@ function stopWallRun()
 	hum.AutoRotate = true
 	stateRemote:FireServer("StopWallR")
 
-	-- Re-arm the climb: finishing a wall run leaves you airborne and lets a SINGLE
-	-- mid-air space press climb again (read + consumed by the Climbing script).
+	-- Arm the climb: after a wall run, one press in the air climbs. The Climbing script
+	-- reads and clears this.
 	char:SetAttribute("WallRanRecently", true)
 
-	-- Clean Visuals
 	removeEffects()
 
 	if wallRunBV then
@@ -242,7 +232,6 @@ function stopWallRun()
 	WallRunL:Stop(0.2)
 end
 
--- INPUT HANDLING
 UserInputService.InputBegan:Connect(function(input, gp)
 	if gp then
 		return
@@ -251,15 +240,13 @@ UserInputService.InputBegan:Connect(function(input, gp)
 	if char:GetAttribute("Stunned") then
 		return
 	end
-	--if char:GetAttribute("CantAnything") then return end
 
 	if input.KeyCode == Enum.KeyCode.Space then
-		-- Only register valid wallrun input if we press space WHILE in the air
+		-- A wall run starts only from a press in the air.
 		if hum:GetState() == Enum.HumanoidStateType.Freefall then
 			spacePressedInAir = true
 		else
-			-- Pressed too early (still grounded/jumping). Buffer the intent: if freefall
-			-- starts within BUFFER_WINDOW and space is still held, it promotes below.
+			-- Pressed before freefall: buffer it.
 			spaceBufferedAt = os.clock()
 		end
 	end
@@ -268,13 +255,12 @@ end)
 UserInputService.InputEnded:Connect(function(input)
 	if input.KeyCode == Enum.KeyCode.Space then
 		spacePressedInAir = false
-		spaceBufferedAt = nil -- releasing space cancels any buffered tap
+		spaceBufferedAt = nil
 	end
 end)
 
 RunService.Heartbeat:Connect(function(dt)
-	-- 0. Buffer promotion: a space tap made just before freefall counts once we're
-	-- actually airborne (and only while the key is still held).
+	-- A buffered press counts once the player is in freefall, if space is still held.
 	if spaceBufferedAt then
 		if os.clock() - spaceBufferedAt > BUFFER_WINDOW then
 			spaceBufferedAt = nil
@@ -286,14 +272,13 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- 1. Check Ground Status to Reset Counter
+	-- Touching the ground resets the wall run count and the press.
 	if not isWallRunning and hum.FloorMaterial ~= Enum.Material.Air then
 		wallRunCount = 0
-		spacePressedInAir = false -- Reset air press if we hit ground
+		spacePressedInAir = false
 		spaceBufferedAt = nil
 	end
 
-	-- Raycasting
 	local rightRay = Root.CFrame.RightVector * WALL_RUN_DISTANCE
 	local leftRay = -Root.CFrame.RightVector * WALL_RUN_DISTANCE
 
@@ -306,7 +291,6 @@ RunService.Heartbeat:Connect(function(dt)
 	local isHoldingSpace = UserInputService:IsKeyDown(Enum.KeyCode.Space)
 	local isFreefall = hum:GetState() == Enum.HumanoidStateType.Freefall
 
-	-- Angle Check
 	local angleCheck = false
 	if WallHit then
 		local dot = Root.CFrame.LookVector:Dot(WallHit.Normal)
@@ -315,22 +299,20 @@ RunService.Heartbeat:Connect(function(dt)
 		end
 	end
 
-	-- Ledge Check
 	local ledgeDetected = false
 	if WallHit then
 		ledgeDetected = isNearLedge(WallHit.Instance, WallHit.Position)
 	end
 
-	-- Logic Loop
 	if isWallRunning then
-		-- Maintain Run: As long as we hold space (even if we started it earlier)
+		-- Keep running while a wall is there and space is held.
 		if WallHit and isHoldingSpace then
 			startWallRun(WallHit, WallSide)
 		else
 			stopWallRun()
 		end
 	else
-		-- Start Run: Requires specific "Pressed In Air" flag
+		-- Start only from a press in the air.
 		if
 			WallHit
 			and spacePressedInAir
