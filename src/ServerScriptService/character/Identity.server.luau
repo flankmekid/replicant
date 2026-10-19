@@ -9,6 +9,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataManager = require(ServerScriptService.modules.dataManager)
 local TitleManager = require(ServerScriptService.modules.TitleManager)
+local DevConfig = require(ServerScriptService.modules.DevConfig)
 
 local soulColors = {
 	Color3.fromRGB(160, 40, 40),
@@ -23,7 +24,7 @@ local soulFonts = {
 }
 
 local specialTitles = {
-	[1526974131] = "THE PRIMAL MAW",
+	[DevConfig.UserIds.primalMaw] = "THE PRIMAL MAW",
 }
 
 local remotes = ReplicatedStorage:WaitForChild("remotes")

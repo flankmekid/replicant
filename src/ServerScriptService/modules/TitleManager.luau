@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local DataManager = require(ServerScriptService.modules.dataManager)
+local DevConfig = require(ServerScriptService.modules.DevConfig)
 
 local AurasFolder =
 	ReplicatedStorage:WaitForChild("assets"):WaitForChild("auras"):WaitForChild("title")
@@ -44,10 +45,26 @@ TitleManager.Titles = {
 	["the Replicant"] = { Liturgy = 0, Description = "Reach level 25 with all weapons." },
 
 	-- Developer titles, granted by UserId.
-	["Angel's Thanatos"] = { Liturgy = 6700, Description = "???", UserId = 107650965 },
-	["the Primal Maw"] = { Liturgy = 6700, Description = "???", UserId = 1526974131 },
-	["the Unforgiven"] = { Liturgy = 6700, Description = "???", UserId = 1718017878 },
-	["the Dragon Knight"] = { Liturgy = 6700, Description = "???", UserId = 1718017878 },
+	["Angel's Thanatos"] = {
+		Liturgy = 6700,
+		Description = "???",
+		UserId = DevConfig.UserIds.thanatos,
+	},
+	["the Primal Maw"] = {
+		Liturgy = 6700,
+		Description = "???",
+		UserId = DevConfig.UserIds.primalMaw,
+	},
+	["the Unforgiven"] = {
+		Liturgy = 6700,
+		Description = "???",
+		UserId = DevConfig.UserIds.unforgiven,
+	},
+	["the Dragon Knight"] = {
+		Liturgy = 6700,
+		Description = "???",
+		UserId = DevConfig.UserIds.unforgiven,
+	},
 }
 
 local killTitles = {

@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local InsertService = game:GetService("InsertService")
 
 local DataManager = require(ServerScriptService.modules.dataManager)
+local DevConfig = require(ServerScriptService.modules.DevConfig)
 local RaceConfig = require(ReplicatedStorage.modules.RaceConfig)
 local RaceAssets = ServerStorage:FindFirstChild("RaceAssets")
 local FacesFolder = ReplicatedStorage:WaitForChild("faces")
@@ -275,7 +276,7 @@ local function UpdateCharacterVisuals(player)
 	if visuals.SkinColor then
 		for _, part in ipairs(char:GetChildren()) do
 			if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-				if raceName == "Maw" and player.UserId == 1526974131 then
+				if raceName == "Maw" and player.UserId == DevConfig.UserIds.primalMaw then
 					part.Color = Color3.fromRGB(166, 7, 14)
 				else
 					part.Color = visuals.SkinColor
@@ -374,7 +375,7 @@ local function UpdateCharacterVisuals(player)
 				if template then
 					local clone = template:Clone()
 					clone:SetAttribute("IsRaceItem", true)
-					if raceName == "Maw" and player.UserId == 1526974131 then
+					if raceName == "Maw" and player.UserId == DevConfig.UserIds.primalMaw then
 						clone:FindFirstChild("Handle").Color = Color3.fromRGB(143, 6, 13)
 					end
 					clone.Parent = char
