@@ -1,21 +1,31 @@
--- Client-side cross-input gate. Shared by M1/M2/E so that once ANY attack input
--- commits, every attack input is blocked for the committed windup, immediately and
--- without waiting for the server-set state to replicate back. This closes the window
--- that let a delayed M2/E press interrupt an M1 animation while the attack still fired.
+-- SPDX-License-Identifier: MIT
+--
+-- Blocks every attack input for the committed windup once any attack (M1, M2, or E)
+-- starts, without waiting for the server state to replicate. Otherwise a late M2 or E
+-- press could cancel an M1 animation while the M1 still fired.
+
 local InputGate = {}
 
 local lockedUntil = 0
 
+-- InputGate.IsLocked() - check whether attack input is locked
+--
+-- Return: true while locked.
 function InputGate.IsLocked()
 	return os.clock() < lockedUntil
 end
 
--- lock for `duration` seconds (the attack's committed windup)
+-- InputGate.Lock() - lock attack input
+-- @duration: the committed windup in seconds
+--
+-- Return: nothing.
 function InputGate.Lock(duration)
 	lockedUntil = os.clock() + (duration or 0)
 end
 
--- release early (e.g. the server declined the attack, so the player is free again)
+-- InputGate.Unlock() - release the lock early, for example when the server declined
+--
+-- Return: nothing.
 function InputGate.Unlock()
 	lockedUntil = 0
 end

@@ -1,7 +1,8 @@
--- Shared M2 (standard). Faithful port of the per-weapon M2 template for the
--- sword/polearm weapons. Client side just plays the anim, fires the server, and
--- waits the cooldown; the real M2 mechanics (hitbox, dash, guardbreak) are
--- server-side. Fist and blade weapons use M2_Fist / M2_Blade instead.
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the standard M2, driven by WeaponConfig: plays the animation, sends
+-- the request, and waits the cooldown. The server runs the M2 itself.
+
 local module = {}
 
 local Players = game:GetService("Players")
@@ -51,13 +52,20 @@ local function soundsFor(char)
 	return c and c.client.sounds
 end
 
--- called by the blade throw E to release the M2 lock after a throw resolves
+-- M2.ResetStats() - release the M2 lock
+--
+-- The blade throw E calls this after a throw resolves.
+--
+-- Return: nothing.
 function module.ResetStats()
 	if canAttack == false then
 		canAttack = true
 	end
 end
 
+-- M2.OnM2Activated() - use the M2
+--
+-- Return: nothing. Yields until the cooldown ends.
 function module.OnM2Activated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
@@ -126,6 +134,11 @@ function module.OnM2Activated()
 	canAttack = true
 end
 
+-- M2.ServerResponse() - handle the server's reply to an attack request
+-- @plr2: the local player
+-- @response: "Declined" when the server rejected the attack
+--
+-- Return: nothing.
 function module.ServerResponse(plr2, response)
 	if not plr2 then
 		return
@@ -133,12 +146,11 @@ function module.ServerResponse(plr2, response)
 	local char = plr2.Character or plr2.CharacterAdded:Wait()
 	if response == "Declined" then
 		InputGate.Unlock()
-		print(response)
 		local weapon = getEquippedTool()
 		local cfg = weapon and WeaponConfig[weapon]
 		local anim = cfg and cfg.client.m2.animID
 		animationHndlr.StopAnim(char, "M2", anim)
-		-- server rejected the swing: kill any optimistic movement velocity we already spawned
+		-- The server rejected the swing: remove any movement that already started.
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			for _, v in ipairs(hrp:GetChildren()) do
@@ -150,8 +162,14 @@ function module.ServerResponse(plr2, response)
 	end
 end
 
+-- M2.Hitstop() - freeze the animations of both fighters on impact
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hitstop = function(ochar, echar)
-	-- freeze both attacker and victim animations on impact (client-side feel)
 	if ochar then
 		animationHndlr.Hitstop(ochar, 0.12)
 	end
@@ -160,6 +178,12 @@ module.Hitstop = function(ochar, echar)
 	end
 end
 
+-- M2.Swing() - play the swing sound
+-- @ochar: the attacking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Swing = function(ochar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.m2Swing)
@@ -171,6 +195,13 @@ module.Swing = function(ochar)
 	end
 end
 
+-- M2.Hit() - play the hit sound and FX
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hit = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.hit)
@@ -184,6 +215,13 @@ module.Hit = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.Blocked() - play the block sound and FX
+-- @ochar: the attacking character
+-- @echar: the blocking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Blocked = function(ochar, echar)
 	local s = Sounds.BlockingHit:Clone()
 	s.Parent = echar.Torso
@@ -193,6 +231,13 @@ module.Blocked = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.Parry() - play the parry sound and FX
+-- @ochar: the parried attacker
+-- @echar: the parrying character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Parry = function(ochar, echar)
 	local s = Sounds.ParrySound:Clone()
 	s.Parent = ochar.Torso
@@ -202,6 +247,13 @@ module.Parry = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M2.GB() - play the guard-break sound and FX
+-- @ochar: the attacking character
+-- @echar: the guard-broken character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.GB = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.gb)

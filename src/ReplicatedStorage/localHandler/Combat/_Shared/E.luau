@@ -1,6 +1,8 @@
--- Shared E (config-driven). Faithful port of the per-weapon E dash template.
--- Serves every weapon whose E is the standard forward dash. Dagger/Tanto keep
--- their own custom throw E (config marks them e.custom = true).
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the standard E (a forward dash) for every weapon, driven by
+-- WeaponConfig. A weapon with a custom E (e.custom) uses its own module.
+
 local module = {}
 
 local Players = game:GetService("Players")
@@ -79,6 +81,9 @@ local function dashEff()
 	end
 end
 
+-- E.OnEActivated() - use the E
+--
+-- Return: nothing. Yields until the cooldown ends.
 function module.OnEActivated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
@@ -91,9 +96,10 @@ function module.OnEActivated()
 		return
 	end
 	local e = cfg.client.e
+	-- A weapon with a custom E runs its own module.
 	if e.custom then
 		return
-	end -- custom throw weapons run their own E module
+	end
 
 	if InputGate.IsLocked() then
 		return
@@ -159,6 +165,11 @@ function module.OnEActivated()
 	canAttack = true
 end
 
+-- E.ServerResponse() - handle the server's reply to an attack request
+-- @plr2: the local player
+-- @response: "Declined" when the server rejected the attack
+--
+-- Return: nothing.
 function module.ServerResponse(plr2, response)
 	local char = plr2.Character or plr2.CharacterAdded:Wait()
 	if response == "Declined" then
@@ -167,7 +178,7 @@ function module.ServerResponse(plr2, response)
 		local cfg = weapon and WeaponConfig[weapon]
 		local anim = cfg and cfg.client.e and cfg.client.e.animID
 		animationHndlr.StopAnim(char, "M1", anim)
-		-- server rejected the swing: kill any optimistic movement velocity we already spawned
+		-- The server rejected the swing: remove any movement that already started.
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			for _, v in ipairs(hrp:GetChildren()) do
@@ -176,12 +187,17 @@ function module.ServerResponse(plr2, response)
 				end
 			end
 		end
-		print(response)
 	end
 end
 
+-- E.Hitstop() - freeze the animations of both fighters on impact
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hitstop = function(ochar, echar)
-	-- freeze both attacker and victim animations on impact (client-side feel)
 	if ochar then
 		animationHndlr.Hitstop(ochar, 0.12)
 	end
@@ -190,6 +206,12 @@ module.Hitstop = function(ochar, echar)
 	end
 end
 
+-- E.Swing() - play the swing sound
+-- @ochar: the attacking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Swing = function(ochar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.eSwing)
@@ -201,6 +223,13 @@ module.Swing = function(ochar)
 	end
 end
 
+-- E.Hit() - play the hit sound and FX
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hit = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.hit)
@@ -214,6 +243,13 @@ module.Hit = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- E.Blocked() - play the block sound and FX
+-- @ochar: the attacking character
+-- @echar: the blocking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Blocked = function(ochar, echar)
 	local s = Sounds.BlockingHit:Clone()
 	s.Parent = echar.Torso
@@ -223,6 +259,13 @@ module.Blocked = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- E.Parry() - play the parry sound and FX
+-- @ochar: the parried attacker
+-- @echar: the parrying character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Parry = function(ochar, echar)
 	local s = Sounds.ParrySound:Clone()
 	s.Parent = ochar.Torso
@@ -232,6 +275,13 @@ module.Parry = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- E.GB() - play the guard-break sound and FX
+-- @ochar: the attacking character
+-- @echar: the guard-broken character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.GB = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.gb)

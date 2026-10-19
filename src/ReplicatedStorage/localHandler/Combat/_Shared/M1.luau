@@ -1,7 +1,9 @@
--- Shared M1 (config-driven). Faithful port of the per-weapon M1 template.
--- Weapon-specific values come from ReplicatedStorage.modules.WeaponConfig,
--- resolved per equipped weapon. Attack state is shared (one equipped weapon
--- at a time; the server is the combo authority via the "Combo" attribute).
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the M1 for every weapon, driven by WeaponConfig: the combo, the
+-- running lunge, the air attack, and the uppercut. The server owns the combo counter
+-- through the Combo attribute.
+
 local module = {}
 
 local Players = game:GetService("Players")
@@ -17,13 +19,13 @@ local WeaponConfig = require(RP.modules.WeaponConfig)
 local InputGate = require(script.Parent:WaitForChild("InputGate"))
 local DashConfig = require(RP.modules.DashConfig)
 
--- uniform constants (identical across every weapon in the original modules)
+-- The same for every weapon.
 local comboResetTime = 5
 local UPPERCUT_VELOCITY = 15
 
--- Eases an HRP up to `targetPos` and HOLDS it there for `window`, then releases (it falls).
--- AlignPosition drives the position via the physics engine, so it plays nice with the
--- character's own simulation instead of fighting it the way a CFrame tween would.
+-- Raises the HRP to targetPos and holds it for window seconds, then lets it fall.
+-- AlignPosition works through physics, so it does not fight the character's own
+-- simulation the way a CFrame tween would.
 local function juggleFloat(hrp, targetPos, window, responsiveness)
 	if not hrp then
 		return
@@ -44,7 +46,7 @@ local function juggleFloat(hrp, targetPos, window, responsiveness)
 	Debris:AddItem(att, window)
 end
 
--- shared attack state
+-- Attack state is shared, because only one weapon is equipped at a time.
 local combo = 0
 local comboResetTask = nil
 local canAttack = true
@@ -70,7 +72,7 @@ local function getEquippedTool()
 	return nil
 end
 
--- resolve a dotted path ("katana.katanaSwing" or "PunchSound") under assets.sounds
+-- Resolves a dotted path under assets.sounds, such as "katana.katanaSwing".
 local function resolveSound(path)
 	if not path then
 		return nil
@@ -82,8 +84,8 @@ local function resolveSound(path)
 	return node
 end
 
--- weapon identity of an arbitrary character (used by the replicated FX callbacks,
--- where the acting character may be a remote player, not the LocalPlayer)
+-- Returns the weapon of any character. The replicated FX handlers also run for other
+-- players, not only the local player.
 local function weaponOf(char)
 	local tool = char and char:FindFirstChildOfClass("Tool")
 	return tool and tool.Name
@@ -122,6 +124,12 @@ local function dashEff()
 	end
 end
 
+-- M1.OnM1Activated() - use the M1
+--
+-- Picks the uppercut, the running lunge, the air attack, or the next combo hit from the
+-- movement state.
+--
+-- Return: nothing. Yields until the attack can repeat.
 function module.OnM1Activated()
 	local char = plr.Character or plr.CharacterAdded:Wait()
 
@@ -174,29 +182,16 @@ function module.OnM1Activated()
 	canAttack = false
 	InputGate.Lock(cfg.server.m1.windup + 0.2)
 
-	-- [[ JUGGLE GATE ]] --
-	-- Launched means we are hanging in the uppercut float. We ARE technically in
-	-- Freefall during it, but a juggled M1/E/M2 should read as the normal GROUND
-	-- combo performed in the air, not the aerial attack. So while Launched holds we
-	-- skip the movement-special branches (Sliding / Running / Freefall) and drop
-	-- straight to the combo branch. Same reasoning has to hold on the server, which
-	-- also gates extraAtk on Launched (see CombatCore.RunM1).
+	-- During the uppercut hang (Launched) the character is in Freefall, but the M1 must be
+	-- the ground combo, not the air attack. The server applies the same rule.
 	local launched = char:GetAttribute("Launched")
 
-	-- SubType is the ONLY honest way the server learns our movement state. Running and
-	-- Sliding are custom attributes set by LocalScripts; a client SetAttribute does not
-	-- replicate up to the server, so the server's GetAttribute("Running") is always nil
-	-- and its running/slide branches never fired. We stamp the state into the M1 remote
-	-- and the server trusts THIS instead of the phantom attribute. (Freefall it can and
-	-- still does re-check itself, since Humanoid states genuinely replicate.)
+	-- SubType tells the server the movement state, because Running and Sliding are
+	-- client-set attributes that do not replicate.
 
-	-- [[ UPPERCUT INPUT ]] --
-	-- Two ways in: the original slide + M1, or Ctrl held + M1 from the ground.
-	-- The Ctrl path is grounded-only. An uppercut out of freefall launches off nothing
-	-- and would swallow the aerial branch below. Slide already owns Ctrl + W while
-	-- running, so a slide with Ctrl still held lands on this branch either way.
-	-- UserInputService is fetched here, not at module scope: this module sits in
-	-- ReplicatedStorage and GetService("UserInputService") throws if the server loads it.
+	-- Uppercut: slide + M1, or Ctrl + M1 on the ground. The Ctrl path needs the ground, so
+	-- it cannot take over the air attack. UserInputService is fetched here, because
+	-- GetService("UserInputService") throws if the server loads this module.
 	local UIS = game:GetService("UserInputService")
 	local ctrlHeld = UIS:IsKeyDown(Enum.KeyCode.LeftControl)
 		or UIS:IsKeyDown(Enum.KeyCode.RightControl)
@@ -207,8 +202,7 @@ function module.OnM1Activated()
 		uppercutDB = true
 		canAttack = false
 
-		-- End the slide cleanly FIRST: fires StopSlide (kills its Heartbeat loop and
-		-- SlideVelocity) so nothing fights the AlignPosition launch we author below.
+		-- End the slide first, so its velocity does not fight the launch.
 		local usEv = RP:FindFirstChild("UppercutStopSlide")
 		if usEv then
 			usEv:Fire()
@@ -223,11 +217,8 @@ function module.OnM1Activated()
 			animationHndlr.LoadAnim(char, "M1", animID, nil, false, spd)
 		end
 
-		-- Attacker's launch is HIT-GATED now. We do NOT rise here on input. We only fire
-		-- the swing; if it connects, the server tells us to rise (module.UppercutRise
-		-- below authors the exact same AlignPosition lift, timed to the confirmed hit so
-		-- attacker and victim leave the ground together). On a whiff, no rise ever comes.
-		-- The slide is already killed above, so we are grounded and committed until then.
+		-- The attacker rises only when the server confirms the hit (UppercutRise), so
+		-- attacker and victim leave the ground together.
 		ServerRemote:FireServer({
 			Type = "Combat",
 			Action = "M1",
@@ -259,14 +250,9 @@ function module.OnM1Activated()
 			animationHndlr.LoadAnim(char, "M1", animID, nil, false, spd)
 		end
 
-		-- The lunge BodyVelocity is created SERVER-side (LungeService, fired from
-		-- CombatCore.RunM1 when extraAtk == 6). Creating one here as well would put two
-		-- authors on the same HumanoidRootPart and the constraint solver would fight
-		-- itself.
-		--
-		-- FireServer moves FIRST: the server needs to start the lunge at the top of the
-		-- attack, not lungeWait seconds into it. The animation still plays here on the
-		-- same schedule, so the step-in reads identically.
+		-- LungeService makes the lunge on the server, and a client mover here would fight
+		-- it. Send the request first, so the server starts the lunge at the top of the
+		-- attack.
 		ServerRemote:FireServer({
 			Type = "Combat",
 			Action = "M1",
@@ -297,8 +283,8 @@ function module.OnM1Activated()
 			animationHndlr.LoadAnim(char, "M1", animID, nil, false, spd)
 		end
 
-		-- MaxForce.Y = 9999 is deliberate. It pins Y velocity at zero for the life of
-		-- the mover, and that is what hangs you in the air on an air M1.
+		-- MaxForce.Y holds the vertical velocity at 0, which hangs the character in the air
+		-- during an air M1.
 		local airSpeed, airLife = DashConfig.Get("M1Air", weapon)
 		if airSpeed then
 			local BV = Instance.new("BodyVelocity", plr.Character.HumanoidRootPart)
@@ -349,8 +335,7 @@ function module.OnM1Activated()
 
 		if combo == comboMax then
 			task.delay(0.25, function()
-				-- dashEff stays regardless. The finisher keeps its visual whether or not
-				-- it travels. Only the movement is table-gated.
+				-- The finisher always gets the dash effect. DashConfig decides if it moves.
 				dashEff()
 				local finSpeed, finLife = DashConfig.Get("M1Finisher", weapon)
 				if finSpeed then
@@ -368,6 +353,11 @@ function module.OnM1Activated()
 	end
 end
 
+-- M1.ServerResponse() - handle the server's reply to an attack request
+-- @plr2: the local player
+-- @response: "Declined" when the server rejected the attack
+--
+-- Return: nothing.
 function module.ServerResponse(plr2, response)
 	local char = plr2.Character or plr2.CharacterAdded:Wait()
 	if response == "Declined" then
@@ -376,7 +366,7 @@ function module.ServerResponse(plr2, response)
 		local cfg = weapon and WeaponConfig[weapon]
 		local anim = cfg and cfg.client.m1.comboAnims[combo]
 		animationHndlr.StopAnim(char, "M1", anim)
-		-- server rejected the swing: kill any optimistic movement velocity we already spawned
+		-- The server rejected the swing: remove any movement that already started.
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
 			for _, v in ipairs(hrp:GetChildren()) do
@@ -385,15 +375,15 @@ function module.ServerResponse(plr2, response)
 				end
 			end
 		end
-		print(response)
 	end
 end
 
--- Server-driven, HIT-GATED attacker rise. CombatCore fires this at the local player
--- ONLY when their uppercut actually connected (from inside the on-hit m1Knockback
--- closure). It authors the exact AlignPosition lift the old input path used to fire
--- immediately, but now timed to the confirmed hit so the attacker rises together with
--- the server-juggled victim. On a whiff the server never fires this, so no rise.
+-- M1.UppercutRise() - lift the attacker after a confirmed uppercut hit
+--
+-- CombatCore fires this only when the uppercut connects, so the attacker rises together
+-- with the victim. On a whiff it never fires.
+--
+-- Return: nothing.
 function module.UppercutRise()
 	local char = plr.Character
 	if not char then
@@ -412,8 +402,14 @@ function module.UppercutRise()
 	)
 end
 
+-- M1.Hitstop() - freeze the animations of both fighters on impact
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hitstop = function(ochar, echar)
-	-- freeze both attacker and victim animations on impact (client-side feel)
 	if ochar then
 		animationHndlr.Hitstop(ochar, 0.12)
 	end
@@ -422,6 +418,12 @@ module.Hitstop = function(ochar, echar)
 	end
 end
 
+-- M1.Swing() - play the swing sound
+-- @ochar: the attacking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Swing = function(ochar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.m1Swing)
@@ -433,6 +435,13 @@ module.Swing = function(ochar)
 	end
 end
 
+-- M1.Hit() - play the hit sound and FX
+-- @ochar: the attacking character
+-- @echar: the character that was hit
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Hit = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.hit)
@@ -446,6 +455,13 @@ module.Hit = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M1.Blocked() - play the block sound and FX
+-- @ochar: the attacking character
+-- @echar: the blocking character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Blocked = function(ochar, echar)
 	local s = Sounds.BlockingHit:Clone()
 	s.Parent = echar.Torso
@@ -455,6 +471,13 @@ module.Blocked = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M1.Parry() - play the parry sound and FX
+-- @ochar: the parried attacker
+-- @echar: the parrying character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.Parry = function(ochar, echar)
 	local s = Sounds.ParrySound:Clone()
 	s.Parent = ochar.Torso
@@ -464,6 +487,13 @@ module.Parry = function(ochar, echar)
 	Debris:AddItem(hitFX, 0.5)
 end
 
+-- M1.GB() - play the guard-break sound and FX
+-- @ochar: the attacking character
+-- @echar: the guard-broken character
+--
+-- The server replicates this to every client.
+--
+-- Return: nothing.
 module.GB = function(ochar, echar)
 	local sc = soundsFor(ochar)
 	local snd = sc and resolveSound(sc.gb)

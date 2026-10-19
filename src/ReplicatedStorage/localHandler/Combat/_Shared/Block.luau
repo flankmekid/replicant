@@ -1,13 +1,10 @@
--- Shared Block (config-driven). REWRITTEN: parry and block are now SEPARATE inputs.
---   module.Parry   -> RMB tap. A pure parry (0.2s window), never rolls into block.
---   module.Hold    -> hold F. A pure block, no parry pre-roll.
---   module.Release -> release F. Ends the block.
--- The old model fused them (a held parry became a block after 0.2s); that is gone.
+-- SPDX-License-Identifier: MIT
 --
--- Thin client: this only plays anims and fires intent. Server _Shared.Block owns the
--- authoritative Parrying/Blocking state (and block WalkSpeed); ParryService owns the
--- parry cooldown. GB is still fired at us by the server on a guardbreak / block-break
--- so we can run break FX through the existing localHandler path.
+-- Client side of parry and block for every weapon. Parry (RMB tap) and block (hold F)
+-- are separate inputs. This module plays the animations and sends the intent. The
+-- server Block module owns the Parrying and Blocking states, and ParryService owns the
+-- parry cooldown.
+
 local module = {}
 
 local Players = game:GetService("Players")
@@ -19,10 +16,9 @@ local animationHndlr = require(RP.modules.animationHandler)
 local ParryCooldownClient = require(RP.modules.ParryCooldownClient)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 
--- [[ CONFIGURATION ]] --
-local BLOCK_COOLDOWN = 0.35 -- lower than the old 0.5, but still not spammable
+-- The delay before the next block, in seconds, so block is not spammable.
+local BLOCK_COOLDOWN = 0.35
 
--- [[ STATE ]] --
 local isBlocking = false
 local nextBlockTime = 0
 
@@ -38,7 +34,7 @@ local function getEquippedTool()
 	return nil
 end
 
--- Shared gate for both parry and block presses.
+-- The shared gate for parry and block presses.
 local function canAct(char)
 	if not char then
 		return false
@@ -64,9 +60,12 @@ local function canAct(char)
 	return true
 end
 
--- ------------------------------------------------------------------ PARRY -----
--- RMB tap. A stunned player is deliberately allowed to parry (the only escape out
--- of an M1 combo), so Stunned is NOT checked here. Block (below) still forbids it.
+-- Block.Parry() - parry (RMB tap)
+--
+-- A pure 0.2-second parry that never becomes a block. A stunned player may parry,
+-- because it is the only escape from an M1 combo.
+--
+-- Return: nothing.
 function module.Parry()
 	local char = plr.Character
 	if not char then
@@ -92,7 +91,7 @@ function module.Parry()
 		return
 	end
 
-	-- cooldown applied immediately on press, keyed per weapon
+	-- The cooldown starts on the press, per weapon.
 	ParryCooldownClient.StartCooldown(weapon .. "_Block")
 
 	ServerRemote:FireServer({
@@ -107,9 +106,12 @@ function module.Parry()
 	RP.assets.sounds.BlockStart:Play()
 end
 
--- ------------------------------------------------------------------ BLOCK -----
--- Hold F. Pure block: no parry, no window. Forbidden while Stunned (a stunned
--- victim gets the parry option only) and gated by the block cooldown.
+-- Block.Hold() - start blocking (hold F)
+--
+-- A pure block with no parry window. Not allowed while stunned, because a stunned
+-- player gets only the parry. The block cooldown applies.
+--
+-- Return: nothing.
 function module.Hold()
 	local char = plr.Character
 	if not char then
@@ -135,8 +137,8 @@ function module.Hold()
 		return
 	end
 
-	-- Guard-broken: block is locked out during the 5s recovery. Give the player
-	-- feedback (bar flashes darker) instead of silently eating the press.
+	-- Guard-broken: block is locked out for the 5-second recovery. Flash the bar instead of
+	-- ignoring the press.
 	if char:GetAttribute("GuardBroken") then
 		RP.remotes.GuardFlash:Fire()
 		return
@@ -156,6 +158,9 @@ function module.Hold()
 	})
 end
 
+-- Block.Release() - stop blocking (release F)
+--
+-- Return: nothing.
 function module.Release()
 	local char = plr.Character
 	local weapon = getEquippedTool()
@@ -175,14 +180,18 @@ function module.Release()
 	isBlocking = false
 end
 
--- ------------------------------------------------------------ COMPAT / FX -----
--- Server still fires GB at us on a guardbreak or block-break. Drop the block and
--- let the existing break-FX path (if any) run. Kept so old call sites don't warn.
+-- Block.GB() - drop the block after a guard break
+-- @ochar: the attacking character
+-- @echar: the guard-broken character
+--
+-- The server fires this on a guard break or a block break.
+--
+-- Return: nothing.
 module.GB = function(ochar, echar)
 	module.Release()
 end
 
--- Back-compat shims: if anything still calls the old names, route them sanely.
+-- The old names, kept for callers that may still use them.
 module.Block = module.Hold
 module.Unblock = module.Release
 
