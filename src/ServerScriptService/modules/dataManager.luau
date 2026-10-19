@@ -473,6 +473,7 @@ function module.PlayerAdded(player)
 						Amount = 1,
 					})
 				end
+				print(`[dataManager] Migrated the old inventory format for {player.Name}.`)
 			end
 			profile.Data.Inventory = nil
 		end
@@ -490,6 +491,7 @@ function module.PlayerAdded(player)
 		end
 
 		if isInventoryEmpty and isHotbarEmpty then
+			print(`[dataManager] New player {player.Name}: {DEFAULT_WEAPON} goes to hotbar slot 1.`)
 			local defaultItem = {
 				Id = game:GetService("HttpService"):GenerateGUID(false),
 				Name = DEFAULT_WEAPON,
@@ -521,6 +523,7 @@ function module.PlayerAdded(player)
 			Profiles[player] = profile
 			module.CreateSessionStats(player, profile)
 			startManaRegeneration(player)
+			print(`[dataManager] Loaded the profile of {player.Name}.`)
 		else
 			profile:EndSession()
 		end
@@ -563,6 +566,7 @@ function module.PlayerRemoving(player)
 	local profile = Profiles[player]
 	if profile then
 		profile:EndSession()
+		print(`[dataManager] Saved the profile of {player.Name}.`)
 	end
 end
 
@@ -1571,6 +1575,7 @@ function module.UnlockSpell(player, spellName)
 				end
 			end
 
+			print(`[dataManager] {player.Name} unlocked the spell {spellName}.`)
 			local tm = _G.TitleManager
 			if tm then
 				tm.CheckSkillUnlock(player, spellName)
@@ -1724,6 +1729,7 @@ function module.ClearInventory(player)
 	local profile = Profiles[player]
 	if profile then
 		profile.Data.InventoryData = { Items = {}, Hotbar = {}, Equipment = {} }
+		print(`[dataManager] Cleared the saved inventory of {player.Name}.`)
 	end
 end
 
@@ -1990,6 +1996,7 @@ function module.UnlockTitle(player, title)
 		return false
 	end
 	table.insert(p.Data.UnlockedTitles, title)
+	print(`[dataManager] {player.Name} unlocked the title {title}.`)
 	return true
 end
 
