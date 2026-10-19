@@ -1,14 +1,17 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The server entry point for ragdolls. NPCs are ragdolled here, and players are told
+-- to ragdoll on their own client through the Ragdoll remote.
 local Manager = {}
 local M = require(script.RagdollModule)
---local stun = require(game.ServerStorage.Modules.StunHandlerV2)
-
---- Call this module directely if u wanna ragdoll from server
+-- ragdollManager.Ragdoll() - ragdoll a character
+-- @self: the character, passed as the first argument
+-- @Duration: seconds until the character gets up, or nil to stay down
+--
+-- Return: nothing.
 function Manager:Ragdoll(Duration)
-	-- A Downed body never auto-recovers. DownedManager owns when they get up
-	-- (revive timer / execute / pickup). Any duration passed in is ignored, so
-	-- neither the server NPC timer below nor the client timer in RagOnDeath gets
-	-- scheduled. Previously a 2s ragdoll landing on a downed player would fire
-	-- ChangeState(GettingUp) two seconds later and stand them back up mid-downed.
+	-- A downed body never gets up on its own. DownedManager decides when, so the
+	-- duration is ignored.
 	if self:GetAttribute("Downed") then
 		Duration = nil
 	end
@@ -22,11 +25,10 @@ function Manager:Ragdoll(Duration)
 		end
 		Hum:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
 		Hum:ChangeState(Enum.HumanoidStateType.Physics)
-		--stun.Stun(Hum, Duration)
 
 		if Duration then
 			task.delay(Duration, function()
-				-- re-check: they may have been knocked down inside the window
+				-- The NPC may have gone down during the ragdoll.
 				if not self.Parent then
 					return
 				end
@@ -46,18 +48,14 @@ function Manager:Ragdoll(Duration)
 	end
 end
 
--- force = true means a deliberate teardown by DownedManager (revive / execute /
--- pickup). Without force, UnRagdoll will not disturb a Downed body.
+-- ragdollManager.UnRagdoll() - end a character's ragdoll
+-- @self: the character, passed as the first argument
+-- @force: true for a deliberate teardown by DownedManager (revive, execute, pickup).
+--         Without it, a Downed body is left alone.
+--
+-- Return: nothing.
 function Manager:UnRagdoll(force)
 	M.UnRagdoll(self, force)
-	--[[
-	local h = highlight:Clone()
-	h.Parent = self
-	game.TweenService:Create(h, .5, {FillTransparency = 0.35}):Play()
-	task.wait(0.5)
-	game.TweenService:Create(h, .5, {FillTransparency = 1}):Play()
-	game.Debris:AddItem(h, 0.5)
-	]]
 end
 
 return Manager

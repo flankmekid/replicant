@@ -1,9 +1,19 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Turns a character's joints into ball sockets and back. Use it through
+-- ragdollManager, which adds the NPC and client handling.
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 
 local Ragdoll = {}
 
+-- RagdollModule.Ragdoll() - ragdoll a character
+-- @self: the character, passed as the first argument
+-- @Duration: seconds until UnRagdoll, or nil to stay ragdolled
+--
+-- Does nothing to a character that is already ragdolled.
+--
+-- Return: nothing.
 function Ragdoll:Ragdoll(Duration)
-	-- Ensure we have a humanoid to work with
 	local humanoid = self:FindFirstChild("Humanoid")
 	if not humanoid then
 		return
@@ -11,26 +21,17 @@ function Ragdoll:Ragdoll(Duration)
 
 	local isDowned = self:GetAttribute("Downed")
 
-	-- Re-entrancy guard. The old code bailed on "Downed" here, which was wrong:
-	-- DownedManager.KnockDown sets Downed BEFORE calling Ragdoll, so this guard
-	-- fired every single time and the knockdown ragdoll never ran at all. The
-	-- actual intent was "don't stack ragdolls on an already-ragdolled body", so
-	-- guard on Ragdolled instead.
+	-- Do not stack a ragdoll on a body that is already ragdolled.
 	if self:GetAttribute("Ragdolled") then
 		return
 	end
 
-	-- 1. Check Hyperarmor
 	if self:GetAttribute("Hyperarmor") and not self:GetAttribute("Hyperarmor") then
 		return
 	end
 
-	-- 2. Apply Stun States.
-	-- A Downed body's ragdoll has NO duration and NO stun timer. DownedManager
-	-- owns the whole lifecycle (Revive / Execute / Carry decide when they get up).
-	-- Letting a stun timer expire here used to clear Stunned, which under the old
-	-- stateHandler dropped the entire state table and silently un-Downed them:
-	-- that is how a downed player could stand up and move mid-ragdoll.
+	-- A downed body's ragdoll has no duration and no stun timer, because DownedManager
+	-- decides when it gets up.
 	if isDowned then
 		Duration = nil
 		stateHandler.SetStun(self, true, nil, 0)
@@ -40,13 +41,10 @@ function Ragdoll:Ragdoll(Duration)
 		stateHandler.SetState(self, "Ragdolled", true, Duration)
 	end
 
-	-- 3. Humanoid Physics Setup (Crucial for preventing tweaking)
-	humanoid.AutoRotate = false -- Stop them from spinning on floor
-	humanoid:ChangeState(Enum.HumanoidStateType.Physics) -- Stop them from trying to stand up
-	-- Optional: If they float, enable PlatformStand instead
-	-- humanoid.PlatformStand = true
+	humanoid.AutoRotate = false
+	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
 
-	-- 4. Convert Joints to Constraints
+	-- Replace the joints with ball sockets. ToolGrip and the root joint stay.
 	for i, v in pairs(self:GetDescendants()) do
 		if
 			v:IsA("Motor6D")
@@ -73,7 +71,6 @@ function Ragdoll:Ragdoll(Duration)
 			Socket.Restitution = 0.5
 
 			if v.Name == "Right Shoulder" or v.Name == "Left Shoulder" then
-				-- Socket.TwistUpperAngle = -30
 			end
 
 			Socket.Parent = v.Parent
@@ -81,10 +78,9 @@ function Ragdoll:Ragdoll(Duration)
 		end
 	end
 
-	-- 5. Schedule Unragdoll (MOVED OUTSIDE THE LOOP)
 	if Duration then
 		task.delay(Duration, function()
-			-- We check if self still exists to prevent errors if NPC died/despawned
+			-- The character may be gone after the delay.
 			if self and self.Parent then
 				Ragdoll.UnRagdoll(self)
 			end
@@ -92,9 +88,14 @@ function Ragdoll:Ragdoll(Duration)
 	end
 end
 
--- force = true lets DownedManager tear the ragdoll down deliberately (revive,
--- execute, pickup). Without it, an UnRagdoll fired by an unrelated expiring timer
--- would stand a downed player back up.
+-- RagdollModule.UnRagdoll() - end a character's ragdoll
+-- @self: the character, passed as the first argument
+-- @force: true to tear down a Downed body's ragdoll (revive, execute, pickup)
+--
+-- Without force, a Downed body is left alone, so an unrelated timer cannot stand a
+-- downed player up.
+--
+-- Return: nothing.
 function Ragdoll:UnRagdoll(force)
 	local humanoid = self:FindFirstChild("Humanoid")
 	if not humanoid then
@@ -108,22 +109,15 @@ function Ragdoll:UnRagdoll(force)
 	stateHandler.SetStun(self, false)
 	stateHandler.RemoveStates(self, "Ragdolled")
 
-	-- 1. Reset Humanoid Properties
 	humanoid.AutoRotate = true
 
-	-- PlatformStand is what actually holds a body on the floor. Leaving it set here
-	-- meant UnRagdoll tore down the constraints and re-enabled the Motor6Ds but left
-	-- the humanoid platform-standing, so the character could act but not move: the
-	-- exact "revived but still ragdolled" symptom. It also made the ChangeState below
-	-- a no-op, because Roblox ignores GettingUp while PlatformStand is true.
+	-- PlatformStand holds a body on the floor. Clear it, or the character cannot move and
+	-- Roblox ignores the GettingUp below.
 	humanoid.PlatformStand = false
 
-	-- 2. Force the "GettingUp" state
-	-- This is the magic line that fixes the tweaking.
-	-- It tells Roblox "I am on the floor, help me stand up safely."
+	-- GettingUp makes the humanoid stand up safely from the floor.
 	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 
-	-- 3. Restore Joints
 	for i, v in pairs(self:GetDescendants()) do
 		if v.Name == "RagdollAttach" or v:IsA("BallSocketConstraint") then
 			v:Destroy()
