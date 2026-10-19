@@ -1,3 +1,6 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Dagger E. A quick slash with its own hit resolution instead of CombatCore.RunE.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -75,6 +78,10 @@ local function upSwing(char)
 	game.Debris:AddItem(attachment, 2)
 end
 
+-- E.ServerCheck() - run the Dagger E
+-- @plr: the player who pressed E
+--
+-- Return: nothing. Yields for the windup.
 function module.ServerCheck(plr)
 	local char = plr.Character
 	if not char or not char:FindFirstChild("HumanoidRootPart") then
@@ -92,7 +99,6 @@ function module.ServerCheck(plr)
 
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
-		-- Crucial: Check if the tool is actually equipped (not just in Backpack/StarterGear)
 		if tool and tool.Parent == currentCharacter then
 			return tool.Name
 		end
@@ -110,13 +116,11 @@ function module.ServerCheck(plr)
 		return
 	end
 
-	-- SET DEBOUNCE AND STATE IMMEDIATELY
 	StateHandler.SetState(char, "CantAnything", true, 0.8)
 	playerM1Debounces[plr] = true
 
 	Helper.SetSpeed(char, 4, 16)
 
-	-- Sound replication
 	task.delay(0.4, function()
 		ReplicateRemote:FireAllClients({
 			Type = "Combat",
@@ -134,7 +138,7 @@ function module.ServerCheck(plr)
 
 	Helper.ResetSpeed(char)
 
-	-- INTERRUPT CHECK: stunned/downed during windup -> abort before the hitbox.
+	-- A stun or a down during the windup cancels the attack before the hitbox.
 	if StateHandler.IsInterrupted(char) then
 		playerM1Debounces[plr] = nil
 		AnimationHandler.StopAnim(char, "ALL")
@@ -163,7 +167,6 @@ function module.ServerCheck(plr)
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
@@ -176,8 +179,6 @@ function module.ServerCheck(plr)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					print("iframed lawl :p")
-
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
 					if
@@ -220,15 +221,12 @@ function module.ServerCheck(plr)
 					local direction = (targetHRP.Position - attackerHRP.Position).Unit
 
 					Helper.ApplyKnockback(targetChar, direction, knockbackDistance * 2, 0.2)
-					--ragdollManager.Ragdoll(targetChar, 1)
-					-- E hitstun (combo-starter); pinned walkspeed so they can't walk out.
-					-- Matches CombatCore E_HITSTUN / HITSTUN_STUNSPEED for cross-weapon parity.
+					-- The E hitstun pins WalkSpeed, so the victim cannot walk out of the combo.
 					StateHandler.SetStun(targetChar, true, 0.8, 2)
 
 					local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 					dmgModule.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
 
-					--targetChar:FindFirstChild("Humanoid"):TakeDamage(dmg + extraDmg)
 					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then
 						DataManager.AddWeaponXP(
 							game.Players:GetPlayerFromCharacter(char),
@@ -262,7 +260,7 @@ function module.ServerCheck(plr)
 						Type = "Combat",
 						Action = "M1",
 						Func = "Parry",
-						FolderName = getEquippedTool(), -- FIXED Action to M2
+						FolderName = getEquippedTool(),
 					}, char, targetChar)
 
 					local parryE =
@@ -320,8 +318,7 @@ function module.ServerCheck(plr)
 					Hitbox:Destroy()
 					return
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- Route through BlockResolver (single chokepoint + guard bar).
-					-- Dagger E replicates under Action "M1" but IS an E for bar purposes.
+					-- The Dagger E replicates as "M1", but the guard bar treats it as an E.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
 						attacker = char,
@@ -397,7 +394,6 @@ function module.ServerCheck(plr)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
-					-- Normal Hit
 					ReplicateRemote:FireAllClients({
 						Type = "Combat",
 						Action = "M1",
@@ -414,10 +410,9 @@ function module.ServerCheck(plr)
 		Hitbox:Destroy()
 	end)
 
-	playerM1Debounces[plr] = nil -- CLEAR PER-PLAYER DEBOUNCE
+	playerM1Debounces[plr] = nil
 end
 
--- Cleanup when player leaves
 Players.PlayerRemoving:Connect(function(plr)
 	playerM1Debounces[plr] = nil
 end)
