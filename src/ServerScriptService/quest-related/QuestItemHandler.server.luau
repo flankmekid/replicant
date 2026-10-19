@@ -1,6 +1,7 @@
--- [[ VOID SPIRE REWARD HANDLER ]]
--- Location: ServerScriptService (Script)
--- Listens for QuestItemReward remote and gives the appropriate item.
+-- SPDX-License-Identifier: MIT
+--
+-- Gives quest reward items. QuestServer calls _G.ItemRewardManager.GiveReward when a
+-- quest with a RewardItem completes.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -15,7 +16,7 @@ local ItemRewardManager = {}
 
 local ITEM_HANDLERS = {
 	VoidSpire = function(player)
-		-- Check player doesn't already have one
+		-- Only one per player.
 		if DataManager.HasItem(player, "Void Spire") then
 			return
 		end
@@ -24,12 +25,10 @@ local ITEM_HANDLERS = {
 		if inv then
 			inv:AddItem("Void Spire", 1)
 		end
-
-		print(player.Name .. " received the Void Spire.")
 	end,
 
 	Lantern = function(player)
-		-- Check player doesn't already have one
+		-- Only one per player.
 		if DataManager.HasItem(player, "Lantern") then
 			return
 		end
@@ -38,11 +37,16 @@ local ITEM_HANDLERS = {
 		if inv then
 			inv:AddItem("Lantern", 1)
 		end
-
-		print(player.Name .. " received the Void Spire.")
 	end,
 }
 
+-- ItemRewardManager.GiveReward() - give a player a quest reward item
+-- @player: the player
+-- @itemName: the RewardItem key, "VoidSpire" or "Lantern"
+--
+-- Does nothing for an unknown item or one the player already has.
+--
+-- Return: nothing.
 ItemRewardManager.GiveReward = function(player, itemName)
 	local handler = ITEM_HANDLERS[itemName]
 	if handler then
