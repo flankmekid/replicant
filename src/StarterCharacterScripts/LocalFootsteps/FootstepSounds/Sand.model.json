@@ -1,0 +1,13 @@
+{
+  "className": "Sound",
+  "properties": {
+    "RollOffMinDistance": 100.0,
+    "PlaybackSpeed": 2.5,
+    "Volume": 0.6000000238418579,
+    "AudioContent": "rbxassetid://134456884",
+    "Looped": true,
+    "SerializedOverrides": {
+      "BinaryString": ""
+    }
+  }
+}
