@@ -80,6 +80,27 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 		return
 	end
 
+	-- Find the handler before charging. The function name is the skill name without
+	-- spaces: "Solar Flare" is SolarFlare. The racial function runs only for the player's
+	-- own racial skill, never as a fallback for a spell without a function.
+	local funcName = string.gsub(skillName, "%s+", "")
+	local isRaceSkill = playerRace and SkillConfig.RaceSkills[playerRace] == skillName
+	local handler
+	if SkillFunctions[funcName] then
+		handler = function()
+			SkillFunctions[funcName](player)
+		end
+	elseif isRaceSkill and RacialSkills[playerRace] then
+		handler = function()
+			RacialSkills[playerRace](player, char, mouseHit)
+		end
+	end
+	if not handler then
+		warn(`[SkillHandler] No function for {skillName}, cast by {player.Name}.`)
+		reply(player, skillName, "Declined")
+		return
+	end
+
 	if not serverCooldowns[player] then
 		serverCooldowns[player] = {}
 	end
@@ -112,9 +133,6 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 
 	reply(player, skillName, "Accepted", cooldown)
 
-	-- The function name is the skill name without spaces: "Solar Flare" is SolarFlare.
-	local funcName = string.gsub(skillName, "%s+", "")
-
 	-- BuffService knows only the weapon buffs. Other buff names do nothing there.
 	if skillInfo.Type == "Buff" then
 		BuffService.Activate(player, skillName)
@@ -133,15 +151,5 @@ CastSkillRemote.OnServerEvent:Connect(function(player, skillName, mouseHit)
 		end)
 	end
 
-	if SkillFunctions[funcName] then
-		task.spawn(function()
-			SkillFunctions[funcName](player)
-		end)
-	elseif RacialSkills[funcName] or RacialSkills[playerRace] then
-		task.spawn(function()
-			RacialSkills[playerRace](player, char, mouseHit)
-		end)
-	else
-		warn(`[SkillHandler] No function {funcName} in SkillFunctions or RacialSkills.`)
-	end
+	task.spawn(handler)
 end)
