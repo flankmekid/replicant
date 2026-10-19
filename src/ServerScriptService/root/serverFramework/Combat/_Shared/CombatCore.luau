@@ -361,11 +361,9 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 				if StateHandler.GetState(targetChar, "Dodging") then
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if
-						targetPlrData
-						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
-					then
-						targetPlrData.Mana.Value += 8
+					if targetPlrData then
+						targetPlrData.Mana.Value =
+							math.min(targetPlrData.Mana.Value + 8, targetPlrData.MaxMana.Value)
 					end
 					local sound = RP.assets.sounds.Dodged:Clone()
 					sound.Parent = targetHRP
@@ -531,11 +529,9 @@ local function resolveHit(plr, char, Hitbox, action, ctx)
 					BlockResolver.OnParrySuccess(targetChar)
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
-					if
-						targetPlrData
-						and targetPlrData.Mana.Value < targetPlrData.MaxMana.Value - 8
-					then
-						targetPlrData.Mana.Value += 8
+					if targetPlrData then
+						targetPlrData.Mana.Value =
+							math.min(targetPlrData.Mana.Value + 8, targetPlrData.MaxMana.Value)
 					end
 					AnimationHandler.StopAnim(char, "ALL")
 					AnimationHandler.LoadAnim(
