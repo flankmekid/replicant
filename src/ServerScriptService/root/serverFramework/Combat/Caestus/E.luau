@@ -1,5 +1,7 @@
--- Caestus server E (thin). Live fist particle FX (fistsWhite) on the leg, mana gain
--- on hit, and half XP. Dash flow + resolution come from CombatCore.RunE.
+-- SPDX-License-Identifier: MIT
+--
+-- Caestus E. Adds fist particle FX on the left leg, mana on hit, and half weapon XP to
+-- CombatCore.RunE.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -39,6 +41,10 @@ local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	end
 end
 
+-- E.ServerCheck() - run the Caestus E
+-- @plr: the player who pressed E
+--
+-- Return: nothing.
 function module.ServerCheck(plr)
 	CombatCore.RunE(plr, WeaponConfig.Caestus.server.e, {
 		onWindupStart = onWindupStart,

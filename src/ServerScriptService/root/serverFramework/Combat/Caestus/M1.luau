@@ -1,6 +1,7 @@
--- Caestus server M1 (thin). Monastic-stance buff (aura + buffed hits deal +dmg/2
--- and restore mana), live fist particle FX per combo, and half XP credit. Slashes
--- come from the generic path (corrected comboMap); everything shared from CombatCore.
+-- SPDX-License-Identifier: MIT
+--
+-- Caestus M1. Adds fist particle FX on each combo hit and half weapon XP to
+-- CombatCore.RunM1. Hits during the Monastic Stance buff go through BuffService.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -11,6 +12,8 @@ local damageCalculator = require(SSS.modules.damageCalculator)
 
 local BuffService = require(SSS.modules.BuffService)
 local WINDUP = WeaponConfig.Caestus.server.m1.windup
+-- The limb that glows for each move pattern: combo hits 1 to 5, then the running
+-- attack (6), the air attack (7), and the uppercut (8).
 local FX_PARTS = {
 	"Left Arm",
 	"Right Arm",
@@ -21,8 +24,6 @@ local FX_PARTS = {
 	"Right Leg",
 	"Right Arm",
 }
--- Buff (Monastic Stance) is now centralized in BuffService and activated from
--- SkillHandler on cast; state + aura FX live there, not here.
 
 local function FX(char, bodypart)
 	local part = char:FindFirstChild(bodypart)
@@ -52,6 +53,11 @@ local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	BuffService.ApplyDamage(plr, char, targetChar, dmg, extraDmg, "Weapon")
 end
 
+-- M1.ServerCheck() - run the Caestus M1
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	CombatCore.RunM1(plr, WeaponConfig.Caestus.server.m1, {
 		onWindupStart = onWindupStart,
