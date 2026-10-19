@@ -1,53 +1,51 @@
 --!strict
--- MapConfig
--- Single source of truth for the world map system.
--- The transform, the UI, and (later) POIs + fog of war all read from here.
+-- SPDX-License-Identifier: MIT
 --
--- Foundation locked during planning:
---   Map image : rbxassetid://83720184302193  (888 x 1000, ratio 0.888)
---   Bounds    : workspace.worldMap.MapBound_Min / MapBound_Max
---   Orientation (Roblox "Top" view): +X = screen right, +Z = screen down
---   Image ratio (0.888) matches world ratio (0.888) -> no distortion, no axis flips.
+-- The settings of the world map: the map image and the two Workspace marker parts that
+-- set the map bounds. MapTransform and the map UI read them. The image ratio (0.888)
+-- matches the world ratio, so the map needs no distortion or axis flip.
 
 local Workspace = game:GetService("Workspace")
 
 local MapConfig = {}
 
--- The uploaded, correctly-proportioned map image.
+-- The map image.
 MapConfig.IMAGE_ID = "rbxassetid://83720184302193"
 
--- Native pixel dimensions of that image (used for aspect-correct UI sizing).
+-- The pixel size of the image, for aspect-correct UI sizing.
 MapConfig.IMAGE_WIDTH = 888
 MapConfig.IMAGE_HEIGHT = 1000
 
--- Names of the corner anchor parts inside workspace.worldMap.
+-- The corner marker parts in workspace.worldMap. Min is the top-left of the map
+-- (lowest X and Z), and Max is the bottom-right.
 MapConfig.BOUND_FOLDER = "worldMap"
-MapConfig.BOUND_MIN = "MapBound_Min" -- lowest  X, lowest  Z  (top-left  on screen: -X left, -Z up)
-MapConfig.BOUND_MAX = "MapBound_Max" -- highest X, highest Z  (bottom-right on screen: +X right, +Z down)
+MapConfig.BOUND_MIN = "MapBound_Min"
+MapConfig.BOUND_MAX = "MapBound_Max"
 
--- Reads the live marker positions from the workspace.
--- Returns minX, minZ, maxX, maxZ (numbers). Errors loudly if the markers are missing,
--- because every downstream system depends on these existing.
+-- MapConfig.getBounds() - read the map bounds from the marker parts
+--
+-- Raises an error if a marker is missing, because every map system needs them.
+--
+-- Return: minX, minZ, maxX, maxZ.
 function MapConfig.getBounds(): (number, number, number, number)
 	local folder = Workspace:FindFirstChild(MapConfig.BOUND_FOLDER)
-	assert(folder, "[MapConfig] Missing workspace." .. MapConfig.BOUND_FOLDER)
+	assert(folder, `[MapConfig] workspace.{MapConfig.BOUND_FOLDER} is missing.`)
 
 	local minPart = folder:FindFirstChild(MapConfig.BOUND_MIN)
 	local maxPart = folder:FindFirstChild(MapConfig.BOUND_MAX)
 	assert(
 		minPart and minPart:IsA("BasePart"),
-		"[MapConfig] Missing/invalid " .. MapConfig.BOUND_MIN
+		`[MapConfig] {MapConfig.BOUND_MIN} is missing or is not a BasePart.`
 	)
 	assert(
 		maxPart and maxPart:IsA("BasePart"),
-		"[MapConfig] Missing/invalid " .. MapConfig.BOUND_MAX
+		`[MapConfig] {MapConfig.BOUND_MAX} is missing or is not a BasePart.`
 	)
 
 	local a = (minPart :: BasePart).Position
 	local b = (maxPart :: BasePart).Position
 
-	-- Be defensive: don't assume which part literally holds the smaller value.
-	-- Whoever placed them, min/max are derived from the actual numbers.
+	-- Compute min and max from the positions, so it does not matter which part is which.
 	local minX = math.min(a.X, b.X)
 	local maxX = math.max(a.X, b.X)
 	local minZ = math.min(a.Z, b.Z)
@@ -56,7 +54,9 @@ function MapConfig.getBounds(): (number, number, number, number)
 	return minX, minZ, maxX, maxZ
 end
 
--- Convenience: the image's aspect ratio (width / height).
+-- MapConfig.getImageAspect() - get the aspect ratio of the map image
+--
+-- Return: the width divided by the height.
 function MapConfig.getImageAspect(): number
 	return MapConfig.IMAGE_WIDTH / MapConfig.IMAGE_HEIGHT
 end

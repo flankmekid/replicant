@@ -1,19 +1,8 @@
---[[
-	ParryCooldownClient
-	Client-side mirror of the server's ParryService cooldown.
-
-	This is the LOCAL prediction + UI feed. The server (ParryService) is the real
-	authority; this exists so the client doesn't fire a parry the server will reject,
-	and so the CooldownTracker sweep matches what the server is actually doing.
-
-	Single source of truth for the client parry cooldown across all 14 weapons, so
-	weapon Block modules and the replication dispatcher all read/write the same state
-	instead of each Block keeping its own trapped local.
-
-	Numbers must match ParryService on the server:
-		BASE  = 5   (full lockout on a parry press)
-		RESET = 1   (partial reset when a parry lands)
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- The client copy of the server's parry cooldown (ParryService), for prediction and the
+-- HUD. It stops the client from firing a parry the server would reject. Every weapon's
+-- Block module uses this one timer. BASE and RESET must match ParryService.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CooldownTracker = require(ReplicatedStorage.modules.CooldownTracker)
@@ -23,17 +12,20 @@ local ParryCooldownClient = {}
 local BASE = 5
 local RESET = 1
 
--- single local timer for the local player (one character, one parry cooldown)
+-- One timer, because the local player has one character.
 local nextParryTime = 0
 
--- weaponId: the CooldownTracker id, e.g. "Katana_Block". Passed in so the UI entry
--- matches the per-weapon id the Block modules already use.
-
+-- ParryCooldownClient.CanParry() - check whether the local player may parry
+--
+-- Return: true if the cooldown is over.
 function ParryCooldownClient.CanParry()
 	return os.clock() >= nextParryTime
 end
 
--- Called on parry PRESS. Starts the full local lockout and shows it on the UI.
+-- ParryCooldownClient.StartCooldown() - start the full cooldown on a parry press
+-- @weaponId: the CooldownTracker id, such as "Katana_Block", or nil for no HUD entry
+--
+-- Return: nothing.
 function ParryCooldownClient.StartCooldown(weaponId)
 	nextParryTime = os.clock() + BASE
 	if weaponId then
@@ -41,9 +33,12 @@ function ParryCooldownClient.StartCooldown(weaponId)
 	end
 end
 
--- Called when the local player LANDS a parry (told by the server via the dispatcher).
--- Shortens the local timer to the partial reset and refreshes the UI entry in place.
--- Only ever shortens, never extends.
+-- ParryCooldownClient.Reset() - shorten the cooldown after a landed parry
+-- @weaponId: the CooldownTracker id, or nil for no HUD entry
+--
+-- Never extends a cooldown that is already shorter.
+--
+-- Return: nothing.
 function ParryCooldownClient.Reset(weaponId)
 	local target = os.clock() + RESET
 	if target < nextParryTime then
@@ -54,6 +49,9 @@ function ParryCooldownClient.Reset(weaponId)
 	end
 end
 
+-- ParryCooldownClient.GetRemaining() - get the time left on the cooldown
+--
+-- Return: the seconds left, or 0.
 function ParryCooldownClient.GetRemaining()
 	return math.max(0, nextParryTime - os.clock())
 end

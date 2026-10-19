@@ -1,14 +1,22 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Owns character states (Stunned, Downed, CantAnything, and others) with optional
+-- timers. Each state is a Lua table entry and a character attribute, written together.
+-- The table is local to each VM, so client code must read the attributes. The design is
+-- in docs/combat-design.md.
+
 local module = {}
 
 local states = {}
-local activeTimers = {} -- Universally tracks all state timers to prevent overlapping
+-- The timer of every timed state, so a new timer can cancel the old one.
+local activeTimers = {}
 
 local animationHandler = require(script.Parent.animationHandler)
 local StatScaling = require(script.Parent.StatScaling)
 
--- stateHandler is shared (ReplicatedStorage), but the stun WALKSPEED pin is
--- server-authoritative and SpeedService lives server-side. Require it lazily and only
--- on the server so a client require of stateHandler never reaches into ServerScriptService.
+-- The stun speed pin runs only on the server, and SpeedService is a server module. Load
+-- it lazily and only on the server, so a client require never reaches into
+-- ServerScriptService.
 local RunService = game:GetService("RunService")
 local _SpeedService
 local function getSpeedService()
@@ -21,13 +29,9 @@ local function getSpeedService()
 	return _SpeedService
 end
 
--- Cancel a stored timer thread safely.
---
--- A task.delay callback calls clearKey() from INSIDE the very thread that is
--- stored in activeTimers[char][key]. task.cancel() errors ("cannot cancel
--- thread") when handed the thread that is currently running. So: pull the
--- thread out of the table first, then only cancel it if it is not us, and
--- only if it is not already dead.
+-- Cancels a stored timer. The timer callback itself calls clearKey, and task.cancel
+-- throws on the running thread, so take the thread out of the table first and skip
+-- the cancel when it is the running thread or already dead.
 local function cancelTimer(char, key)
 	local bucket = activeTimers[char]
 	if not bucket then
@@ -51,15 +55,8 @@ local function cancelTimer(char, key)
 	pcall(task.cancel, thread)
 end
 
--- Single removal path for every state key. Writes the Lua table entry AND the
--- Instance attribute together so the two can never disagree.
---
--- The old code did `if next(states[char]) == nil then states[char] = nil end` in
--- several places. That dropped the WHOLE table when one key happened to be last,
--- while leaving the other keys' attributes still set on the Instance. Callers
--- reading GetState() then saw a clean character while callers reading
--- GetAttribute() still saw Downed/CantAnything. That desync is what let downed
--- players act. The table is now kept alive; only individual keys are cleared.
+-- The only way a state key is removed. It clears the table entry and the attribute
+-- together, so they never disagree, and it never drops the whole table.
 local function clearKey(char, key)
 	if not char then
 		return
@@ -74,12 +71,21 @@ local function clearKey(char, key)
 	char:SetAttribute(key, nil)
 end
 
+-- stateHandler.ReturnStates() - get the state table of a character
+-- @char: the character
+--
+-- Return: the state table of this VM, or nil.
 function module.ReturnStates(char)
 	return states[char]
 end
 
--- Canonical "is this character allowed to act" check. Read this instead of
--- hand-rolling attribute checks per call site.
+-- stateHandler.CanAct() - check whether a character may act
+-- @char: the character
+--
+-- Use this instead of checking attributes at each call site.
+--
+-- Return: false while Stunned, Downed, CantAnything, Ragdolled, Carried, or
+-- BeingExecuted, true otherwise.
 function module.CanAct(char)
 	if not char then
 		return false
@@ -101,14 +107,14 @@ function module.CanAct(char)
 	return true
 end
 
--- ATTRIBUTE-BASED READS (use these from the CLIENT).
+-- stateHandler.GetStateAttr() - read a state from the character attribute
+-- @char: the character
+-- @stateKey: the state name
 --
--- `states` is a plain Lua table local to whichever VM required this module. The
--- server's states table and the client's states table are SEPARATE. A state set
--- by the server (Downed, Carried, BeingExecuted) never appears in the client's
--- table, so GetState() called from a LocalScript returns nil for all of them.
--- SetAttribute DOES replicate, so attributes are the only cross-boundary read.
--- Client code must use these, not GetState.
+-- Use this on the client. Server states never reach the client's state table, but
+-- attributes replicate.
+--
+-- Return: the state value, or nil.
 function module.GetStateAttr(char, stateKey: string)
 	if not char then
 		return nil
@@ -116,10 +122,7 @@ function module.GetStateAttr(char, stateKey: string)
 	return char:GetAttribute(stateKey)
 end
 
--- True while some other system owns this character's HumanoidRootPart (downed
--- ragdoll, carry constraints, execution anchor, Messatsu weld). Anything that
--- writes HRP.CFrame every frame (lock-on) must stand down while this is true.
--- Reads attributes, so it is correct on both server and client.
+-- The states in which another system owns the HumanoidRootPart.
 local ROOT_OWNED_STATES = {
 	"Downed",
 	"Ragdolled",
@@ -129,10 +132,17 @@ local ROOT_OWNED_STATES = {
 	"Executing",
 }
 
--- ignoreRagdoll = true asks the weaker question: "is something OTHER than a plain
--- knockdown ragdoll holding this root?" A ragdoll still owns the root (never drive
--- CFrame through one), but it is not a reason to DROP a lock-on. LockOn passes true
--- when it asks "may I keep this lock" and nothing when it asks "may I drive the root".
+-- stateHandler.IsRootOwned() - check whether another system owns the character's root
+-- @char: the character
+-- @ignoreRagdoll: true to ignore a plain knockdown ragdoll
+--
+-- A downed ragdoll, a carry, an execution, or a Messatsu weld owns the root. Code that
+-- writes HRP.CFrame every frame, such as the lock-on, must stop while this is true.
+-- LockOn passes ignoreRagdoll when it asks whether it may keep a lock, because a
+-- ragdoll owns the root but is no reason to drop the lock. Reads attributes, so it
+-- works on the server and the client.
+--
+-- Return: true if another system owns the root.
 function module.IsRootOwned(char, ignoreRagdoll)
 	if not char then
 		return false
@@ -145,34 +155,31 @@ function module.IsRootOwned(char, ignoreRagdoll)
 			return true
 		end
 	end
-	-- A Messatsu grab welds two HumanoidRootParts together (the WeldConstraint is
-	-- parented to the ATTACKER's character, Part0 = attacker HRP, Part1 = victim
-	-- HRP). Neither party may drive CFrame while that weld exists, or two clients
-	-- both writing CFrame on rigidly-joined bodies blow the solver up into NaN.
-	-- Scan our own character for a weld we own, and check whether anything is
-	-- welded TO our root from the other side.
+	-- A Messatsu grab welds two roots together, with the weld in the attacker's
+	-- character. If both clients wrote CFrame to the joined bodies, the solver would fail
+	-- with NaN. Check for a weld we own and for a weld that binds our root from outside.
 	local root = char:FindFirstChild("HumanoidRootPart")
 	if not root then
 		return false
 	end
 
-	-- carry constraints live directly on the victim's root
+	-- The carry constraints are on the victim's root.
 	if root:FindFirstChild("CarryPos") or root:FindFirstChild("CarryOri") then
 		return true
 	end
 
-	-- a weld we own (we are the grabber)
+	-- A weld we own: we are the grabber.
 	for _, v in ipairs(char:GetChildren()) do
 		if v:IsA("WeldConstraint") and v.Enabled and (v.Part0 == root or v.Part1 == root) then
 			return true
 		end
 	end
 
-	-- a weld someone else owns that binds our root (we are the grabbed)
+	-- A weld someone else owns: we are grabbed.
 	for _, v in ipairs(root:GetJoints()) do
 		if v:IsA("WeldConstraint") and v.Enabled then
 			local other = (v.Part0 == root) and v.Part1 or v.Part0
-			-- ignore the character's own internal welds (accessories, tools)
+			-- Ignore the character's own welds, such as accessories and tools.
 			if other and not other:IsDescendantOf(char) then
 				return true
 			end
@@ -182,7 +189,12 @@ function module.IsRootOwned(char, ignoreRagdoll)
 	return false
 end
 
--- Is this character a legal lock-on target? Attribute-based; safe on the client.
+-- stateHandler.IsValidTarget() - check whether a character can be locked on to
+-- @char: the character
+--
+-- Reads attributes, so it works on the client.
+--
+-- Return: true if the character is alive and not downed, carried, or executed.
 function module.IsValidTarget(char)
 	if not char then
 		return false
@@ -203,6 +215,13 @@ function module.IsValidTarget(char)
 	return true
 end
 
+-- stateHandler.GetState() - read a state from this VM's state table
+-- @char: the character
+-- @stateKey: the state name
+--
+-- On the client this does not see server states. Use GetStateAttr there.
+--
+-- Return: the state value, or nil.
 function module.GetState(char, stateKey: string)
 	if states[char] then
 		return states[char][stateKey]
@@ -210,10 +229,12 @@ function module.GetState(char, stateKey: string)
 	return nil
 end
 
--- Returns true if the character is in a state that should cancel any
--- in-progress attack swing (windup or pending hitbox). Centralized here so
--- every weapon checks the same interrupt condition and it can be expanded
--- in one place. Currently: Stunned (covers hits, parries, guard-break) or Downed.
+-- stateHandler.IsInterrupted() - check whether an attack in progress must cancel
+-- @char: the character
+--
+-- Every weapon uses this one check.
+--
+-- Return: true while Stunned or Downed.
 function module.IsInterrupted(char)
 	if not char then
 		return false
@@ -229,13 +250,16 @@ function module.IsInterrupted(char)
 	return false
 end
 
--- Reactive interrupt watcher. Fires onInterrupt() the instant the character
--- becomes Stunned or Downed (via the attributes SetStun/SetState write), then
--- self-disconnects so it only fires once. Auto-tears down after `window` seconds
--- as a safety net. Returns a stop() function the caller invokes on normal swing
--- completion so a finished swing's watcher can't fire against a later, unrelated stun.
--- Use this to cancel in-flight dash movers / animations the moment a hit lands,
--- rather than waiting for the windup to finish.
+-- stateHandler.WatchInterrupt() - call a function when the character is interrupted
+-- @char: the character
+-- @window: seconds after which the watcher removes itself
+-- @onInterrupt: called once when the character becomes Stunned or Downed
+--
+-- Use this to cancel dash movers and animations the moment a hit lands, instead of
+-- after the windup.
+--
+-- Return: a stop function. Call it when the swing ends normally, so a later stun does
+-- not trigger the watcher.
 function module.WatchInterrupt(char, window, onInterrupt)
 	if not char or type(onInterrupt) ~= "function" then
 		return function() end
@@ -253,8 +277,7 @@ function module.WatchInterrupt(char, window, onInterrupt)
 		end
 		table.clear(conns)
 
-		-- Same self-cancel hazard as the state timers: the timeout thread itself
-		-- calls disconnectAll. Never hand task.cancel the running thread.
+		-- The timeout thread itself calls disconnectAll, so never cancel the running thread.
 		local t = timeoutTask
 		timeoutTask = nil
 		if t and t ~= coroutine.running() and coroutine.status(t) ~= "dead" then
@@ -270,12 +293,12 @@ function module.WatchInterrupt(char, window, onInterrupt)
 		disconnectAll()
 		local ok, err = pcall(onInterrupt)
 		if not ok then
-			warn("[WatchInterrupt] onInterrupt failed ->", err)
+			warn(`[stateHandler] WatchInterrupt callback failed: {err}.`)
 		end
 	end
 
-	-- If already interrupted at registration time, fire on the next frame so the
-	-- caller's local mover references are assigned before we try to cancel them.
+	-- Already interrupted: fire on the next frame, so the caller has assigned its mover
+	-- references before they are cancelled.
 	if module.IsInterrupted(char) then
 		task.defer(trigger)
 		return disconnectAll
@@ -302,10 +325,18 @@ function module.WatchInterrupt(char, window, onInterrupt)
 		timeoutTask = task.delay(window, disconnectAll)
 	end
 
-	-- caller stops the watcher on normal completion
 	return disconnectAll
 end
 
+-- stateHandler.SetState() - set a state on a character
+-- @char: the character
+-- @stateKey: the state name
+-- @value: the state value
+-- @duration: seconds until the state clears, or nil for no timer
+--
+-- Setting a state again replaces its old timer.
+--
+-- Return: nothing.
 function module.SetState(char, stateKey: string, value, duration: number)
 	if not states[char] then
 		states[char] = {}
@@ -328,6 +359,16 @@ function module.SetState(char, stateKey: string, value, duration: number)
 	end
 end
 
+-- stateHandler.SetStun() - stun a character or end the stun
+-- @char: the character
+-- @value: true to stun, false to end the stun
+-- @duration: seconds until the stun ends, or nil for no timer
+-- @stunSpeed: the WalkSpeed during the stun, or nil to leave the speed alone
+--
+-- A stun stops the animations, locks jumping, and pins the speed through SpeedService.
+-- A character with the HyperArmor attribute ignores the stun but still takes damage.
+--
+-- Return: nothing.
 function module.SetStun(char, value: boolean, duration: number, stunSpeed: number)
 	if not char or not char:FindFirstChild("Humanoid") then
 		return
@@ -340,52 +381,38 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 		activeTimers[char] = {}
 	end
 
-	if value then -- STUNNING
-		-- HYPERARMOR: an armored attacker/caster absorbs the hit without losing their
-		-- move. We skip the anim-stop, the Stunned state, and the speed pin, so the
-		-- swing/cast rides through to its hitbox. Damage is still dealt by
-		-- damageCalculator (which runs independently of this call), so this is
-		-- "armor only", never damage immunity. Set/cleared by the move that owns the
-		-- armor window (CombatCore guardbreak swings; SkillFunctions casts).
+	if value then
+		-- Hyper armor: the attacker keeps their move. Damage still applies, so this is
+		-- armor, not immunity.
 		if char:GetAttribute("HyperArmor") then
 			return
 		end
 
 		animationHandler.StopAnim(char, "ALL")
 
-		-- Cancel any existing stun timer
 		cancelTimer(char, "Stunned")
 
-		-- Handle stun speed. Push a STUN-priority modifier through SpeedService instead
-		-- of stashing OriginalWalkSpeed. The old stash restored to a single remembered
-		-- value and ignored other live modifiers, so a player hit mid-block came back at
-		-- base speed instead of block speed. Now the pin just overrides while it's live
-		-- and, when popped, the stack recomputes (block/skill slow still applies if held).
+		-- The stun pin is a STUN-priority modifier. When it pops, SpeedService settles
+		-- the speed to whatever is still active, such as a block.
 		local SpeedService = getSpeedService()
 		if stunSpeed and stunSpeed > 0 and SpeedService then
 			SpeedService.Push(char, "Stun", stunSpeed, SpeedService.Priority.STUN)
 		end
 
-		-- Lock jump for the duration. Disabling the Jumping humanoid state (rather
-		-- than zeroing JumpPower) is server-authoritative, cancels an already-queued
-		-- jump, and needs no value snapshot. Restored on both stun-clear paths below.
+		-- Disable the Jumping state instead of zeroing JumpPower: it works from the server,
+		-- cancels a queued jump, and needs no saved value.
 		humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
 
-		-- Set Stun State
 		states[char]["Stunned"] = true
 		char:SetAttribute("Stunned", true)
 
-		-- Start the new timer
 		if duration and type(duration) == "number" and duration > 0 then
 			activeTimers[char]["Stunned"] = task.delay(duration, function()
 				if not states[char] then
 					return
 				end
 
-				-- Restore speed. Pop the stun modifier and let SpeedService recompute:
-				-- a Downed character keeps their PIN, a still-blocking one settles to block,
-				-- otherwise full base. The Downed guard on the jump-restore is kept so a
-				-- downed player's jump stays disabled (the downed system re-enables it).
+				-- A Downed character keeps the jump lock, because the downed system re-enables it.
 				local SpeedService = getSpeedService()
 				if SpeedService then
 					SpeedService.Pop(char, "Stun")
@@ -396,12 +423,9 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 
 				clearKey(char, "Stunned")
 
-				-- Post-stun dash lockout. The victim's hitstun is tuned so an M1 string
-				-- is a true combo, but the dash client buffers a Q press and retries it
-				-- every frame; without this it would fire on the very first frame the
-				-- stun clears, slipping out in the sliver before the next hitbox. Hold a
-				-- brief DashLocked flag (read by the Dash LocalScript) to close that gap.
-				-- Skipped for Downed (already fully locked by the downed system).
+				-- Lock dashes for a moment after the stun. The Dash LocalScript buffers a Q press
+				-- and retries it every frame, so without this it would slip out of a true combo in
+				-- the gap before the next hitbox. Downed characters are already locked.
 				if not states[char]["Downed"] then
 					char:SetAttribute("DashLocked", true)
 					task.delay(0.15, function()
@@ -412,12 +436,10 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 				end
 			end)
 		end
-	else -- UN-STUNNING (Clearing Stun manually)
-		-- Cancel any pending timer
+	else
 		cancelTimer(char, "Stunned")
 
 		if states[char] then
-			-- Restore speed via SpeedService pop (see the timer path above for why).
 			local SpeedService = getSpeedService()
 			if SpeedService then
 				SpeedService.Pop(char, "Stun")
@@ -431,14 +453,19 @@ function module.SetStun(char, value: boolean, duration: number, stunSpeed: numbe
 	end
 end
 
+-- stateHandler.RemoveStates() - clear one state, or every state, of a character
+-- @char: the character
+-- @stateKey: the state name, or nil for every state
+--
+-- Stunned is cleared through SetStun, so the speed and jump are restored.
+--
+-- Return: nothing.
 function module.RemoveStates(char, stateKey: string)
 	if not states[char] then
 		return
 	end
 
 	if stateKey then
-		-- SPECIAL CASE: Stunned goes through SetStun so walkspeed is restored.
-		-- SetStun(false) clears ONLY the Stunned key; it no longer drops the table.
 		if stateKey == "Stunned" then
 			module.SetStun(char, false)
 			return
@@ -446,7 +473,7 @@ function module.RemoveStates(char, stateKey: string)
 
 		clearKey(char, stateKey)
 	else
-		-- Clearing ALL states. Snapshot the keys first: clearKey mutates the table.
+		-- Copy the keys first, because clearKey changes the table.
 		local keys = {}
 		for key in pairs(states[char]) do
 			table.insert(keys, key)
@@ -465,12 +492,10 @@ function module.RemoveStates(char, stateKey: string)
 	end
 end
 
--- Cleanup on player disconnect
 game.Players.PlayerRemoving:Connect(function(plr)
 	if plr.Character then
 		local char = plr.Character
 
-		-- Cancel all active timers for this character
 		if activeTimers[char] then
 			for key in pairs(activeTimers[char]) do
 				cancelTimer(char, key)

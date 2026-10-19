@@ -1,16 +1,21 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Every race: its rarity, racial skill, stats, passives, and appearance, and the
+-- rarity weights of the race spin.
+
 local RaceConfig = {}
 
--- Rarity Weights (Higher number = More common)
+-- Rarity weights for the race spin. A higher weight is more common.
 RaceConfig.Rarities = {
-	{ Name = "Common", Weight = 40, Color = Color3.fromRGB(203, 203, 203) }, -- 50
-	{ Name = "Uncommon", Weight = 30, Color = Color3.fromRGB(125, 205, 165) }, -- 30
-	{ Name = "Rare", Weight = 15, Color = Color3.fromRGB(96, 146, 255) }, -- 15
+	{ Name = "Common", Weight = 40, Color = Color3.fromRGB(203, 203, 203) },
+	{ Name = "Uncommon", Weight = 30, Color = Color3.fromRGB(125, 205, 165) },
+	{ Name = "Rare", Weight = 15, Color = Color3.fromRGB(96, 146, 255) },
 	{ Name = "Epic", Weight = 10, Color = Color3.fromRGB(162, 96, 255) },
 	{ Name = "Legendary", Weight = 5, Color = Color3.fromRGB(255, 53, 53) },
 }
 
 RaceConfig.Races = {
-	-- [[ COMMON ]] --
+	-- Common races.
 	["Human"] = {
 		Rarity = "Common",
 		Stats = { HPBoost = 10 },
@@ -43,7 +48,7 @@ RaceConfig.Races = {
 		Description = "Greedy scavengers, creatures spat out of the Void.",
 	},
 
-	-- [[ UNCOMMON ]] --
+	-- Uncommon races.
 
 	["Verdis"] = {
 		Rarity = "Uncommon",
@@ -66,7 +71,7 @@ RaceConfig.Races = {
 		Description = "'Go out there and show them what we can truly do as a group.' -Spider Queen Quelana.",
 	},
 
-	-- [[ RARE ]] --
+	-- Rare races.
 
 	["Cruor"] = {
 		Rarity = "Rare",
@@ -102,7 +107,7 @@ RaceConfig.Races = {
 		Description = "Nimble, but very fragile.",
 	},
 
-	-- [[ EPIC ]] --
+	-- Epic races.
 
 	["Marasi"] = {
 		Rarity = "Epic",
@@ -127,7 +132,7 @@ RaceConfig.Races = {
 		Description = "The eye sees all who dare cross its path...",
 	},
 
-	-- [[ LEGENDARY ]] --
+	-- Legendary races.
 
 	["Maw"] = {
 		Rarity = "Legendary",

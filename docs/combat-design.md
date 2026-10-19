@@ -291,3 +291,61 @@ default), so an incoming hit deals damage but does not stop the animation or stu
 caster out of the skill. Buffs are instant and get no armor. A skill can opt out with
 `HyperArmor = false`. A parry still beats the armor: every parry branch clears the
 `HyperArmor` attribute before it stuns the caster.
+
+## Dash tuning
+
+`DashConfig` is the one tuning table for weapon-attack dashes: the forward
+BodyVelocity that a weapon swing gives the attacker. Q dashes, sprint, skill dashes,
+racial dashes, and mob and boss dashes are not in it.
+
+The distance is speed times life. A 26-speed dash with a 0.3 s life covers about 7.8
+studs. Tune `speed` to change how far a move carries. Tune `life` only to change how
+the burst feels: a short life snaps and a long one glides.
+
+Two guard rails apply to every value that `Get` returns: `MAX_SPEED` (50) and
+`MIN_LIFE` (0.2). They make sure that a 75-speed gap closer cannot come back without a
+deliberate change in one visible place. An entry with `exempt = true` skips both. It
+is reserved for multi-part moves whose numbers are the move design, such as the second
+step of the Tanto E.
+
+- A speed of 0 turns a dash off. `Get` returns nil and the call site skips the
+  BodyVelocity. The animation, FX, hitbox, and timing do not change. The M1 finisher
+  dash is off. If it comes back, watch for whiffs: M1 knockback pushes the target back
+  over the string, and the finisher dash made up for that drift.
+- The air M1 hang comes from its call site (`MaxForce.Y` holds the vertical velocity
+  at 0), not from this table.
+- The fist family keeps a gap-closing M2 (40 against the default 26), and the longer
+  weapons step in further on the running attack (50 against 35).
+
+| Move key | Call site |
+|---|---|
+| `M1Finisher`, `M1Air` | `ReplicatedStorage.localHandler.Combat._Shared.M1` |
+| `M1Lunge` | `ServerScriptService.modules.LungeService` |
+| `M2` | `ServerScriptService.root.serverFramework.Combat._Shared.CombatCore` |
+| `E` | `ReplicatedStorage.localHandler.Combat._Shared.E` |
+| `TantoE1`, `TantoE2` | `ServerScriptService.root.serverFramework.Combat.Tanto.E` |
+| `ShacklesM2` | `ServerScriptService.root.serverFramework.Combat.Shackles.M2` |
+| `ShacklesM2Air` | `ReplicatedStorage.localHandler.Combat.Shackles.M2` |
+
+## Character state
+
+`stateHandler` owns character states such as `Stunned`, `Downed`, and `CantAnything`.
+Each state is two things that are always written together: an entry in a Lua table
+and an attribute on the character.
+
+- The Lua table is local to the VM that required the module. The server's table and
+  the client's table are separate, so a state that the server sets (`Downed`,
+  `Carried`, `BeingExecuted`) never appears in the client's table. Client code must
+  read attributes (`GetStateAttr`), because attributes replicate.
+- `clearKey` is the only path that removes a state. It clears the table entry and the
+  attribute together. Dropping the whole table when one key was last left other
+  attributes set, so `GetState` and `GetAttribute` disagreed, and that let downed
+  players act.
+- A state set by a client (for example `Running` and `Sliding` from LocalScripts) does
+  not replicate to the server, because a client's `SetAttribute` does not replicate.
+  That is why attacks send the movement state as `SubType` in the payload.
+
+`SetStun` with the `HyperArmor` attribute set does nothing: an armored attacker keeps
+their move but still takes damage. After a stun ends, `DashLocked` is set for 0.15 s,
+because the Dash LocalScript buffers a Q press and would otherwise slip out of a true
+combo in the gap before the next hitbox.

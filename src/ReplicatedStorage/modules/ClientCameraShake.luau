@@ -1,23 +1,9 @@
---[[
-	ClientCameraShake
-	Single client-side owner of one CameraShaker instance bound to the local camera.
-
-	Why this exists: several systems want to shake the camera (climbing, parry, taking/
-	dealing damage). Each newing its own CameraShaker means multiple render-step binds all
-	writing camera.CFrame, fighting each other. This module is the one shaker; everyone
-	calls into it.
-
-	Client only. Requiring it on the server is a no-op guard (returns the table, methods
-	just bail) so shared paths don't error.
-
-	API:
-		ClientCameraShake.Bump()                       -- quick snappy hit (parry)
-		ClientCameraShake.Damage(taken)                -- damage shake; taken=true is bigger
-		ClientCameraShake.ShakeOnce(mag, rough, fIn, fOut)  -- generic passthrough
-
-	The server fires ReplicatedStorage.remotes.CameraShake to a client with a descriptor;
-	this module listens for that and routes it, so the damage shake needs no extra receiver.
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- The one CameraShaker on the client. Several systems shake the camera (climbing,
+-- parry, damage), and separate shakers would each write camera.CFrame every frame and
+-- fight each other, so everyone calls this module. It also handles the CameraShake
+-- remote from the server. On the server every function does nothing.
 
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -25,7 +11,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ClientCameraShake = {}
 
--- server guard: never build a shaker off a real camera on the server
+-- On the server there is no camera to shake.
 if not RunService:IsClient() then
 	function ClientCameraShake.Bump() end
 	function ClientCameraShake.Damage() end
@@ -37,7 +23,7 @@ local CameraShaker = require(ReplicatedStorage:WaitForChild("modules"):WaitForCh
 
 local renderPriority = Enum.RenderPriority.Camera.Value + 1
 
--- the shaker applies its offset on top of whatever the camera currently is
+-- The shake offset applies on top of the current camera CFrame.
 local shaker
 local function applyShake(shakeCf)
 	local cam = workspace.CurrentCamera
@@ -49,29 +35,37 @@ end
 shaker = CameraShaker.new(renderPriority, applyShake)
 shaker:Start()
 
--- ===== public shakes =====
-
--- quick, snappy single hit. used for a landed parry.
+-- ClientCameraShake.Bump() - a quick, snappy shake, used for a landed parry
+--
+-- Return: nothing.
 function ClientCameraShake.Bump()
 	shaker:ShakeOnce(4, 10, 0, 0.4)
 end
 
--- damage shake. taking a hit rattles harder than landing one.
+-- ClientCameraShake.Damage() - a damage shake
+-- @taken: true when the local player took the hit, which shakes harder
+--
+-- Return: nothing.
 function ClientCameraShake.Damage(taken)
 	if taken then
-		shaker:ShakeOnce(6, 9, 0, 0.55) -- bigger when you take it
+		shaker:ShakeOnce(6, 9, 0, 0.55)
 	else
-		shaker:ShakeOnce(3.5, 9, 0, 0.4) -- smaller when you deal it
+		shaker:ShakeOnce(3.5, 9, 0, 0.4)
 	end
 end
 
--- generic passthrough for callers that want exact control (e.g. climbing's grab).
+-- ClientCameraShake.ShakeOnce() - a custom shake, such as the climbing grab
+-- @magnitude: the shake strength
+-- @roughness: the shake speed
+-- @fadeIn: the fade-in time in seconds, 0 by default
+-- @fadeOut: the fade-out time in seconds, 0.5 by default
+--
+-- Return: nothing.
 function ClientCameraShake.ShakeOnce(magnitude, roughness, fadeIn, fadeOut)
 	shaker:ShakeOnce(magnitude, roughness, fadeIn or 0, fadeOut or 0.5)
 end
 
--- ===== server-driven shakes (damage) =====
--- descriptor: { kind = "Damage", taken = bool } or { kind = "Bump" }
+-- The server sends { kind = "Damage", taken = bool } or { kind = "Bump" }.
 local remote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("CameraShake")
 remote.OnClientEvent:Connect(function(descriptor)
 	if type(descriptor) ~= "table" then

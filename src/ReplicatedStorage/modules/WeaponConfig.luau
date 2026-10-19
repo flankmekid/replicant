@@ -1,41 +1,28 @@
 --!strict
--- WeaponConfig
--- Source of truth for per-weapon values. Uniform constants live in the shared
--- modules, not here: airVelocity=45, uppercutVelocity=15, eDashVelocity=50,
--- m2DashVelocity=35, parryCooldown=5, blockCooldown=0.5.
+-- SPDX-License-Identifier: MIT
 --
--- server.e.eRecovery: E teardown delay (hitbox destroy + activeAttacks release).
--- Omit it and you get 0.1, same as M1, which is what makes E a combo starter.
--- Set it only where the weapon should feel heavy. Raising it past ~0.35 starts
--- eating the follow-up M1 outright rather than just delaying it, because RunM1
--- declines while activeAttacks[char] is still held.
+-- The values of every weapon, for the client and the server: animations, sounds,
+-- cooldowns, damage, hitboxes, and timing. Dash speeds are in DashConfig. The timing
+-- design (for example server.e.eRecovery) is in docs/combat-design.md.
+
 local C = {}
 
--- Uppercut juggle tuning. Shared by the client M1 (attacker's launch) and the server
--- CombatCore (victim's launch) so the two ALWAYS agree on where the apex is. Both parties
--- ride an AlignPosition to the same apex height; the victim sits Offset studs ahead of the
--- attacker so the follow-up M1 string reaches them. Retune the juggle here, one place.
+-- The uppercut juggle. The client M1 (the attacker's rise) and CombatCore (the
+-- victim's launch) both read it, so they always agree on the apex.
 C.Uppercut = {
-	RiseHeight = 14, -- studs both rise from their own footing to the apex
-	Offset = 4, -- studs the victim is placed ahead of the attacker at apex
-	HangWindow = 1.2, -- seconds they hold at the apex (keep == CombatCore LAUNCH_WINDOW)
-	Responsiveness = 30, -- AlignPosition ease: higher snaps up faster, lower floats up
+	RiseHeight = 14, -- Studs that both rise from their own footing.
+	Offset = 4, -- Studs that the victim is placed ahead of the attacker.
+	HangWindow = 1.2, -- Seconds at the apex.
+	Responsiveness = 30, -- AlignPosition ease: higher snaps up faster.
 }
 
--- ── WEAPON FAMILIES ──────────────────────────────────────────────────────────
--- `family` groups weapons that share a moveset skeleton, so shared logic can ask
--- "is this a greatsword?" directly. It is NOT xpName: xpName is an XP-attribution
--- alias (nil = bank to my own track) and happens to read "Greatsword" on DS and
--- Deathbringer only because they bank XP into the base weapon's track. Keying
--- behaviour off xpName silently skipped the base Greatsword, which is how it ended
--- up with an M1 chain CombatCore is written to deny heavies. Add a weapon to a
--- family by building it from the family base below; `family` comes with it.
+-- The family field groups weapons that share a moveset, so shared code can ask whether
+-- a weapon is a greatsword. Do not use xpName for that: xpName only redirects XP (nil
+-- means the weapon's own track). A weapon built from a family base gets its family.
 
--- Deep-merge `override` onto a copy of `base`. Lists (t[1] ~= nil) replace wholesale
--- rather than merging index-wise, so an override never inherits a longer base list's
--- tail. Vector3/CFrame are userdata, not tables, so they always replace atomically.
--- Everything is copied, never referenced: two weapons off one base must not be able
--- to mutate each other.
+-- Deep-merges override onto a copy of base. A list replaces the whole base list, so it
+-- never keeps the tail of a longer base list. Everything is copied, so two weapons
+-- built from one base cannot change each other.
 local function deepCopy(value: any): any
 	if type(value) ~= "table" then
 		return value
@@ -59,17 +46,15 @@ local function merge(base: any, override: any): any
 	return out
 end
 
--- Builds the per-weapon cooldown keys, which are always "<weapon>_M2" / "<weapon>_E".
--- These were hand-written per entry; deriving them removes a copy-paste class of bug.
+-- Sets the cooldown keys "<weapon>_M2" and "<weapon>_E".
 local function withCooldownKeys(name: string, cfg: any): any
 	cfg.client.m2.cdKey = name .. "_M2"
 	cfg.client.e.cdKey = name .. "_E"
 	return cfg
 end
 
--- Shared greatsword skeleton: Greatsword, Dragon Slayer and Deathbringer differ only
--- in damage, M2 shape, and which model the trail hangs off. Everything below was
--- byte-identical across all three before this table existed.
+-- The greatsword base. Greatsword, Dragon Slayer, and Deathbringer differ only in
+-- damage, the M2 shape, and the trail model.
 local GreatswordBase = {
 	family = "Greatsword",
 	client = {
@@ -81,7 +66,7 @@ local GreatswordBase = {
 				"rbxassetid://75252982138756",
 				"rbxassetid://83321379404970",
 				"rbxassetid://12074819641",
-			}, -- {"rbxassetid://12074816470", "rbxassetid://12074817864", "rbxassetid://12074838957", "rbxassetid://12074836890", "rbxassetid://12074819641"},
+			},
 			lungeAnim = "rbxassetid://12074847009",
 			airAnim = "rbxassetid://120024992814931",
 			uppercutAnim = "rbxassetid://113982059903937",
@@ -126,9 +111,9 @@ local GreatswordBase = {
 			setSpeed = { 8, 16 },
 			lungeWait = 0.3,
 			swingSoundFunc = "Swing",
-			-- xpName is deliberately absent: nil means "bank XP to my own track", which
-			-- is what the base Greatsword wants. A merge cannot override a value back to
-			-- nil, so the variants that DO alias into the Greatsword track set it below.
+			-- The xpName field is absent: nil means the weapon's own XP track. A merge
+			-- cannot set a value back to nil, so the variants that use the Greatsword track
+			-- set it below.
 			hitboxShape = "InBox",
 			hitboxSize = Vector3.new(11, 7, 11),
 			hitboxOffset = CFrame.new(0, 0, -5),
@@ -281,7 +266,7 @@ C["Dagger"] = {
 			airWait = 0.35,
 		},
 		m2 = { cooldown = 4, animID = "rbxassetid://105653775477364" },
-		e = { custom = true }, -- bespoke throw ability; keeps its own module
+		e = { custom = true }, -- A custom throw E in its own module.
 		block = {
 			blockAnim = "rbxassetid://88771475533388",
 			parryAnim = "rbxassetid://12075933616",
@@ -340,8 +325,8 @@ C["Dagger"] = {
 	tool = { weldPart = "Blade", idleAnim = "rbxassetid://124925225124105" },
 }
 
--- Deathbringer and Dragon Slayer are the same weapon as the base greatsword with more
--- damage; they alias their XP into the Greatsword track rather than carrying their own.
+-- Deathbringer and Dragon Slayer are the greatsword base with more damage. Their XP
+-- goes to the Greatsword track.
 C["Deathbringer"] = withCooldownKeys(
 	"Deathbringer",
 	merge(GreatswordBase, {
@@ -567,8 +552,8 @@ C["Fists"] = {
 	tool = { weldPart = nil, idleAnim = "rbxassetid://96039324012000" },
 }
 
--- The base greatsword: slower, weaker M2 (a wide lingering 1.2s sweep rather than the
--- variants' quick 0.2s stab) and no XP alias, since this IS the Greatsword track.
+-- The base greatsword: a slower, weaker M2 (a wide 1.2-second sweep instead of the
+-- quick 0.2-second stab of the variants), and its own XP track.
 C["Greatsword"] = withCooldownKeys(
 	"Greatsword",
 	merge(GreatswordBase, {
@@ -602,7 +587,7 @@ C["Guandao"] = {
 				"rbxassetid://82661079692126",
 				"rbxassetid://82285313584065",
 				"rbxassetid://82661079692126",
-			}, --, "rbxassetid://124209719397794"
+			},
 			lungeAnim = "rbxassetid://104237193184444",
 			airAnim = "rbxassetid://125596523289062",
 			uppercutAnim = "rbxassetid://113982059903937",
@@ -1086,7 +1071,7 @@ C["Tanto"] = {
 			airWait = 0.35,
 		},
 		m2 = { cooldown = 4, animID = "rbxassetid://105653775477364" },
-		e = { custom = true }, -- bespoke throw ability; keeps its own module
+		e = { custom = true }, -- A custom throw E in its own module.
 		block = {
 			blockAnim = "rbxassetid://88771475533388",
 			parryAnim = "rbxassetid://12075933616",

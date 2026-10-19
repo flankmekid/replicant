@@ -1,16 +1,9 @@
---[[
-	ZoneConfig
-	Central definitions for every world zone shown by ZoneGui's AreaGuiScript.
-
-	To add a zone:
-	  1. Add an entry to `zones`, keyed by the EXACT name of the part in
-	     workspace.Locations (the raycast matches on hit.Name).
-	  2. Set its title, body, and climate.
-	That's it. No code changes needed.
-
-	climate must be a key in `climates` below. It drives the atmosphere tween
-	and whether the Snow GUI is enabled.
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- Every world zone that the zone GUI shows. To add a zone, add an entry to zones, keyed
+-- by the exact name of its part in workspace.Locations (the raycast matches hit.Name),
+-- with a title, a body, and a climate. The climate is a key in climates, which sets the
+-- atmosphere and whether snow shows.
 
 local ZoneConfig = {}
 
@@ -72,7 +65,7 @@ ZoneConfig.zones = {
 	},
 }
 
--- Atmosphere presets. `default` is applied when a zone is left (no zone overhead).
+-- Atmosphere presets. default applies outside every zone.
 ZoneConfig.climates = {
 	desert = { Density = 0.34, Offset = 0.375, Color = Color3.fromRGB(72, 71, 63), snow = false },
 	forest = { Density = 0.3, Offset = 0.3, Color = Color3.fromRGB(70, 72, 62), snow = false },

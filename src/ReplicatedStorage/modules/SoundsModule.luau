@@ -1,19 +1,17 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Plays a copy of a sound and removes it after a set time.
+
 local module = {}
 
---||Services||--
 local Debris = game:GetService("Debris")
 
-------------------------------------------------------------------------------------------------------------------
-
---[[
-the paramters are: the sound instance, the parent of the sound and the time it takes to destroy the sound instance
-
-so as an example if you have a part in workspace and a Sound under this script you can just do:
-
-module.PlaySound(script.Sound, workspace.Part, 5) 
-]]
-
---//
+-- SoundsModule.PlaySound() - play a copy of a sound
+-- @Sound: the sound to copy
+-- @Parent: where to play it
+-- @DestroyTime: seconds until the copy is removed
+--
+-- Return: nothing.
 function module.PlaySound(Sound: Sound, Parent, DestroyTime: number)
 	local sound = Sound:Clone()
 	sound.Parent = Parent

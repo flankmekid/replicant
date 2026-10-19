@@ -1,32 +1,29 @@
---[[
-	CooldownTracker
-	DISPLAY ONLY. This module never gates whether an ability fires. It only records that
-	a cooldown has started so the GUI can show it. Existing debounces remain the source of truth.
-
-	API:
-		CooldownTracker.Register(id, label, duration)
-		CooldownTracker.GetActive() -> ordered list for the GUI (also prunes completed entries)
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- Records started cooldowns so the HUD can show them. Display only: it never decides
+-- whether an ability can fire. Each ability's own debounce does that.
 
 local CooldownTracker = {}
 
--- active[id] = { label = string, startTime = number, duration = number }
+-- Layout: active[id] = { label, startTime, duration }.
 local active = {}
--- order = { id1, id2, ... }  FIFO: index 1 = oldest still-active, last = newest
+-- Ids from oldest to newest.
 local order = {}
 
--- Register (or refresh) a cooldown.
--- id:       unique key per ability instance, e.g. "Greatsword_E".
---           If already active, refresh in place (no duplicate entry, no reorder).
--- label:    display text, e.g. "Critical". The "(2.4)" countdown is appended by the GUI.
--- duration: FULL seconds until the ability is actually usable again (windup + lockout).
+-- CooldownTracker.Register() - show a cooldown on the client HUD
+-- @id: a unique key for the cooldown
+-- @label: the text on the HUD entry
+-- @duration: the length in seconds
+--
+-- Registering an active id again restarts it in place.
+--
+-- Return: nothing.
 function CooldownTracker.Register(id, label, duration)
 	if type(id) ~= "string" or type(duration) ~= "number" or duration <= 0 then
 		return
 	end
 
 	if active[id] then
-		-- refresh in place
 		active[id].startTime = os.clock()
 		active[id].duration = duration
 		active[id].label = label or active[id].label
@@ -38,15 +35,19 @@ function CooldownTracker.Register(id, label, duration)
 		startTime = os.clock(),
 		duration = duration,
 	}
-	table.insert(order, id) -- new entries go to the END (newest)
+	table.insert(order, id)
 end
 
--- Returns the ordered list of active cooldowns. Prunes completed ones as a side effect.
--- Each entry: { id, label, remaining (>=0), fraction (1 at start -> 0 at end) }
+-- CooldownTracker.GetActive() - list the active cooldowns, oldest first
+--
+-- Also removes the finished ones.
+--
+-- Return: an array of { id, label, remaining, fraction }. fraction goes from 1 at the
+-- start to 0 when ready.
 function CooldownTracker.GetActive()
 	local now = os.clock()
 
-	-- prune completed (iterate backwards so table.remove is safe)
+	-- Iterate backwards so table.remove is safe.
 	for i = #order, 1, -1 do
 		local id = order[i]
 		local cd = active[id]
@@ -69,14 +70,16 @@ function CooldownTracker.GetActive()
 			id = id,
 			label = cd.label,
 			remaining = remaining,
-			fraction = remaining / cd.duration, -- 1 at start, 0 when ready
+			fraction = remaining / cd.duration,
 		})
 	end
 	return result
 end
 
--- Remove a single active cooldown by id (e.g. when an ability becomes usable
--- again early, like a dash charge returning). Safe no-op if not present.
+-- CooldownTracker.Remove() - remove a cooldown early, such as when a dash charge returns
+-- @id: the key used in Register
+--
+-- Return: nothing.
 function CooldownTracker.Remove(id)
 	if active[id] then
 		active[id] = nil
@@ -89,7 +92,9 @@ function CooldownTracker.Remove(id)
 	end
 end
 
--- Optional helper for testing/cleanup.
+-- CooldownTracker.Clear() - remove every cooldown
+--
+-- Return: nothing.
 function CooldownTracker.Clear()
 	active = {}
 	order = {}

@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Every armor: its clothing, its HP, defense, and damage multipliers, and its price.
+
 local module = {}
 
 module.Armors = {
@@ -5,7 +9,7 @@ module.Armors = {
 		DisplayName = "Rags",
 		ShirtID = "rbxassetid://2366827682",
 		PantsID = "rbxassetid://2366829065",
-		HPBuff = 1, -- 1.0 = No change
+		HPBuff = 1, -- 1 means no change.
 		DefBuff = 1,
 		DmgBuff = 1,
 		Cost = 0,
@@ -13,7 +17,8 @@ module.Armors = {
 
 	["Elven"] = {
 		DisplayName = "Elven Armor",
-		ShirtID = "rbxassetid://135586256426680", -- Placeholder generic RPG shirt
+		-- TODO: Replace the placeholder shirt.
+		ShirtID = "rbxassetid://135586256426680",
 		PantsID = "rbxassetid://82544693774259",
 		HPBuff = 1.1,
 		DefBuff = 1.25,
@@ -21,7 +26,7 @@ module.Armors = {
 		Cost = 1000,
 	},
 
-	-- KNIGHT
+	-- Knight armors.
 	["Knight Initiate"] = {
 		DisplayName = "Knight Initiate",
 		ShirtID = "rbxassetid://18858472870",
@@ -41,7 +46,7 @@ module.Armors = {
 		Cost = 2500,
 	},
 
-	-- SAMURAI
+	-- Samurai armors.
 	["Ashigaru"] = {
 		DisplayName = "Ashigaru Armor",
 		ShirtID = "rbxassetid://5268607204",

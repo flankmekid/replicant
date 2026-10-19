@@ -99,3 +99,34 @@ instead of dying. NPCs never go down. `DownedManager` owns the whole life cycle:
 
 The knockdown ragdolls first and sets `Downed` after, so the body is on the floor
 before any other system sees it as downed.
+
+## Stat spread
+
+Players invest 0 to 50 points in each stat. The curves are in `StatScaling`, the one
+place that both the server and the client read. The values at level 50 (with a soft
+cap at 40, after which a point gives 30% of its value) are:
+
+| Stat | Effect |
+|---|---|
+| Vitality | +100 max HP, additive, from a hand-tuned back-heavy table |
+| Strength | +35% weapon damage (M1, E, M2) |
+| Dexterity | +50% skill damage |
+| Magic | +50% racial skill damage, +100 max mana, 5x passive mana regen, 2x in-combat regen |
+| Stamina | a third wall run at 10, a second dash at 30, a momentum soft cap at 20, +1 WalkSpeed per 10 points |
+
+Damage bonuses are additive fractions (0.35 means +35%). `damageCalculator` adds them
+to the race and armor bonuses in one pool and applies it once, so they never multiply
+each other.
+
+Skill points are bought with Liturgy on a rising curve: all 150 cost about 200k
+Liturgy. Assigning a skill point to a stat is free, one to one. A respec frees every
+assigned point and keeps the bought ones.
+
+## Weapon families
+
+Every weapon belongs to a seed family. Branch weapons share the family of their seed
+weapon, so skills from both branches (for example a Monk Z and an Akuma X) fit in one
+loadout. A hybrid weapon is its own family for its skill list, but it has no XP bar:
+swinging it gives half the XP to each of its two parent families. The hybrid weapon
+unlocks when both parents reach level 10, and its skills at 15, 20, and 25 (see Hybrid
+skills).

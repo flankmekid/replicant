@@ -1,41 +1,24 @@
---[[
-	StatScaling
-	Shared module: single source of truth for the Souls-like stat spread curves.
-	Required by both the server damageCalculator (str/dex/magic damage) and
-	dataManager (vitality HP, magic mana/regen, stamina movement).
-
-	All stats are invested as integer points 0-50.
-
-	Design targets (value at level 50, soft-capped at level 40):
-	  Vitality  -> +100 max HP (additive, back-heavy lookup curve)
-	  Strength  -> +35% weapon damage (M1/E/M2)     => multiplier 1.35
-	  Dexterity -> +50% skill damage                 => multiplier 1.50
-	  Magic     -> +50% racial-move damage (1.50),
-	               +100 max mana,
-	               5x passive mana regen, 2x in-combat regen
-	  Stamina   -> movement: wall-run @10, 2nd dash @30, velocity soft-cap @20,
-	               +1 walkspeed per 10 levels (continuous)
-
-	Damage bonuses are returned as ADDITIVE fractions (e.g. 0.35), so callers
-	sum them into one pool with armor/race and apply once. They are NOT
-	multiplied together.
-]]
+-- SPDX-License-Identifier: MIT
+--
+-- The stat spread curves (Vitality, Strength, Dexterity, Magic, Stamina; 0 to 50
+-- points each) and the skill point price. The server and the client both use them.
+-- Damage bonuses are additive fractions (0.35 means +35%), so callers add them into one
+-- pool. The design targets are in docs/systems-design.md.
 
 local StatScaling = {}
 
 StatScaling.MAX_STAT = 50
-StatScaling.SOFT_CAP = 40 -- knee: full per-point value up to here, reduced after
-local POST_CAP_RATIO = 0.30 -- points past the knee give 30% of normal value
+-- Full value per point up to SOFT_CAP. After it, a point gives POST_CAP_RATIO of that.
+StatScaling.SOFT_CAP = 40
+local POST_CAP_RATIO = 0.30
 
--- ── Soft-cap helper ────────────────────────────────────────────────
--- Returns a 0..1 progress value for `points`, where progress reaches the
--- knee proportionally, then continues at POST_CAP_RATIO up to MAX_STAT,
--- normalized so that points == MAX_STAT returns exactly 1.0.
+-- Returns the progress (0 to 1) of points on the soft-capped curve. MAX_STAT returns
+-- exactly 1.
 local function softCapProgress(points)
 	points = math.clamp(points, 0, StatScaling.MAX_STAT)
 	local knee = StatScaling.SOFT_CAP
 	local maxStat = StatScaling.MAX_STAT
-	-- raw "value units" accrued: 1 per point pre-knee, POST_CAP_RATIO per point after
+	-- One unit per point before the soft cap, POST_CAP_RATIO per point after.
 	local function rawUnits(p)
 		if p <= knee then
 			return p
@@ -50,15 +33,12 @@ local function softCapProgress(points)
 end
 StatScaling.SoftCapProgress = softCapProgress
 
--- Generic: scale an additive bonus by soft-capped progress toward maxBonus.
--- e.g. scaledBonus(strPoints, 0.35) -> 0..0.35
+-- Scales maxBonus by the soft-capped progress of points.
 local function scaledBonus(points, maxBonus)
 	return softCapProgress(points) * maxBonus
 end
 
--- ── VITALITY: max HP (additive) ────────────────────────────────────
--- Baked back-heavy cumulative lookup. Index = stat level (1-50).
--- Level 0 = +0. Lands exactly +100 at level 50. Hand-tunable.
+-- Vitality: flat max HP by level, back-heavy, +100 at level 50. Tuned by hand.
 local VITALITY_HP = {
 	[0] = 0,
 	[1] = 0,
@@ -114,69 +94,106 @@ local VITALITY_HP = {
 }
 StatScaling.VITALITY_HP = VITALITY_HP
 
+-- StatScaling.GetHPBonus() - get the max HP bonus of Vitality
+-- @vitPoints: the Vitality points
+--
+-- Return: the flat HP bonus.
 function StatScaling.GetHPBonus(vitPoints)
 	vitPoints = math.clamp(math.floor(vitPoints or 0), 0, StatScaling.MAX_STAT)
 	return VITALITY_HP[vitPoints] or 0
 end
 
--- ── STRENGTH: weapon damage additive bonus (max +0.35) ─────────────
+-- StatScaling.GetStrengthBonus() - get the weapon damage bonus of Strength
+-- @strPoints: the Strength points
+--
+-- Return: an additive fraction, up to 0.35.
 function StatScaling.GetStrengthBonus(strPoints)
 	return scaledBonus(strPoints or 0, 0.35)
 end
 
--- ── DEXTERITY: skill damage additive bonus (max +0.50) ─────────────
+-- StatScaling.GetDexterityBonus() - get the skill damage bonus of Dexterity
+-- @dexPoints: the Dexterity points
+--
+-- Return: an additive fraction, up to 0.50.
 function StatScaling.GetDexterityBonus(dexPoints)
 	return scaledBonus(dexPoints or 0, 0.50)
 end
 
--- ── MAGIC ──────────────────────────────────────────────────────────
--- Racial-move damage additive bonus (max +0.50)
+-- StatScaling.GetMagicDamageBonus() - get the racial skill damage bonus of Magic
+-- @magicPoints: the Magic points
+--
+-- Return: an additive fraction, up to 0.50.
 function StatScaling.GetMagicDamageBonus(magicPoints)
 	return scaledBonus(magicPoints or 0, 0.50)
 end
 
--- Max mana flat bonus (max +100, additive). Linear (no soft cap) so each
--- point of magic gives a steady, legible +2 mana.
+-- StatScaling.GetManaBonus() - get the max mana bonus of Magic
+-- @magicPoints: the Magic points
+--
+-- Linear, with no soft cap, so each point gives a steady +2 mana.
+--
+-- Return: the flat mana bonus, up to 100.
 function StatScaling.GetManaBonus(magicPoints)
 	magicPoints = math.clamp(math.floor(magicPoints or 0), 0, StatScaling.MAX_STAT)
 	return math.floor((magicPoints / StatScaling.MAX_STAT) * 100 + 0.5)
 end
 
--- Passive regen multiplier: 1x at 0 -> 5x at 50 (linear).
+-- StatScaling.GetPassiveRegenMult() - get the passive mana regen multiplier of Magic
+-- @magicPoints: the Magic points
+--
+-- Return: 1 at 0 points to 5 at 50, linear.
 function StatScaling.GetPassiveRegenMult(magicPoints)
 	magicPoints = math.clamp(magicPoints or 0, 0, StatScaling.MAX_STAT)
-	return 1 + (magicPoints / StatScaling.MAX_STAT) * 4 -- 1..5
+	return 1 + (magicPoints / StatScaling.MAX_STAT) * 4
 end
 
--- In-combat regen multiplier: 1x at 0 -> 2x at 50 (linear).
+-- StatScaling.GetCombatRegenMult() - get the in-combat mana regen multiplier of Magic
+-- @magicPoints: the Magic points
+--
+-- Return: 1 at 0 points to 2 at 50, linear.
 function StatScaling.GetCombatRegenMult(magicPoints)
 	magicPoints = math.clamp(magicPoints or 0, 0, StatScaling.MAX_STAT)
-	return 1 + (magicPoints / StatScaling.MAX_STAT) * 1 -- 1..2
+	return 1 + (magicPoints / StatScaling.MAX_STAT) * 1
 end
 
--- ── STAMINA ────────────────────────────────────────────────────────
--- Discrete unlock thresholds
-StatScaling.STAMINA_WALLRUN_UNLOCK = 10 -- 3rd wall run at >=10
-StatScaling.STAMINA_DASH_UNLOCK = 30 -- 2nd dash at >=30
-StatScaling.STAMINA_VELOCITY_KNEE = 20 -- velocity-time soft-caps here
+-- Stamina unlocks: the third wall run, the second dash, and the level where the
+-- momentum build-up soft-caps.
+StatScaling.STAMINA_WALLRUN_UNLOCK = 10
+StatScaling.STAMINA_DASH_UNLOCK = 30
+StatScaling.STAMINA_VELOCITY_KNEE = 20
 
+-- StatScaling.GetWallRunCount() - get the number of wall runs
+-- @stamPoints: the Stamina points
+--
+-- Return: 3 from STAMINA_WALLRUN_UNLOCK, otherwise 2.
 function StatScaling.GetWallRunCount(stamPoints)
 	return ((stamPoints or 0) >= StatScaling.STAMINA_WALLRUN_UNLOCK) and 3 or 2
 end
 
+-- StatScaling.HasSecondDash() - check whether Stamina unlocks the second dash
+-- @stamPoints: the Stamina points
+--
+-- Return: true from STAMINA_DASH_UNLOCK.
 function StatScaling.HasSecondDash(stamPoints)
 	return (stamPoints or 0) >= StatScaling.STAMINA_DASH_UNLOCK
 end
 
--- +1 walkspeed per 10 levels (continuous), max +5 at 50.
+-- StatScaling.GetWalkspeedBonus() - get the WalkSpeed bonus of Stamina
+-- @stamPoints: the Stamina points
+--
+-- Return: +1 per 10 points, up to +5.
 function StatScaling.GetWalkspeedBonus(stamPoints)
 	stamPoints = math.clamp(stamPoints or 0, 0, StatScaling.MAX_STAT)
 	return math.floor(stamPoints / 10)
 end
 
--- Canonical base walkspeed for a character, including the Stamina bonus but BEFORE
--- race SpeedBoost. The single source of truth that every "reset to default speed"
--- site should use instead of the literal 16. Reads stamina live from PlayerStats.
+-- StatScaling.GetBaseWalkSpeed() - get the base WalkSpeed of a character
+-- @character: the character
+--
+-- Includes the Stamina bonus, read live from PlayerStats, but not the race SpeedBoost.
+-- Use this instead of the literal 16.
+--
+-- Return: the WalkSpeed.
 StatScaling.BASE_WALKSPEED = 16
 function StatScaling.GetBaseWalkSpeed(character)
 	local stam = 0
@@ -192,9 +209,13 @@ function StatScaling.GetBaseWalkSpeed(character)
 	return StatScaling.BASE_WALKSPEED + StatScaling.GetWalkspeedBonus(stam)
 end
 
--- Velocity (momentum) build-up time multiplier: faster (lower) with investment,
--- soft-capping its returns at level 20 but still improving slightly to 50.
--- Returns a 0..1 progress; callers map it onto their own time range.
+-- StatScaling.GetVelocityProgress() - get the momentum build-up progress of Stamina
+-- @stamPoints: the Stamina points
+--
+-- More Stamina builds momentum faster. The returns soft-cap at level 20 and still
+-- improve a little up to 50. Callers map the progress onto their own time range.
+--
+-- Return: progress from 0 to 1.
 function StatScaling.GetVelocityProgress(stamPoints)
 	stamPoints = math.clamp(stamPoints or 0, 0, StatScaling.MAX_STAT)
 	local knee = StatScaling.STAMINA_VELOCITY_KNEE
@@ -208,21 +229,22 @@ function StatScaling.GetVelocityProgress(stamPoints)
 	return rawUnits(stamPoints) / maxUnits
 end
 
--- ── SKILL POINT BUDGET (Model A) ───────────────────────────────────
--- Liturgy buys SKILL POINTS (capped at MAX_SKILL_POINTS). Assigning a skill
--- point to a stat is free (1:1). Buying the n-th skill point follows a gentle
--- rising curve tuned so all 150 cost ~200k Liturgy total.
+-- Skill points are bought with Liturgy, up to MAX_SKILL_POINTS, on a gentle rising
+-- curve: all 150 cost about 200k Liturgy.
 StatScaling.MAX_SKILL_POINTS = 150
 StatScaling.COST_BASE = 9
 StatScaling.COST_EXPONENT = 1.15
 
--- Cost to buy the NEXT skill point given how many you already OWN.
+-- StatScaling.GetNextSkillPointCost() - get the price of the next skill point
+-- @owned: the skill points the player already owns
+--
+-- Return: the Liturgy cost.
 function StatScaling.GetNextSkillPointCost(owned)
 	owned = math.max(0, math.floor(owned or 0))
 	return math.floor(StatScaling.COST_BASE * ((owned + 1) ^ StatScaling.COST_EXPONENT))
 end
 
--- Backwards-compat alias (older callers referenced GetNextPointCost).
+-- The old name of GetNextSkillPointCost.
 StatScaling.GetNextPointCost = StatScaling.GetNextSkillPointCost
 
 return StatScaling
