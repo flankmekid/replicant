@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shows the dash effect on the character for a ground dash.
+
 script.Parent.OnServerEvent:Connect(function(plr)
 	local char = plr.Character
 	local Effect = game.ReplicatedStorage.effects.DashEffect:Clone()
