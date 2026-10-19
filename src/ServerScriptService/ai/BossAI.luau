@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The boss AI: aggro by threat, a player-like moveset (M1 chain, crit, E strike,
+-- dash, block, parry), reactions to the player's attacks, and AOE attacks. MobServer
+-- spawns bosses and calls Update.
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -243,7 +248,7 @@ local function aoeCircle(boss, aoeDef, cfg)
 		if stateManager.GetState(char, "Dodging") then
 			continue
 		end
-		-- XZ only: jumping doesn't help
+		-- Only the horizontal distance counts, so jumping does not dodge it.
 		if xzDist(char.PrimaryPart.Position, bossPos) <= radius then
 			dmgModule.CalculateDamage(boss.Model, char, aoeDef.Damage or cfg.Damage, 0)
 		end
@@ -299,7 +304,7 @@ local function aoeLine(boss, aoeDef, target, cfg)
 		if stateManager.GetState(char, "Dodging") then
 			continue
 		end
-		-- Project onto XZ plane only — jumping doesn't help
+		-- Only the horizontal distance counts, so jumping does not dodge it.
 		local toPlayer = char.PrimaryPart.Position - bossPos
 		local toPlayerXZ = Vector3.new(toPlayer.X, 0, toPlayer.Z)
 		local along = fwd:Dot(toPlayerXZ)
@@ -456,7 +461,7 @@ local function fireAOE(boss, target, cfg)
 		end
 	end)
 	if not ok then
-		warn("[BossAI] AOE error (" .. aoeType .. "):", err)
+		warn(`[BossAI] AOE {aoeType} failed: {err}.`)
 	end
 end
 
@@ -712,9 +717,10 @@ local function bossM1Chain(boss, target, cfg)
 		local knock = isLast and 12 or 5
 		local res = meleeWindow(boss, cfg.M1Damage or 7, knock, false)
 
+		-- A parry leaves the boss exposed, so drop the chain.
 		if res == "parried" then
 			return false
-		end -- exposed, drop the chain
+		end
 
 		task.wait(cfg.M1HitGap or 0.45)
 	end
@@ -734,7 +740,7 @@ local function bossCrit(boss, target, cfg)
 		boss.Animations.Crit:Play(0.1)
 	end
 
-	-- Danger telegraph (red shield), identical FX to the existing heavy attack.
+	-- The same red danger telegraph as the boss heavy attack.
 	local dangerFX = ReplicatedStorage.assets.FX.danger:Clone()
 	local weld = Instance.new("WeldConstraint", dangerFX)
 	dangerFX.Parent = boss.Model
@@ -767,7 +773,7 @@ local function bossCrit(boss, target, cfg)
 		return
 	end
 
-	-- breaksGuard = true → always punches through block.
+	-- A crit always breaks the guard.
 	meleeWindow(boss, cfg.CritDamage or 16, 8, true)
 end
 
@@ -841,7 +847,7 @@ local function bossBlock(boss, cfg)
 		return
 	end
 	stateManager.SetState(boss.Model, "Blocking", true, 0.6)
-	-- Block stance anim: reuse the player block id already used elsewhere.
+	-- Reuse the player block animation.
 	do
 		local a = Instance.new("Animation")
 		a.AnimationId = "rbxassetid://96311777205911"
@@ -887,7 +893,7 @@ local function handlePlayerLikeAttack(boss, target, cfg)
 				return
 			end
 		else
-			-- vs player M1: roll parry first, then dash.
+			-- Against a player M1: roll a parry first, then a dash.
 			if math.random() < (cfg.ParryChance or 0.30) and bossParry(boss, target, cfg) then
 				boss.IsAttacking = false
 				return
@@ -896,7 +902,7 @@ local function handlePlayerLikeAttack(boss, target, cfg)
 				boss.IsAttacking = false
 				return
 			end
-			-- Caught with defenses down mid-combo → maybe block the chip.
+			-- Caught with defenses down during the combo: maybe block the chip.
 			if math.random() < (cfg.BlockChance or 0.40) then
 				bossBlock(boss, cfg)
 				boss.IsAttacking = false
@@ -919,7 +925,7 @@ local function handlePlayerLikeAttack(boss, target, cfg)
 		if dist <= (cfg.ERange or 28) and os.clock() >= (boss.ECooldown or 0) then
 			bossEStrike(boss, target, cfg)
 		end
-		-- else: just let Update's movement walk us in this tick.
+		-- Otherwise the movement in Update walks the boss in this tick.
 		boss.IsAttacking = false
 		return
 	end
@@ -1242,6 +1248,12 @@ local function onBossDeath(boss, cfg)
 	end
 end
 
+-- BossAI.Update() - run one AI tick for a boss
+-- @boss: the boss object from Spawn
+--
+-- MobServer calls this every frame. The boss acts at most every UPDATE_RATE seconds.
+--
+-- Return: nothing.
 function BossAI.Update(boss)
 	if not isAlive(boss.Model) then
 		return
@@ -1318,13 +1330,13 @@ function BossAI.Update(boss)
 		and dist <= (cfg.AttackRange + 5)
 		and playerCommittedSwing(target)
 	then
-		-- one reaction per distinct player commit
+		-- React once per player commit.
 		local commitId = math.floor((os.clock()) * 1000)
 		if not boss.LastReactCommit or (os.clock() - boss.LastReactCommit) > 0.5 then
 			boss.LastReactCommit = os.clock()
 
-			-- vs a guard-break (player M2) the boss only dashes, never parries,
-			-- so the player's GB answer always connects.
+			-- Against a guard break (player M2), the boss only dashes and never parries, so
+			-- the player's guard break always connects.
 			local playerM2 = stateManager.GetState(target, "M2")
 			if playerM2 then
 				if math.random() < (cfg.DashChance or 0.45) then
@@ -1336,7 +1348,7 @@ function BossAI.Update(boss)
 					return
 				end
 			else
-				-- vs a normal swing: roll parry, then dash, then block.
+				-- Against a normal swing: roll a parry, then a dash, then a block.
 				if math.random() < (cfg.ParryChance or 0.30) then
 					boss.IsAttacking = true
 					task.spawn(function()
@@ -1426,17 +1438,22 @@ function BossAI.Update(boss)
 	end
 end
 
+-- BossAI.Spawn() - spawn a boss from MobConfig
+-- @bossName: the key in MobConfig.Mobs and the model name in ServerStorage.Mobs
+-- @spawnCFrame: where to spawn
+--
+-- Return: the boss object, or nil when the config, model, or Humanoid is missing.
 function BossAI.Spawn(bossName, spawnCFrame)
 	local cfg = MobConfig.Mobs[bossName]
 	if not cfg then
-		warn("[BossAI] No config for: " .. bossName)
+		warn(`[BossAI] No MobConfig entry for {bossName}.`)
 		return
 	end
 
 	local storage = game:GetService("ServerStorage")
 	local template = storage:FindFirstChild("Mobs") and storage.Mobs:FindFirstChild(bossName)
 	if not template then
-		warn("[BossAI] No model in ServerStorage.Mobs for: " .. bossName)
+		warn(`[BossAI] No model in ServerStorage.Mobs for {bossName}.`)
 		return
 	end
 
@@ -1446,7 +1463,7 @@ function BossAI.Spawn(bossName, spawnCFrame)
 
 	local hum = model:FindFirstChild("Humanoid")
 	if not hum then
-		warn("[BossAI] No Humanoid in: " .. bossName)
+		warn(`[BossAI] Model {bossName} has no Humanoid.`)
 		model:Destroy()
 		return
 	end

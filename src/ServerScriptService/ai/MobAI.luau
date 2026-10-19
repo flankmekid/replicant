@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The mob AI: wander, detection in a view cone, pack alerts, search, chase with
+-- orbiting and flanking, and attacks limited by attack tokens per player. MobServer
+-- spawns mobs and calls Update.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -392,8 +397,9 @@ local function mergeCombatGroup(mob, targetChar)
 		return
 	end
 
-	local cwCount = 0 -- how many packmates are circling clockwise (OrbitDir = 1)
-	local ccwCount = 0 -- counterclockwise (OrbitDir = -1)
+	-- Packmates circling clockwise (OrbitDir = 1) and counterclockwise (OrbitDir = -1).
+	local cwCount = 0
+	local ccwCount = 0
 
 	for _, packMob in pairs(MobAI.Registry) do
 		if packMob == mob then
@@ -420,16 +426,22 @@ local function mergeCombatGroup(mob, targetChar)
 		end
 	end
 
-	-- Assign the less-used direction so mobs spread to opposite sides
+	-- Take the less used direction, so mobs spread to opposite sides.
 	if cwCount > ccwCount then
 		mob.OrbitDir = -1
 	elseif ccwCount > cwCount then
 		mob.OrbitDir = 1
 	end
-	-- If equal (including both zero, meaning first aggro), keep whatever was
-	-- randomly assigned when the mob originally spotted the player.
+	-- On a tie, including the first aggro, keep the random direction from detection.
 end
 
+-- MobAI.ReceiveAlert() - send a mob to search after a packmate saw a player
+-- @mob: the mob object
+-- @lastKnownPos: where the player was seen
+--
+-- Does nothing if the mob is already chasing, searching, or detecting.
+--
+-- Return: nothing.
 function MobAI.ReceiveAlert(mob, lastKnownPos)
 	if mob.Dead then
 		return
@@ -458,10 +470,18 @@ function MobAI.ReceiveAlert(mob, lastKnownPos)
 	end)
 end
 
+-- MobAI.Register() - add a mob to the registry that pack logic reads
+-- @mob: the mob object
+--
+-- Return: nothing.
 function MobAI.Register(mob)
 	MobAI.Registry[mob.Model] = mob
 end
 
+-- MobAI.Unregister() - remove a mob from the registry
+-- @mob: the mob object
+--
+-- Return: nothing.
 function MobAI.Unregister(mob)
 	MobAI.Registry[mob.Model] = nil
 end
@@ -537,7 +557,6 @@ local function onDeath(mob)
 	local topDealer = getTopDamageDealer(mob)
 	if topDealer and topDealer.Character then
 		local char = topDealer.Character
-		print("Top damage dealer: " .. char.Name)
 		local hum = char:FindFirstChild("Humanoid")
 		if hum then
 			hum.Health = math.min(hum.MaxHealth, hum.Health + hum.MaxHealth * 0.2)
@@ -622,7 +641,7 @@ local function fireHitbox(mob, damage, isHeavy, attackToken)
 				continue
 			end
 
-			-- clash with the target's attack (shared registry with players)
+			-- A clash with the target's attack. Players and mobs share the registry.
 			local clashOutcome, clashTarget = CombatCore.ResolveClash(attackToken, hit)
 			if clashOutcome == "lose" then
 				if attackToken then
@@ -683,9 +702,7 @@ local function fireHitbox(mob, damage, isHeavy, attackToken)
 				hitbox:Destroy()
 				return
 			elseif isBlocking then
-				-- Route through the shared BlockResolver so a mob hit feeds the
-				-- player's guard bar (fill / block-break / facing). Heavy attacks
-				-- guardbreak, matching the prior isHeavy = full-damage behavior.
+				-- BlockResolver feeds the player's guard bar. Heavy attacks are guard breaks.
 				local BlockResolver =
 					require(game:GetService("ServerScriptService").modules.BlockResolver)
 				local mobHRP = mob.Model:FindFirstChild("HumanoidRootPart")
@@ -1032,6 +1049,13 @@ local function handleObstacleJumping(mob, target)
 	end
 end
 
+-- MobAI.Update() - run one AI tick for a mob
+-- @mob: the mob object from Spawn
+--
+-- MobServer calls this every frame. A mob far from every player moves to
+-- ReplicatedStorage until a player comes near.
+--
+-- Return: nothing.
 function MobAI.Update(mob)
 	if not isAlive(mob.Model) then
 		return
@@ -1050,7 +1074,6 @@ function MobAI.Update(mob)
 	local cfg = MobConfig.Mobs[mob.Name]
 	local root = mob.Model.PrimaryPart
 
-	-- Hide/show
 	if not playerInRange(root.Position, cfg.NPCHideRange) then
 		mob.Model.Parent = ReplicatedStorage
 		return
@@ -1060,7 +1083,6 @@ function MobAI.Update(mob)
 		end
 	end
 
-	-- Stun
 	if stateManager.GetState(mob.Model, "Stunned") then
 		if mob.AttackTokenTarget then
 			releaseAttackToken(mob.AttackTokenTarget)
@@ -1336,17 +1358,22 @@ function MobAI.Update(mob)
 	end
 end
 
+-- MobAI.Spawn() - spawn a mob from MobConfig
+-- @mobName: the key in MobConfig.Mobs and the model name in ServerStorage.Mobs
+-- @spawnCFrame: where to spawn
+--
+-- Return: the mob object, or nil when the config, model, or Humanoid is missing.
 function MobAI.Spawn(mobName, spawnCFrame)
 	local cfg = MobConfig.Mobs[mobName]
 	if not cfg then
-		warn("[MobAI] No config for: " .. mobName)
+		warn(`[MobAI] No MobConfig entry for {mobName}.`)
 		return
 	end
 
 	local storage = game:GetService("ServerStorage")
 	local template = storage:FindFirstChild("Mobs") and storage.Mobs:FindFirstChild(mobName)
 	if not template then
-		warn("[MobAI] No model in ServerStorage.Mobs for: " .. mobName)
+		warn(`[MobAI] No model in ServerStorage.Mobs for {mobName}.`)
 		return
 	end
 
@@ -1356,7 +1383,7 @@ function MobAI.Spawn(mobName, spawnCFrame)
 
 	local hum = model:FindFirstChild("Humanoid")
 	if not hum then
-		warn("[MobAI] No Humanoid in: " .. mobName)
+		warn(`[MobAI] Model {mobName} has no Humanoid.`)
 		model:Destroy()
 		return
 	end

@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Stats, animations, and behavior settings for every mob and boss, keyed by the model
+-- name in ServerStorage.Mobs.
 local MobConfig = {}
 
 MobConfig.Mobs = {
@@ -198,9 +202,9 @@ MobConfig.Mobs = {
 				"rbxassetid://104365254449720",
 				"rbxassetid://133831562453891",
 			},
-			Crit = "rbxassetid://90438398769518", -- Dragon Slayer M2
-			EStrike = "rbxassetid://89138660171326", -- Dragon Slayer E
-			Dash = "rbxassetid://78977275276675", -- player RollFrontGround
+			Crit = "rbxassetid://90438398769518", -- The Dragon Slayer M2.
+			EStrike = "rbxassetid://89138660171326", -- The Dragon Slayer E.
+			Dash = "rbxassetid://78977275276675", -- The player RollFrontGround.
 			AOE = {
 				Circle = "rbxassetid://84682072138993",
 				Line = "rbxassetid://116348460718433",
