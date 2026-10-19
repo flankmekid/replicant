@@ -1,12 +1,13 @@
--- [[ MAIN GAME HANDLER ]] --
--- Location: ServerScriptService (Script)
+-- SPDX-License-Identifier: MIT
+--
+-- Owns the player life cycle on the server: data load, spawning, stats, armor, loot on
+-- death, and the shop remotes. All shop prices are set here, never by the client.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
--- Modules
 local DataManager = require(ServerScriptService.modules:WaitForChild("dataManager"))
 local InventoryManager = require(ServerScriptService.modules:WaitForChild("inventoryManager"))
 local RagdollManager = require(ServerScriptService.modules:WaitForChild("ragdollManager"))
@@ -23,7 +24,6 @@ local BASE_WALKSPEED = 16
 local BASE_JUMP_HEIGHT = 7.2
 local BASE_HP = 100
 
--- Configuration
 local EVENTS_FOLDER = ReplicatedStorage:WaitForChild("remotes")
 local SPAWN_EVENT = EVENTS_FOLDER:WaitForChild("SpawnPlayer")
 local CHANGE_WEAPON_EVENT = EVENTS_FOLDER:WaitForChild("ChangeWeapon")
@@ -62,15 +62,12 @@ local SPELLS_LIST = {
 	"Rising Dragon",
 }
 
--- [[ ARMOR LOGIC ]] --
-
 local function UpdateArmorVisuals(character, armorName)
 	if not character then
 		return
 	end
 	local armorData = ArmorConfig.Armors[armorName] or ArmorConfig.Armors["Rags"]
 
-	-- Handle Shirt
 	local shirt = character:FindFirstChildOfClass("Shirt")
 	if not shirt then
 		shirt = Instance.new("Shirt")
@@ -79,7 +76,6 @@ local function UpdateArmorVisuals(character, armorName)
 	end
 	shirt.ShirtTemplate = armorData.ShirtID
 
-	-- Handle Pants
 	local pants = character:FindFirstChildOfClass("Pants")
 	if not pants then
 		pants = Instance.new("Pants")
@@ -97,14 +93,14 @@ local function UpdateArmorStats(player, armorName)
 
 	local armorBuffs = stats:WaitForChild("ArmorBuffs", 5)
 	if not armorBuffs then
-		warn("ArmorBuffs folder missing for " .. player.Name)
+		warn(`[mainGameHandler] ArmorBuffs folder missing for {player.Name}.`)
 		return
 	end
 
 	local armorData = ArmorConfig.Armors[armorName]
 
 	if not armorData then
-		warn("Armor [" .. tostring(armorName) .. "] not found in Config! Defaulting to Rags.")
+		warn(`[mainGameHandler] Armor {armorName} not found in ArmorConfig. Using Rags.`)
 		armorData = ArmorConfig.Armors["Rags"]
 	end
 
@@ -119,7 +115,6 @@ local function UpdateArmorStats(player, armorName)
 	end
 end
 
--- [[ STATS & RACE APPLICATION ]] --
 local function applyStats(character)
 	local player = Players:GetPlayerFromCharacter(character)
 	if not player then
@@ -135,7 +130,6 @@ local function applyStats(character)
 
 	local humanoid = character:WaitForChild("Humanoid")
 
-	-- [[ 2. VALIDATE & ENFORCE CONFIG ]] --
 	local raceName = statsFolder:WaitForChild("Race").Value
 	local raceData = RaceConfig.Races[raceName] or RaceConfig.Races["Human"]
 	local targetStats = raceData.Stats or {}
@@ -166,7 +160,6 @@ local function applyStats(character)
 		end
 	end
 
-	-- [[ 3. HEALTH LOGIC ]] --
 	local function updateHealth()
 		local raceBoost = statsFolder:FindFirstChild("HPBoost") and statsFolder.HPBoost.Value or 0
 		local armorMult = 1
@@ -174,7 +167,7 @@ local function applyStats(character)
 			armorMult = armorBuffs.HPBuff.Value
 		end
 
-		-- [[ STAT SPREAD: Vitality adds flat HP additively, BEFORE the armor multiply ]] --
+		-- Vitality adds flat HP before the armor multiplier.
 		local vitPoints = 0
 		local sf = statsFolder:FindFirstChild("Stats")
 		if sf and sf:FindFirstChild("Vitality") then
@@ -213,7 +206,6 @@ local function applyStats(character)
 
 	updateHealth()
 
-	-- [[ 4. BIND ATTRIBUTES ]] --
 	local function updateAttribute(statName, attributeName, armorStatName)
 		local raceVal = statsFolder:FindFirstChild(statName) and statsFolder[statName].Value or 1
 		local armorVal = 1
@@ -241,7 +233,6 @@ local function applyStats(character)
 		end)
 	end
 
-	-- [[ 5. MOVEMENT STATS ]] --
 	local function updateJump()
 		local jumpMult = statsFolder:FindFirstChild("JumpBoost") and statsFolder.JumpBoost.Value
 			or 1
@@ -254,17 +245,14 @@ local function applyStats(character)
 	updateJump()
 
 	local function updateSpeed()
-		-- Route through SpeedService so a Stamina/SpeedBoost change re-settles the
-		-- character to the correct value WITHOUT stomping an active stun/block/skill
-		-- pin. Resolve computes GetFullSpeed (GetBaseWalkSpeed * SpeedBoost) when the
-		-- modifier stack is empty, which is exactly the old behavior, and keeps the
-		-- higher-priority modifier's speed when one is live.
+		-- SpeedService keeps an active stun, block, or skill speed, and otherwise sets the
+		-- full speed.
 		SpeedService.Resolve(humanoid.Parent)
 	end
 	if statsFolder:FindFirstChild("SpeedBoost") then
 		statsFolder.SpeedBoost.Changed:Connect(updateSpeed)
 	end
-	-- re-apply when Stamina changes (level-up / respec)
+	-- Re-apply the speed when Stamina changes on level-up or respec.
 	do
 		local sf = statsFolder:FindFirstChild("Stats")
 		if sf and sf:FindFirstChild("Stamina") then
@@ -274,15 +262,10 @@ local function applyStats(character)
 	updateSpeed()
 end
 
--- Exposed so other server scripts can force a stat re-apply. RaceHandler needs this:
--- a reroll changes HPBoost/ManaBoost on the PlayerStats value objects, but only
--- applyStats pushes those into Humanoid.MaxHealth. Without it, rerolling from Maw
--- (HPBoost 35) to Human (HPBoost 10) left MaxHealth stuck at the old value while the
--- stat object read the new one, so the HP bar and the actual humanoid disagreed.
--- (Same _G pattern the codebase already uses for QuestManager and TitleManager.)
+-- RaceHandler calls this after a reroll, because only applyStats pushes HPBoost into
+-- Humanoid.MaxHealth.
 _G.ApplyStats = applyStats
 
--- [[ HELPER: DATA WAITER ]] --
 local function WaitForData(player)
 	local timeout = 0
 	while not DataManager.GetProfile(player) do
@@ -314,30 +297,28 @@ local function StartPositionTracker(player)
 				continue
 			end
 
+			-- Save the position only when the player is alive, not downed, out of combat, and on
+			-- the ground.
 			if player:GetAttribute("HasPressedPlay") ~= true then
 				continue
 			end
 
-			-- not dead
 			if humanoid.Health <= 0 then
 				DataManager.ClearLastPosition(player)
 				continue
 			end
 
-			-- not downed
 			if StateHandler.GetState(char, "Downed") then
 				DataManager.ClearLastPosition(player)
 				continue
 			end
 
-			-- not in combat
 			local combatExpiry = player:GetAttribute("CombatLogExpiry")
 			if combatExpiry and os.clock() < combatExpiry then
 				DataManager.ClearLastPosition(player)
 				continue
 			end
 
-			-- only save when grounded
 			local state = humanoid:GetState()
 			local isGrounded = (
 				state == Enum.HumanoidStateType.Running
@@ -350,19 +331,16 @@ local function StartPositionTracker(player)
 				continue
 			end
 
-			-- All conditions passed — save this position
 			DataManager.SaveLastPosition(player, rootPart.Position)
 		end
 	end)
 end
 
--- [[ SPAWNING LOGIC ]] --
 local function SafeTeleport(rootPart, cframe, description)
 	rootPart.Anchored = true
 	rootPart.CFrame = cframe
 	task.wait(0.1)
 	rootPart.Anchored = false
-	print(string.format("[GAME] Teleported %s to %s", rootPart.Parent.Name, description))
 end
 
 local function SendToGameSpawn(character)
@@ -372,9 +350,8 @@ local function SendToGameSpawn(character)
 		return
 	end
 
-	-- 1. Get Player & Race
 	local player = Players:GetPlayerFromCharacter(character)
-	local raceName = "Human" -- Default fallback
+	local raceName = "Human"
 
 	if player then
 		local stats = player:FindFirstChild("PlayerStats")
@@ -383,42 +360,39 @@ local function SendToGameSpawn(character)
 		end
 	end
 
-	-- 2. Find the main Spawns folder
 	local allSpawnsFolder = workspace:FindFirstChild(RACE_SPAWNS_FOLDER_NAME)
 
 	if allSpawnsFolder then
 		local validSpawns = {}
 
-		-- 3. Check for specific Race Folder
 		local raceSpecificFolder = allSpawnsFolder:FindFirstChild(raceName)
 
 		if raceSpecificFolder then
-			-- A: Folder Exists -> Collect spawns ONLY from this folder
 			for _, child in ipairs(raceSpecificFolder:GetChildren()) do
 				if child:IsA("BasePart") then
 					table.insert(validSpawns, child)
 				end
 			end
 		else
-			-- B: Folder Does Not Exist -> Collect spawns from Main Folder (ignoring sub-folders)
+			-- Without a race folder, use the spawn parts directly in the main folder. Race
+			-- folders are not BaseParts, so they are skipped.
 			for _, child in ipairs(allSpawnsFolder:GetChildren()) do
-				if child:IsA("BasePart") then -- This ensures we don't pick other Race Folders
+				if child:IsA("BasePart") then
 					table.insert(validSpawns, child)
 				end
 			end
 		end
 
-		-- 4. Pick Random
 		if #validSpawns > 0 then
 			local randomSpawn = validSpawns[math.random(1, #validSpawns)]
 			local targetCF = CFrame.new(randomSpawn.Position + Vector3.new(0, 4, 0))
 			SafeTeleport(rootPart, targetCF, "GameSpawn (" .. raceName .. ")")
 		else
-			warn("[GAME] No valid spawn parts found for race: " .. raceName)
-			-- Optional: Add a fallback here if absolutely no spawns exist
+			warn(`[mainGameHandler] No spawn parts found for race {raceName}.`)
+			-- TODO: Add a fallback spawn for when no spawn part exists.
 		end
 	else
-		warn("[GAME] '" .. RACE_SPAWNS_FOLDER_NAME .. "' folder missing in Workspace!")
+		warn(`[mainGameHandler] Folder {RACE_SPAWNS_FOLDER_NAME} is missing in Workspace.`)
 	end
 end
 
@@ -449,7 +423,6 @@ local function HandleCharacterLoad(player, character)
 		task.wait()
 	end
 
-	-- Character Config
 	character.Archivable = true
 	humanoid.BreakJointsOnDeath = false
 	humanoid.RequiresNeck = false
@@ -458,19 +431,16 @@ local function HandleCharacterLoad(player, character)
 	local attach = Instance.new("Attachment", rootPart)
 	attach.Name = "ForceAttachment"
 
-	-- Guard meter: establish the GuardBar attribute so the HUD controller can read
-	-- it and GuardBarService's regen loop will service this character.
+	-- GuardBarService.Init sets the GuardBar attribute that the HUD reads.
 	GuardBarService.Init(character)
 
-	-- [[ ARMOR SETUP ON SPAWN ]] --
-	-- Stats come from the stats-armor; visuals from the (possibly transmogged) vanity.
+	-- Stats come from the armor. Visuals come from the vanity, which can be a transmog.
 	local currentArmor = DataManager.GetCurrentArmor(player)
 	local currentVanity = DataManager.GetCurrentVanity(player)
 	UpdateArmorVisuals(character, currentVanity)
 	UpdateArmorStats(player, currentArmor)
 
 	if player:GetAttribute("HasPressedPlay") == false then
-		-- MENU SPAWN
 		local menuSpawn = workspace.spawnRoom:FindFirstChild(MENU_SPAWN_NAME)
 		if menuSpawn then
 			rootPart.CFrame = CFrame.new(menuSpawn.Position + Vector3.new(0, 3, 0))
@@ -495,7 +465,6 @@ local function HandleCharacterLoad(player, character)
 		end
 	end
 
-	-- Death
 	humanoid.Died:Connect(function()
 		RagdollManager.Ragdoll(character, 10)
 		if not rootPart.Anchored then
@@ -509,13 +478,14 @@ local function HandleCharacterLoad(player, character)
 
 		local player = Players:GetPlayerFromCharacter(character)
 		if player then
-			TagManager.UntagIfAttackerDied(player) -- remove the dead player as an attacker from others
-			TagManager.ClearPlayerTag(player) -- and clear their OWN tag so death ends combat (stops music)
+			-- Remove the dead player as an attacker from others, and clear their own tag, so
+			-- death ends combat and stops the combat music.
+			TagManager.UntagIfAttackerDied(player)
+			TagManager.ClearPlayerTag(player)
 		end
 	end)
 end
 
--- [[ LOOT & INVENTORY ]] --
 local function connectLootLogic(humanoid)
 	if humanoid:GetAttribute("LootLinked") then
 		return
@@ -536,7 +506,6 @@ local function connectLootLogic(humanoid)
 		local dyingPlayer = Players:GetPlayerFromCharacter(model)
 
 		if dyingPlayer then
-			-- [[ DEATH TRACKING ]]
 			if DataManager and TitleManager then
 				DataManager.AddDeath(dyingPlayer)
 				TitleManager.CheckDeaths(dyingPlayer)
@@ -544,12 +513,10 @@ local function connectLootLogic(humanoid)
 
 			DataManager.HandlePlayerDeath(dyingPlayer, model.HumanoidRootPart.Position)
 
-			-- [[ KILL CREDIT ]]
 			local killTag = humanoid:FindFirstChild("KillTag")
 			if killTag and killTag.Value ~= "" then
 				local killer = Players:FindFirstChild(killTag.Value)
 				if killer and killer ~= dyingPlayer then
-					print(killer.Name .. " KILLED " .. model.Name)
 					if DataManager and TitleManager then
 						DataManager.AddKill(killer)
 						TitleManager.CheckKills(killer)
@@ -582,7 +549,6 @@ local function EquipWeapon(player, weaponName, deleteOld)
 		DataManager.ClearInventory(player)
 	end
 
-	-- Cleaner function
 	local function clean(parent)
 		for _, item in pairs(parent:GetChildren()) do
 			if WEAPON_FOLDER:FindFirstChild(item.Name) then
@@ -611,7 +577,6 @@ local function LoadInventory(player)
 	InventoryManager.new(player, savedData)
 end
 
--- [[ EVENT LISTENERS ]] --
 Players.PlayerAdded:Connect(function(player)
 	player:SetAttribute("HasPressedPlay", false)
 	task.spawn(function()
@@ -625,10 +590,7 @@ Players.PlayerAdded:Connect(function(player)
 	end)
 
 	player.CharacterAdded:Connect(function(character)
-		-- Tear down any buff left standing from the PREVIOUS life. Buffs were only
-		-- ever cleared by their own expiry timer, so dying mid-buff left the entry
-		-- in BuffService (still applying its damage/heal modifier on the new body)
-		-- and left the aura particles welded to the corpse.
+		-- Clear the buffs of the previous life, so they do not carry over to the new body.
 		BuffService.ClearAll(player, nil)
 
 		local diedConn
@@ -638,9 +600,8 @@ Players.PlayerAdded:Connect(function(player)
 				diedConn:Disconnect()
 				diedConn = nil
 			end
-			-- Sweep THIS body explicitly: the corpse persists after death, and by the
-			-- time a later teardown runs, plr.Character is already the new character,
-			-- so an un-swept aura would stay on the old one forever.
+			-- Sweep this body explicitly. A later cleanup sees plr.Character as the new
+			-- character, so the aura would stay on the corpse.
 			BuffService.ClearAll(player, character)
 		end)
 
@@ -650,7 +611,6 @@ Players.PlayerAdded:Connect(function(player)
 		TitleManager.CheckSpecUnlock(player)
 		TitleManager.UpdateAura(player, DataManager.GetCurrentTitle())
 
-		-- 1. Apply Appearance and Stats
 		HandleCharacterLoad(player, character)
 		applyStats(character)
 		connectLootLogic(character:WaitForChild("Humanoid"))
@@ -662,12 +622,12 @@ Players.PlayerAdded:Connect(function(player)
 		player:FindFirstChild("PlayerStats").Mana.Value =
 			player:FindFirstChild("PlayerStats").MaxMana.Value
 
-		-- Wait for the expected weapon to land in the Backpack before equipping
+		-- Wait for the saved weapon to reach the Backpack before equipping, for at most
+		-- 3 seconds.
 		local currentWeapon = DataManager.GetCurrentWeapon(player)
 		if currentWeapon and currentWeapon ~= "" then
 			local backpack = player:FindFirstChild("Backpack")
 			if backpack and not backpack:FindFirstChild(currentWeapon) then
-				-- Wait up to 3 seconds for the grant block to finish
 				local waited = 0
 				repeat
 					task.wait(0.1)
@@ -690,18 +650,8 @@ Players.PlayerAdded:Connect(function(player)
 			playerInv:Sync()
 		end
 
-		-- Handshake for RaceHandler. Both scripts have their own CharacterAdded and
-		-- both write appearance: this one owns armor (Shirt/Pants), stats, inventory
-		-- visuals; RaceHandler owns skin, face, hair, race items, and runs
-		-- CleanAccessories, which destroys any accessory not named EquipSlot_*.
-		--
-		-- The ordering used to rest entirely on one script waiting 0.3s and the other
-		-- 0.5s, which is not coordination, it is a race that usually wins. If
-		-- HandleCharacterLoad yielded long enough (it has WaitForChild calls with 10s
-		-- timeouts and a spin on IsDescendantOf), LoadAllVisuals could land AFTER
-		-- CleanAccessories and get wiped.
-		--
-		-- RaceHandler now waits on this attribute instead of a magic number.
+		-- RaceHandler waits for this attribute before it writes the appearance, so its
+		-- CleanAccessories cannot remove the inventory visuals. See docs/systems-design.md.
 		character:SetAttribute("BaseSetupComplete", true)
 	end)
 end)
@@ -711,7 +661,8 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 local MENU_AREA_CENTER = Vector3.new(-3232.061, 6, -1263.206)
-local MENU_AREA_HALF_SIZE = Vector3.new(82, 20, 79) -- Half of 164, generous Y, half of 158
+-- Half the menu area size (164 x 158), with a generous Y.
+local MENU_AREA_HALF_SIZE = Vector3.new(82, 20, 79)
 
 local function IsInMenuArea(position)
 	local diff = position - MENU_AREA_CENTER
@@ -737,10 +688,8 @@ SPAWN_EVENT.OnServerEvent:Connect(function(player)
 			return
 		end
 
-		-- [[ SAVED POSITION RESTORE ]] --
 		local savedPos = DataManager.GetLastPosition(player)
 		if savedPos and IsInMenuArea(savedPos) then
-			print("[GAME] Saved position was inside menu area, clearing.")
 			DataManager.ClearLastPosition(player)
 			savedPos = nil
 		end
@@ -761,12 +710,6 @@ SPAWN_EVENT.OnServerEvent:Connect(function(player)
 					targetPos = savedPos + Vector3.new(0, 3, 0)
 				end
 
-				print(
-					"[GAME] Restoring "
-						.. player.Name
-						.. " to saved position: "
-						.. tostring(targetPos)
-				)
 				char.Parent = workspace.plrManager.alive
 				SafeTeleport(rootPart, CFrame.new(targetPos), "SavedPosition")
 				return
@@ -783,7 +726,6 @@ REQUEST_SYNC_EVENT.OnServerEvent:Connect(function(player)
 	end
 end)
 
--- [[ BUYING ARMOR EVENT ]] --
 BUY_ARMOR_EVENT.OnServerEvent:Connect(function(player, armorName)
 	local armorData = ArmorConfig.Armors[armorName]
 	if not armorData then
@@ -792,7 +734,8 @@ BUY_ARMOR_EVENT.OnServerEvent:Connect(function(player, armorName)
 
 	if DataManager.OwnsArmor(player, armorName) then
 		DataManager.SetCurrentArmor(player, armorName)
-		DataManager.SetCurrentVanity(player, nil) -- equipping resets transmog
+		-- Equipping armor resets the transmog.
+		DataManager.SetCurrentVanity(player, nil)
 		UpdateArmorVisuals(player.Character, armorName)
 		UpdateArmorStats(player, armorName)
 		applyStats(player.Character)
@@ -810,7 +753,8 @@ BUY_ARMOR_EVENT.OnServerEvent:Connect(function(player, armorName)
 
 		DataManager.AddArmor(player, armorName)
 		DataManager.SetCurrentArmor(player, armorName)
-		DataManager.SetCurrentVanity(player, nil) -- equipping resets transmog
+		-- Equipping armor resets the transmog.
+		DataManager.SetCurrentVanity(player, nil)
 
 		UpdateArmorVisuals(player.Character, armorName)
 		UpdateArmorStats(player, armorName)
@@ -818,10 +762,9 @@ BUY_ARMOR_EVENT.OnServerEvent:Connect(function(player, armorName)
 	end
 end)
 
--- Deterministic server-side cleanup when swapping weapons.
--- Clears the arm tool-grip welds directly (instead of waiting for the client
--- DisconnectM6D round-trip, which races the tool destroy) and tells the client
--- to stop the old weapon's looping idle track.
+-- Clears the tool-grip welds on the server instead of waiting for the client's
+-- DisconnectM6D, which races the tool destroy. Then tells the client to stop the old
+-- weapon's idle animation.
 local function cleanupWeaponVisuals(player)
 	local char = player.Character
 	if char then
@@ -839,12 +782,8 @@ local function cleanupWeaponVisuals(player)
 	STOP_WEAPON_IDLE_EVENT:FireClient(player)
 end
 
--- Humanoid:UnequipTools() is deferred: the old tool re-parents to the Backpack on a
--- later frame, not synchronously. A blind single task.wait() sometimes returned before
--- that settled, so ClearWeapons ran against a character that still held the old tool and
--- the swap left stale equipped state (new weapon then needed a manual unequip+re-equip).
--- Yield until the character genuinely has no equipped Tool, bounded so a stuck tool can
--- never hang the handler.
+-- UnequipTools is deferred: the tool returns to the Backpack on a later frame. Wait
+-- until no Tool is equipped, with a bound so a stuck tool cannot hang the handler.
 local function waitForNoEquippedTool(player)
 	for _ = 1, 8 do
 		local char = player.Character
@@ -855,23 +794,18 @@ local function waitForNoEquippedTool(player)
 	end
 end
 
--- [[ AUTHORITATIVE WEAPON PRICES ]] --
--- The client used to send the price along with the purchase, and the server charged
--- whatever it was told. A crafted BuyWeapon fire with price 0 bought anything free.
--- The price now lives here and the client's number is ignored entirely.
---
--- Seeds are granted free by the tutorial NPCs and also sold for 500 in the shops.
--- HasItem blocks re-purchase, so the shop is only ever reachable by someone who
--- skipped the tutorial. Both doors resolve to this one entry.
+-- The server owns every price, and the client's price argument is ignored. Seed
+-- weapons are free from the tutorial NPCs. A shop reaches only players who skipped
+-- the tutorial, because HasItem blocks a second purchase.
 local WEAPON_PRICES = {
-	-- seeds (free from the tutorial NPCs)
+	-- Seed weapons.
 	["Fists"] = 0,
 	["Sword"] = 0,
 	["Katana"] = 0,
 	["Dagger"] = 0,
 	["Greatsword"] = 0,
 
-	-- branch weapons (class vendors, gated on family level 10)
+	-- Branch weapons from the class vendors, gated on family level 10.
 	["Caestus"] = 1000,
 	["Shackles"] = 1000,
 	["Excalibur"] = 1000,
@@ -880,14 +814,13 @@ local WEAPON_PRICES = {
 	["Dragon Slayer"] = 1000,
 	["Deathbringer"] = 1500,
 
-	-- hybrids (trainer-gated, world-discovered)
+	-- Hybrid weapons, gated by trainers and found in the world.
 	["Guandao"] = 2500,
 	["Scythe"] = 2500,
 }
 
 BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
-	-- Never trust the shape of client input either: a table here would throw inside
-	-- FindFirstChild.
+	-- A table here would throw inside FindFirstChild.
 	if type(weaponName) ~= "string" then
 		return
 	end
@@ -897,20 +830,13 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 		return
 	end
 
-	-- The client's `price` argument is deliberately discarded. A weapon absent from
-	-- the table is simply not for sale, rather than falling back to a client claim.
+	-- A weapon that is not in the table is not for sale.
 	price = WEAPON_PRICES[weaponName]
 	if not price then
-		warn(
-			"[BuyWeapon] no server price for '"
-				.. weaponName
-				.. "'; refusing sale to "
-				.. player.Name
-		)
+		warn(`[mainGameHandler] {player.Name} tried to buy {weaponName}, which has no price.`)
 		return
 	end
 
-	-- Optional: Check if they already own it
 	if DataManager.HasItem(player, weaponName) then
 		return
 	end
@@ -923,14 +849,13 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 
 	local inv = InventoryManager.GetInventory(player)
 
-	-- Guard the Backpack hook so the deferred UnequipTools below can't
-	-- re-register the old tool after ClearWeapons wipes it.
+	-- Guard the Backpack hook, so the deferred UnequipTools cannot register the old tool
+	-- again after ClearWeapons removes it.
 	if inv then
 		inv.IsSwapping = true
 	end
 
 	player.Character.Humanoid:UnequipTools()
-	-- Wait until the old tool has actually left the character, not just one frame.
 	waitForNoEquippedTool(player)
 
 	if DataManager.RemoveLiturgy(player, price) then
@@ -942,32 +867,19 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 			game.Debris:AddItem(s, 2)
 		end
 
-		-- [[ HYBRID REPLACEMENT LOGIC ]] --
 		if inv then
-			inv:ClearWeapons() -- Wipes the old weapons securely
-			-- Stop the orphaned idle AFTER the old tool is destroyed (see ChangeWeapon).
+			inv:ClearWeapons()
+			-- Stop the old idle only after the old tool is destroyed.
 			cleanupWeaponVisuals(player)
-			inv:AddItem(weaponName, 1) -- Grants the new physical tool and logs the data
+			inv:AddItem(weaponName, 1)
 		end
 
-		-- [[ LEVEL 10 CLASS QUEST ]] --
-		-- The 10 milestone is "you may now be armed", so BUYING the branch weapon is
-		-- what closes it. The trainer has nothing to teach until 15 and cannot be the
-		-- completion. Handled here, at the single server-side purchase chokepoint, so
-		-- it fires for every branch weapon and cannot be spoofed by a client firing
-		-- QuestAction directly.
-		--
-		-- Completion is family-scoped, not weapon-scoped: buying EITHER fist weapon
-		-- closes ClassQuest_Fists_10. A player who ignores the marker and finds the
-		-- Oni on their own still gets credit. The quest is a hint, not a rail, and
-		-- Akuma is never surfaced by the UI.
-		--
-		-- Completing it hands control back to the reconciler, so a player who is
-		-- already past 15 immediately gets the next checkpoint rather than waiting
-		-- for a level-up that already happened.
+		-- Buying a branch weapon completes the level 10 class quest of its family. It is
+		-- done here, at the only server purchase path, so a client cannot fake it. See
+		-- docs/systems-design.md.
 		local SkillConfig = require(game.ReplicatedStorage.modules.SkillConfig)
 		local family = SkillConfig.GetXPFamily(weaponName)
-		-- Seeds (Fists, Sword, ...) map to themselves and are not a branch purchase.
+		-- Seed weapons map to themselves and are not a branch purchase.
 		if family and family ~= weaponName then
 			local qm = _G.QuestManager
 			if qm then
@@ -978,9 +890,8 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 			end
 		end
 
-		-- Deterministic post-swap reconcile (see ChangeWeapon). Only after a real
-		-- purchase, so an unaffordable attempt does not wipe the player's weapon.
-		-- Runs a frame later, after the unconditional IsSwapping release below.
+		-- Reconcile one frame later, after the swap guard is released. Only a real purchase
+		-- does this, so a failed purchase does not remove the player's weapon.
 		if inv then
 			task.spawn(function()
 				task.wait()
@@ -989,25 +900,21 @@ BUY_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName, price)
 		end
 	end
 
-	-- Always release the swap guard, even if they couldn't afford it
-	-- (they were already unequipped above).
+	-- Release the swap guard even when the purchase failed, because the player was
+	-- already unequipped.
 	if inv then
 		inv.IsSwapping = false
 	end
 end)
 
--- [[ AUTHORITATIVE EQUIPMENT PRICES ]] --
--- The old handler took the client's price and, worse, had a `price == 0` branch that
--- granted the item with NO liturgy check at all: firing BuyItem("Void Spire", 0) got
--- it free. Prices live here now and the client's number is ignored.
--- Only what an actual vendor sells. Anything absent is not purchasable, and the
--- handler refuses rather than trusting a client-supplied price.
+-- The server owns every price, and the client's price argument is ignored. An item
+-- that is not in the table is not for sale.
 local ITEM_PRICES = {
-	-- Free, bundled with the Hoss armor (which is charged separately via BuyArmor).
+	-- Free with the Hoss armor, which BuyArmor charges for.
 	["Prayer Beads"] = 0,
 	["Abyssal Helmet"] = 500,
-	-- Black Trench Coat / Lantern / Void Spire exist in ServerStorage.Equipment but
-	-- have no vendor. Deliberately absent: they are granted elsewhere, not bought.
+	-- Black Trench Coat, Lantern, and Void Spire have no vendor. They are granted
+	-- elsewhere.
 }
 
 BUY_ITEM_EVENT.OnServerEvent:Connect(function(player, itemName, price)
@@ -1020,14 +927,13 @@ BUY_ITEM_EVENT.OnServerEvent:Connect(function(player, itemName, price)
 		return
 	end
 
-	-- Optional: Check if they already own it
 	if DataManager.HasItem(player, itemName) then
 		return
 	end
 
 	price = ITEM_PRICES[itemName]
 	if not price then
-		warn("[BuyItem] no server price for '" .. itemName .. "'; refusing sale to " .. player.Name)
+		warn(`[mainGameHandler] {player.Name} tried to buy {itemName}, which has no price.`)
 		return
 	end
 
@@ -1040,22 +946,18 @@ BUY_ITEM_EVENT.OnServerEvent:Connect(function(player, itemName, price)
 			game.Debris:AddItem(s, 2)
 		end
 
-		-- [[ HYBRID REPLACEMENT LOGIC ]] --
 		local inv = InventoryManager.GetInventory(player)
 		if inv then
-			inv:AddItem(itemName, 1) -- Grants the new physical tool and logs the data
+			inv:AddItem(itemName, 1)
 		end
 	end
 end)
 
--- [[ AUTHORITATIVE SKILL PRICES ]] --
--- Priced by SLOT, matching the trainer dialogues (Z = 1000, X = 1500, C = 2500).
--- The slot comes from the skill's index in SkillConfig.WeaponSkills, so there is no
--- second list to keep in sync: add a skill to a family and it is priced automatically.
+-- Skills are priced by slot, the same as the trainer dialogues. The slot is the
+-- skill's index in SkillConfig.WeaponSkills, so a new skill gets a price on its own.
 local SKILL_SLOT_PRICES = { [1] = 1000, [2] = 1500, [3] = 2500 }
 
--- Mastery level a family must have reached to be taught the skill in each slot.
--- Mirrors the trainer state machine (15 / 20 / 25).
+-- The family mastery level needed for each slot, the same as the trainer.
 local SKILL_SLOT_LEVELS = { [1] = 15, [2] = 20, [3] = 25 }
 
 BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
@@ -1063,14 +965,13 @@ BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
 		return
 	end
 
-	-- Check if they already own it using the new DataManager function
 	if DataManager.HasSpell(player, spellName) then
 		return
 	end
 
 	local SkillConfig = require(ReplicatedStorage.modules:WaitForChild("SkillConfig"))
 
-	-- Resolve the skill to its family and slot. An unknown skill name is not for sale.
+	-- An unknown skill is not for sale.
 	local family, slot
 	for weaponName, skills in pairs(SkillConfig.WeaponSkills) do
 		for i, name in ipairs(skills) do
@@ -1086,37 +987,21 @@ BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
 	end
 
 	if not family or not slot then
-		-- Racial skills and anything not in WeaponSkills are granted elsewhere, not
-		-- bought. Refuse rather than charging a client-supplied price.
-		warn("[BuySpell] '" .. spellName .. "' is not a purchasable weapon skill; refusing.")
+		-- Racial skills and other skills are granted elsewhere, not bought.
+		warn(`[mainGameHandler] {player.Name} tried to buy {spellName}, which is not for sale.`)
 		return
 	end
 
-	-- The client's `price` is discarded. It used to be charged verbatim, so a crafted
-	-- BuySpell fire with price 0 unlocked any skill for free.
 	price = SKILL_SLOT_PRICES[slot]
 	if not price then
 		return
 	end
 
-	-- And the client cannot skip the level gate by talking straight to the remote:
-	-- the trainer checks mastery on its side, but that check lived only on the client.
+	-- The trainer checks the level only on the client, so check it here too.
 	local level = DataManager.GetWeaponLevel(player, family)
 	local required = SKILL_SLOT_LEVELS[slot]
 	if required and level < required then
-		warn(
-			"[BuySpell] "
-				.. player.Name
-				.. " tried to buy '"
-				.. spellName
-				.. "' at "
-				.. family
-				.. " "
-				.. level
-				.. " (needs "
-				.. required
-				.. "); refusing."
-		)
+		warn(`[mainGameHandler] {player.Name} needs {family} level {required} for {spellName}.`)
 		return
 	end
 
@@ -1129,7 +1014,6 @@ BUY_SPELL_EVENT.OnServerEvent:Connect(function(player, spellName, price)
 			game.Debris:AddItem(s, 2)
 		end
 
-		-- Grant the spell
 		DataManager.UnlockSpell(player, spellName)
 	end
 end)
@@ -1139,23 +1023,14 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 		return
 	end
 
-	-- ChangeWeapon is the TUTORIAL grant path: the five starter NPCs hand out the
-	-- seed weapons for free. It charges nothing, so it must never be able to hand
-	-- out anything else. Previously it would grant ANY of the 14 weapons, meaning a
-	-- crafted ChangeWeapon("Dragon Slayer") fire got a 1000-liturgy branch weapon for
-	-- nothing. Branch weapons and hybrids go through BuyWeapon, which prices them.
+	-- ChangeWeapon is the free tutorial path for seed weapons, so it must not grant
+	-- anything else. Branch and hybrid weapons go through BuyWeapon.
 	local SkillConfig = require(ReplicatedStorage.modules:WaitForChild("SkillConfig"))
 	local isSeed = (not SkillConfig.IsHybrid(weaponName))
 		and (SkillConfig.WeaponFamily[weaponName] == weaponName)
 
 	if not isSeed then
-		warn(
-			"[ChangeWeapon] "
-				.. player.Name
-				.. " requested non-seed weapon '"
-				.. weaponName
-				.. "'; refusing (branch weapons must be bought)."
-		)
+		warn(`[mainGameHandler] {player.Name} asked ChangeWeapon for {weaponName}, not a seed.`)
 		return
 	end
 
@@ -1164,7 +1039,6 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 		return
 	end
 
-	-- Optional: Check if they already own it
 	if DataManager.HasItem(player, weaponName) then
 		return
 	end
@@ -1176,13 +1050,11 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 
 		if player.Character and player.Character:FindFirstChild("Humanoid") then
 			player.Character.Humanoid:UnequipTools()
-			-- Wait until the old tool has actually left the character, not just one frame.
 			waitForNoEquippedTool(player)
 		end
 
-		-- Destroy the old physical tools FIRST, then stop the orphaned idle. The idle
-		-- stopper must run after the tool is gone: if it fires before the destroy, the
-		-- old tool's Equipped handler can restart the idle a frame later and survive.
+		-- Destroy the old tools before stopping the idle. Otherwise the old tool's Equipped
+		-- handler can restart the idle a frame later.
 		inv:ClearWeapons()
 		cleanupWeaponVisuals(player)
 
@@ -1190,9 +1062,8 @@ CHANGE_WEAPON_EVENT.OnServerEvent:Connect(function(player, weaponName)
 
 		inv.IsSwapping = false
 
-		-- Deterministic post-swap reconcile: after the guard is released and one frame
-		-- has passed, force the end-state to "weaponName is the only weapon", sweeping
-		-- any stray old tool a late unequip may have dropped back in.
+		-- One frame after the guard is released, make weaponName the only weapon, in case a
+		-- late unequip put an old tool back.
 		task.wait()
 		if inv then
 			inv:ReconcileWeapons(weaponName)
@@ -1202,7 +1073,6 @@ end)
 
 MOVE_ITEM_EVENT.OnServerEvent:Connect(
 	function(player, itemId, sourceType, sourceIndex, targetType, targetIndex)
-		-- Basic type validation to prevent RemoteEvent exploit spam
 		if
 			typeof(itemId) ~= "string"
 			or typeof(sourceType) ~= "string"
@@ -1234,7 +1104,6 @@ USE_HOTBAR_EVENT.OnServerEvent:Connect(function(player, slotNumber)
 	end
 
 	if itemData.IsSpell then
-		print(player.Name .. " casted spell: " .. itemData.Name)
 		return
 	end
 
@@ -1282,7 +1151,6 @@ workspace.plrManager.alive.DescendantAdded:Connect(function(descendant)
 	end
 end)
 
--- [[ RETURN TO MENU ]] --
 RETURN_TO_MENU_EVENT.OnServerEvent:Connect(function(player)
 	local combatExpiry = player:GetAttribute("CombatLogExpiry")
 	if combatExpiry and os.clock() < combatExpiry then
@@ -1293,10 +1161,8 @@ RETURN_TO_MENU_EVENT.OnServerEvent:Connect(function(player)
 
 	local char = player.Character
 
-	-- Drop every active buff before moving them to the menu. Buffs were previously
-	-- only ever torn down by their own expiry timer, so returning to menu mid-buff
-	-- kept the damage/heal modifier AND the aura FX, and carried both into the next
-	-- run. Pass char explicitly: teardown must sweep THIS body, not a future one.
+	-- Drop every buff before the move to the menu, so no modifier or aura carries into
+	-- the next run. Pass char, so the cleanup sweeps this body.
 	BuffService.ClearAll(player, char)
 
 	if not char then

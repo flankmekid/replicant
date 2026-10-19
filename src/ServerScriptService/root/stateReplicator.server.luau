@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Sets server-side movement states (Dodging, Sliding, and the vault and wall-run
+-- locks) when the client reports them through the stateRepl remote.
 local RP = game:GetService("ReplicatedStorage")
 local stateRemote = RP.remotes.stateRepl
 local stateHandler = require(RP.modules.stateHandler)
@@ -14,7 +18,6 @@ stateRemote.OnServerEvent:Connect(function(plr, args)
 
 	if args == "Dodge" then
 		stateHandler.SetState(char, "Dodging", true, dashDuration.Value)
-		--print("Dodging?: ", stateHandler.GetState(char, "Dodging"))
 	elseif args == "SlideOn" then
 		stateHandler.SetState(char, "Sliding", true, 99999)
 	elseif args == "SlideOff" then
