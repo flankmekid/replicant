@@ -13,4 +13,5 @@ exclude = [
 	"src/StarterPlayerScripts/PlayerModule/**",
 	"src/StarterCharacterScripts/Animate/**",
 	"src/StarterCharacterScripts/LocalFootsteps/**",
+	"src/StarterCharacterScripts/RagdollClient.client.luau",
 ]

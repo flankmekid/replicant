@@ -10,3 +10,4 @@ src/ServerScriptService/modules/TableUtil.luau
 src/StarterPlayerScripts/PlayerModule/
 src/StarterCharacterScripts/Animate/
 src/StarterCharacterScripts/LocalFootsteps/
+src/StarterCharacterScripts/RagdollClient.client.luau
