@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shows the unequipped weapon on the character's back. The back model comes from
+-- ReplicatedStorage.WeldTools, by tool name, and is removed when the tool is equipped.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BackTools = ReplicatedStorage:WaitForChild("WeldTools")
 

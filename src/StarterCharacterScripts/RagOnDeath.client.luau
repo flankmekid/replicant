@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of the ragdoll: puts the local humanoid into Physics when the server
+-- ragdolls it, stands it up again afterwards, applies the death push, and reports death.
+
 local player = game.Players.LocalPlayer
 local Remote = game.ReplicatedStorage.remotes:WaitForChild("Ragdoll")
 local Char = player.Character or player.CharacterAdded:Wait()
@@ -10,13 +15,9 @@ Remote.OnClientEvent:Connect(function(duration)
 		Hum:ChangeState(Enum.HumanoidStateType.Physics)
 		Hum.AutoRotate = false
 
-		-- The server sends duration = nil for a Downed body, so no self-recovery
-		-- gets scheduled at all. The re-check inside the delay covers the other
-		-- case: a normal 2s ragdoll (Messatsu, a heavy hit) that lands first and
-		-- is then followed by a knockdown inside the window. Without it, this
-		-- timer would fire ChangeState(GettingUp) on a downed player and stand
-		-- them up. The server cannot cancel a task.delay living on the client, so
-		-- the check has to happen here, at fire time, not at schedule time.
+		-- A downed body gets no duration, so it never gets up on its own. The check in the
+		-- delay covers a short ragdoll followed by a knockdown: the server cannot cancel a
+		-- client task.delay, so the check runs when the timer fires.
 		if duration then
 			task.delay(duration, function()
 				if Char:GetAttribute("Downed") then

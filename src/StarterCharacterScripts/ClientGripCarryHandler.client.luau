@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shows grip (B) and carry (V) prompts near a downed character from
+-- ReplicatedStorage.Downed and sends the requests to the server.
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -17,7 +22,6 @@ local GripButton = Enum.KeyCode.B
 local debounce = false
 local gripDB = false
 
--- 2. CREATE THE GUI (Bottom Middle & Horizontal)
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
@@ -27,30 +31,29 @@ interactionGui.ResetOnSpawn = true
 interactionGui.Parent = playerGui
 
 local container = Instance.new("Frame")
-container.Size = UDim2.new(0, 400, 0, 50) -- Wider container to fit both texts
-container.Position = UDim2.new(0.5, 0, 0.92, 0) -- 92% down the screen
-container.AnchorPoint = Vector2.new(0.5, 1) -- Anchored at the bottom-center
+container.Size = UDim2.new(0, 400, 0, 50)
+container.Position = UDim2.new(0.5, 0, 0.92, 0)
+container.AnchorPoint = Vector2.new(0.5, 1)
 container.BackgroundTransparency = 1
 container.Parent = interactionGui
 
--- UIListLayout handles the Horizontal alignment automatically
 local listLayout = Instance.new("UIListLayout")
 listLayout.Parent = container
-listLayout.FillDirection = Enum.FillDirection.Horizontal -- Side by side
-listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center -- Center of frame
+listLayout.FillDirection = Enum.FillDirection.Horizontal
+listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 listLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-listLayout.Padding = UDim.new(0, 60) -- Space between the two texts
+listLayout.Padding = UDim.new(0, 60)
 
 local function createLabel(text)
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(0, 100, 1, 0) -- Fixed width blocks
+	label.Size = UDim2.new(0, 100, 1, 0)
 	label.BackgroundTransparency = 1
 	label.Text = text
-	label.Font = Enum.Font.RobotoMono -- Kept your font preference
-	label.TextSize = 16 -- Kept your size preference
+	label.Font = Enum.Font.RobotoMono
+	label.TextSize = 16
 	label.TextStrokeTransparency = 1
 	label.TextTransparency = 1
-	label.TextColor3 = Color3.fromRGB(150, 150, 150) -- Kept your color preference
+	label.TextColor3 = Color3.fromRGB(150, 150, 150)
 	label.Parent = container
 	return label
 end
@@ -58,7 +61,6 @@ end
 local gripLabel = createLabel("B - Grip")
 local carryLabel = createLabel("V - Carry")
 
--- 3. FADE LOGIC
 local isVisible = false
 local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
@@ -83,7 +85,7 @@ local function fadeGui(visible)
 	):Play()
 end
 
--- 4. UTILITY FUNCTIONS
+-- Returns the closest downed character within 5 studs, or nil.
 function GetClosestDowned(position)
 	local maxDistance = 5
 	local nearestDowned, nearestDistance
@@ -119,7 +121,6 @@ function GetClosestDowned(position)
 	return nearestDowned
 end
 
--- 5. ACTIONS
 local function Carry(actionName, inputState, _inputObject)
 	if Character:GetAttribute("CantAnything") then
 		return
@@ -185,9 +186,8 @@ RunService.RenderStepped:Connect(function()
 	local victim = GetClosestDowned(Head.Position)
 
 	if victim and victim ~= Character then
-		print(victim)
-		fadeGui(true) -- Show GUI
+		fadeGui(true)
 	else
-		fadeGui(false) -- Hide GUI
+		fadeGui(false)
 	end
 end)

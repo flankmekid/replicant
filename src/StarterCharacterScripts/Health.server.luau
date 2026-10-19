@@ -1,52 +1,51 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Regenerates the character's HP when it has taken no damage for WAIT_TIME seconds,
+-- scaled by the race RegenMultiplier. A downed character does not regenerate.
+
 local character = script.Parent
 local humanoid = character:WaitForChild("Humanoid")
 
--- CONFIGURATION
-local REGEN_RATE = 1 -- How much health to restore per tick
-local REGEN_FREQUENCY = 0.25 -- How often to heal (in seconds)
-local WAIT_TIME = 30 -- How long to wait after taking damage (in seconds)
+-- HP per tick.
+local REGEN_RATE = 1
+-- Seconds between ticks.
+local REGEN_FREQUENCY = 0.25
+-- Seconds without damage before regeneration starts.
+local WAIT_TIME = 30
 
-local lastDamageTime = 0 -- Timestamp of the last hit
+-- The os.time() of the last hit.
+local lastDamageTime = 0
 local currentHealth = humanoid.Health
 
--- Detect when health changes to determine if damage was taken
+-- A drop in HP counts as damage.
 humanoid.HealthChanged:Connect(function(newHealth)
-	-- If health went DOWN, it means we took damage
 	if newHealth < currentHealth then
-		lastDamageTime = os.time() -- Reset the timer
+		lastDamageTime = os.time()
 	end
 
-	-- Update our tracker so we know the new baseline
 	currentHealth = newHealth
 end)
 
--- The Loop
 while true do
 	task.wait(REGEN_FREQUENCY)
 
-	-- Check 1: Is the player alive?
 	if humanoid.Health <= 0 then
 		continue
 	end
 
-	-- Check 2: Are they missing health?
 	if humanoid.Health >= humanoid.MaxHealth then
 		continue
 	end
 
-	-- Check 3: Has it been long enough since the last hit?
 	if (os.time() - lastDamageTime) >= WAIT_TIME and not character:GetAttribute("Downed") then
-		-- [[ NEW LOGIC ]] --
-		-- Get the multiplier from the Character Attribute (defaults to 1 if missing)
 		local mult = character:GetAttribute("RegenMultiplier") or 1
 
-		-- Calculate final heal amount
 		local finalHeal = REGEN_RATE * mult
 
-		-- Heal the player
 		humanoid.Health = math.min(humanoid.Health + finalHeal, humanoid.MaxHealth)
 
-		-- Update tracker immediately so the heal doesn't confuse the damage detector logic
+		-- Update the tracked HP, so the heal does not look like damage or healing to the
+		-- damage check.
 		currentHealth = humanoid.Health
 	end
 end

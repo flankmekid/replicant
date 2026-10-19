@@ -1,3 +1,9 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The quest UI on the client: the objective marker, the tracker, the journal, the class
+-- quest banner, the completion popup, and the availability icons over quest NPCs. It
+-- reacts to the QuestUpdate remote from the server.
+
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -13,8 +19,6 @@ local SkillConfig = require(ReplicatedStorage.modules.SkillConfig)
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
-
--- ── GUI References ────────────────────────────────────────────────────────────
 
 local GUI = PlayerGui:WaitForChild("QuestGUI")
 local TrackerFrame = GUI:WaitForChild("TrackerFrame")
@@ -45,8 +49,6 @@ local ClassQuestBanner = GUI:WaitForChild("ClassQuestBanner")
 local BannerTitle = ClassQuestBanner:WaitForChild("BannerTitle")
 local BannerSub = ClassQuestBanner:WaitForChild("BannerSub")
 
--- ── Constants ─────────────────────────────────────────────────────────────────
-
 local COLOR_MAIN = Color3.fromRGB(212, 175, 55)
 local COLOR_SIDE = Color3.fromRGB(180, 180, 180)
 local COLOR_TRACKED_BG = Color3.fromRGB(50, 45, 35)
@@ -60,8 +62,6 @@ local COMPLETE_FADE = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirec
 local OFFSCREEN_POS = UDim2.new(0.5, 0, 1.3, 0)
 local ONSCREEN_POS = UDim2.new(0.5, 0, 0.82, 0)
 
--- ── State ─────────────────────────────────────────────────────────────────────
-
 local activeQuests = {}
 local trackedId = nil
 local selectedId = nil
@@ -73,10 +73,6 @@ local bannerQueue = {}
 local bannerPlaying = false
 local completeQueue = {}
 local completePlaying = false
-
--- ─────────────────────────────────────────────────────────────────────────────
--- QUEST OBJECTIVE MARKER
--- ─────────────────────────────────────────────────────────────────────────────
 
 local function destroyMarker()
 	if activeMarker then
@@ -108,10 +104,6 @@ local function createMarker(partName, questType)
 
 	activeMarker = bbGui
 end
-
--- ─────────────────────────────────────────────────────────────────────────────
--- TRACKER
--- ─────────────────────────────────────────────────────────────────────────────
 
 local function updateTracker()
 	if not trackedId or not activeQuests[trackedId] then
@@ -147,10 +139,6 @@ local function updateTracker()
 		destroyMarker()
 	end
 end
-
--- ─────────────────────────────────────────────────────────────────────────────
--- JOURNAL
--- ─────────────────────────────────────────────────────────────────────────────
 
 local function clearQuestList()
 	for _, btn in pairs(questButtons) do
@@ -272,10 +260,6 @@ local function setJournalOpen(open)
 	end
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- BANNER (class quest unlocked)
--- ─────────────────────────────────────────────────────────────────────────────
-
 local function playBanner(questId, def)
 	BannerTitle.Text = def.Title
 	BannerSub.Text = "New quest available. Check your journal."
@@ -312,10 +296,6 @@ local function queueBanner(questId, def)
 		bannerPlaying = false
 	end)
 end
-
--- ─────────────────────────────────────────────────────────────────────────────
--- COMPLETE UI
--- ─────────────────────────────────────────────────────────────────────────────
 
 local function playCompleteUI(questName, liturgyReward)
 	CompleteName.Text = questName
@@ -357,17 +337,13 @@ local function queueCompleteUI(questName, liturgyReward)
 	end)
 end
 
--- ─────────────────────────────────────────────────────────────────────────────
--- NPC AVAILABILITY ICON SYSTEM
--- ─────────────────────────────────────────────────────────────────────────────
-
 local SHOW_DIST = 100
 local HIDE_DIST = 110
 
 local QuestBillboardTemplate = ReplicatedStorage:WaitForChild("assets")
 	:WaitForChild("QuestBillboard")
 
--- npcIcons[key] = { part, billboard, shown (bool), available (bool) }
+-- Layout: npcIcons[key] = { part, billboard, shown, available }.
 local npcIcons = {}
 
 local function getPlayerHRP()
@@ -434,11 +410,9 @@ RunService.Heartbeat:Connect(function()
 		elseif dist >= HIDE_DIST then
 			setShown(key, false)
 		end
-		-- 100–110 stud band: hysteresis, keep current state
+		-- Between 100 and 110 studs, keep the current state (hysteresis).
 	end
 end)
-
--- ── Availability logic ────────────────────────────────────────────────────────
 
 local function getQuestState(questId)
 	local ok, result = pcall(function()
@@ -473,8 +447,6 @@ local function trainerHasSomething(weaponKey, skillWeaponKey)
 
 	return false
 end
-
--- ── NPC definitions ───────────────────────────────────────────────────────────
 
 local NPC_DEFS = {
 	{
@@ -627,10 +599,6 @@ task.spawn(function()
 	end
 end)
 
--- ─────────────────────────────────────────────────────────────────────────────
--- BUTTON CONNECTIONS
--- ─────────────────────────────────────────────────────────────────────────────
-
 TrackToggleBtn.MouseButton1Click:Connect(function()
 	if not selectedId then
 		return
@@ -690,7 +658,7 @@ local CloseTitlePanelBindable =
 	game:GetService("ReplicatedStorage"):WaitForChild("remotes"):WaitForChild("CloseTitlePanel")
 JournalCloseBtn.MouseButton1Click:Connect(function()
 	setJournalOpen(false)
-	-- also close the Titles panel (it no longer has its own X)
+	-- Also close the Titles panel, which has no close button of its own.
 	CloseTitlePanelBindable:Fire()
 end)
 
@@ -703,7 +671,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- LiturgyDisplay button also opens journal
+-- The Liturgy display button also opens the journal.
 task.spawn(function()
 	local masteryGui = PlayerGui:WaitForChild("LiturgyDisplay", 20)
 	if masteryGui then
@@ -716,10 +684,6 @@ task.spawn(function()
 	end
 end)
 
--- ─────────────────────────────────────────────────────────────────────────────
--- REMOTE HANDLER
--- ─────────────────────────────────────────────────────────────────────────────
-
 QuestUpdateRemote.OnClientEvent:Connect(function(action, payload)
 	if action == "New" then
 		if not payload then
@@ -729,7 +693,7 @@ QuestUpdateRemote.OnClientEvent:Connect(function(action, payload)
 		if journalOpen then
 			rebuildQuestList()
 		end
-		-- Immediately hide NPC icon for this quest giver
+		-- Hide the quest giver's icon at once.
 		reEvalAll()
 	elseif action == "Tracked" then
 		if payload then
@@ -794,7 +758,7 @@ QuestUpdateRemote.OnClientEvent:Connect(function(action, payload)
 
 		queueCompleteUI(questName, liturgyReward)
 
-		-- Re-eval after brief wait so repeatable quests can become available again
+		-- Check again after a short wait, so a repeatable quest can become available again.
 		task.delay(0.5, reEvalAll)
 	elseif action == "ListUpdate" then
 		if not payload then
@@ -815,14 +779,10 @@ QuestUpdateRemote.OnClientEvent:Connect(function(action, payload)
 		queueBanner(payload.Id, payload.Data)
 	elseif action == "InsufficientFunds" then
 		if payload then
-			warn("Not enough Liturgy. Required: " .. tostring(payload.Required))
+			warn(`[QuestClient] Not enough Liturgy: {payload.Required} needed.`)
 		end
 	end
 end)
-
--- ─────────────────────────────────────────────────────────────────────────────
--- INIT
--- ─────────────────────────────────────────────────────────────────────────────
 
 TrackerFrame.Visible = false
 JournalFrame.Visible = false
@@ -834,7 +794,7 @@ CompleteFrame.Visible = false
 local QuestReadyRemote = ReplicatedStorage:WaitForChild("QuestSystem"):WaitForChild("QuestReady")
 QuestReadyRemote:FireServer()
 
--- Register NPC icons after a brief wait for world + data to load
+-- Register the NPC icons after a short wait, so the world and the data can load.
 task.spawn(function()
 	task.wait(1.5)
 	for _, def in ipairs(NPC_DEFS) do

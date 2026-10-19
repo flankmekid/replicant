@@ -349,3 +349,29 @@ and an attribute on the character.
 their move but still takes damage. After a stun ends, `DashLocked` is set for 0.15 s,
 because the Dash LocalScript buffers a Q press and would otherwise slip out of a true
 combo in the gap before the next hitbox.
+
+## Lock-on
+
+The lock-on (G) is client-side: it turns the character to face the target and moves
+the camera over the shoulder. It publishes the target as the `LockTarget` attribute,
+so the server-side lunge can follow it. The server checks range and validity again,
+so a forged attribute gains nothing.
+
+The update loop writes the character's root CFrame every frame. That write must never
+fight another system that owns the root, so the lock stops or pauses when
+`stateHandler.IsRootOwned` is true:
+
+- Downed, carried, being executed, or welded by a Messatsu grab: the lock ends. With a
+  Messatsu weld, both clients writing CFrame on two rigidly joined bodies breaks the
+  physics solver with NaN, and a NaN camera made the world disappear.
+- A plain knockdown ragdoll: the lock stays and the camera keeps the target in frame,
+  but the loop stops turning the root until the ragdoll ends.
+
+Standing on top of the target makes the horizontal direction zero, and `.Unit` of a
+zero vector is NaN. Below `MinFlatDistance` the loop keeps the last good frame, and
+it checks every camera vector for NaN before it writes. A NaN camera cannot be
+recovered without a respawn.
+
+Every check reads attributes, not `stateHandler.GetState`, because server states never
+reach the client's state table. Reading `GetState` here is why players could once lock
+onto downed players.

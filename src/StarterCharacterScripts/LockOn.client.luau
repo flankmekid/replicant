@@ -1,4 +1,8 @@
--- LOCAL SCRIPT (inside StarterPlayerScripts)
+-- SPDX-License-Identifier: MIT
+--
+-- The lock-on (G): locks onto the closest visible target, switches left or right with
+-- strafe + G, turns the character to face the target, and moves the camera over the
+-- shoulder. Holding G unlocks. The design is in docs/combat-design.md.
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -9,41 +13,32 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local camera = Workspace.CurrentCamera
 
--- Ensure you still have the RemoteEvent from the previous step
 local toggleShiftLockEvent = ReplicatedStorage.remotes:WaitForChild("ToggleShiftLock")
 local StateHandler = require(ReplicatedStorage.modules.stateHandler)
 
--- CONFIGURATION
 local CONFIG = {
-	Keybind = Enum.KeyCode.G, -- The Master Key
+	Keybind = Enum.KeyCode.G,
 	MaxDistance = 100,
 	TargetFolder = Workspace:WaitForChild("plrManager"):WaitForChild("alive"),
 
-	-- Camera "Feel" Settings
-	CameraSmoothness = 0.15, -- 0.05 is very slow/heavy, 0.3 is snappy
-	LockOnOffset = Vector3.new(0, 1, 0), -- Aim at chest/head
+	CameraSmoothness = 0.15, -- 0.05 is slow and heavy, 0.3 is snappy.
+	LockOnOffset = Vector3.new(0, 1, 0), -- Aim at the chest.
 
-	-- Over-the-Shoulder Position relative to Player
-	-- X = Right, Y = Up, Z = Back
+	-- The camera position relative to the player: X is right, Y is up, Z is back.
 	ShoulderOffset = Vector3.new(-5, 8, 7),
 
-	-- Input Settings
-	HoldToUnlockTime = 0.35, -- How long to hold G to force unlock
+	HoldToUnlockTime = 0.35, -- Seconds to hold G to unlock.
 
-	-- Below this flat XZ separation the look/offset vectors go degenerate. See
-	-- the RenderStepped comment. Standing on top of the target used to produce a
-	-- zero-magnitude vector, .Unit on it returns NaN, and NaN in camera.CFrame is
-	-- what made the camera spin and the world vanish.
+	-- Below this horizontal distance the look vectors are degenerate, and .Unit
+	-- returns NaN, which breaks the camera.
 	MinFlatDistance = 2.5,
 }
 
--- STATE VARIABLES
 local isLockedOn = false
 local currentTarget = nil
 local keyPressTime = 0
 local isHoldingKey = false
 
--- VISUALS
 local reticleGui = Instance.new("BillboardGui")
 reticleGui.Name = "LockOnReticle"
 reticleGui.Size = UDim2.new(0, 40, 0, 40)
@@ -54,26 +49,15 @@ local reticleImage = Instance.new("ImageLabel")
 reticleImage.Parent = reticleGui
 reticleImage.BackgroundTransparency = 1
 reticleImage.Size = UDim2.new(1, 0, 1, 0)
-reticleImage.Image = "rbxassetid://12389946814" -- Circle
-reticleImage.ImageColor3 = Color3.fromRGB(255, 50, 50) -- Red
+reticleImage.Image = "rbxassetid://12389946814"
+reticleImage.ImageColor3 = Color3.fromRGB(255, 50, 50)
 
 reticleGui.Parent = player:WaitForChild("PlayerGui")
 
---------------------------------------------------------------------------------
--- STATE GATES
---------------------------------------------------------------------------------
+-- These checks read attributes, not StateHandler.GetState, because server states never
+-- reach the client's state table.
 
--- IMPORTANT: read ATTRIBUTES, not StateHandler.GetState().
---
--- stateHandler keeps its state in a plain Lua table local to whichever VM
--- required the module. The server's table and this client's table are separate
--- objects. A state the server sets (Downed, Carried, BeingExecuted) never lands
--- in the client's table, so GetState() from here returns nil for every one of
--- them. The old code called GetState(enemy, "Downed") and it silently did
--- nothing, which is why you could lock onto downed players. SetAttribute DOES
--- replicate, so attributes are the only read that works across the boundary.
-
--- Can the local player hold a lock at all right now?
+-- Returns whether the local player may hold a lock right now.
 local function canSelfLock()
 	local char = player.Character
 	if not char then
@@ -85,21 +69,13 @@ local function canSelfLock()
 		return false
 	end
 
-	-- A downed player locks onto nothing.
 	if char:GetAttribute("Downed") then
 		return false
 	end
 
-	-- Anything that means another system owns our HumanoidRootPart: the carry
-	-- AlignPosition/AlignOrientation, the execution anchor, the Messatsu weld.
-	-- IsRootOwned is attribute-based and also sniffs for a weld binding our root,
-	-- so it catches the grab.
-	--
-	-- A plain knockdown ragdoll is DELIBERATELY excluded (ignoreRagdoll = true).
-	-- Getting knocked down no longer drops the lock. The lock survives the flop and
-	-- the RenderStepped loop below just stops writing myRoot.CFrame while Ragdolled
-	-- is set, so we still never become a second author on the part. Downed, carry,
-	-- execution and the grab all still kill the lock.
+	-- No lock while another system owns our root (carry, execution, Messatsu weld). A
+	-- plain knockdown ragdoll is ignored: the lock survives it, and the update loop
+	-- only stops writing the root CFrame while ragdolled.
 	if StateHandler.IsRootOwned(char, true) then
 		return false
 	end
@@ -107,7 +83,7 @@ local function canSelfLock()
 	return true
 end
 
--- Is this character a legal thing to lock ONTO?
+-- Returns whether a character can be locked onto.
 local function isValidTarget(enemy)
 	if not enemy or not enemy.Parent then
 		return false
@@ -121,7 +97,6 @@ local function isValidTarget(enemy)
 		return false
 	end
 
-	-- No locking onto someone who is down, being carried, or being executed.
 	if enemy:GetAttribute("Downed") then
 		return false
 	end
@@ -147,10 +122,6 @@ local function isFiniteVector(v)
 		and v.Z ~= -math.huge
 end
 
---------------------------------------------------------------------------------
--- TARGETING FUNCTIONS
---------------------------------------------------------------------------------
-
 local function getAllValidTargets()
 	local targets = {}
 	local character = player.Character
@@ -167,7 +138,7 @@ local function getAllValidTargets()
 			local root = enemy.HumanoidRootPart
 			local dist = (myRoot.Position - root.Position).Magnitude
 			if dist < CONFIG.MaxDistance then
-				-- Raycast for visibility
+				-- Only visible targets count, or targets closer than 10 studs.
 				local origin = camera.CFrame.Position
 				local dir = (root.Position - origin)
 				local params = RaycastParams.new()
@@ -205,8 +176,8 @@ local function getClosestTarget()
 	return closest
 end
 
--- DIRECTIONAL SWITCHING LOGIC
--- Direction: -1 for Left, 1 for Right
+-- Returns the nearest target on the given side of the current one on screen
+-- (-1 is left, 1 is right).
 local function getDirectionalTarget(direction)
 	if not currentTarget then
 		return getClosestTarget()
@@ -214,36 +185,32 @@ local function getDirectionalTarget(direction)
 
 	local targets = getAllValidTargets()
 	local bestCandidate = nil
-	local bestAngle = math.huge -- We want the smallest angle difference
+	local bestAngle = math.huge
 
 	local camCFrame = camera.CFrame
 	local currentTargetPos = currentTarget.HumanoidRootPart.Position
 
-	-- We want to compare other enemies relative to the CURRENT target on screen
 	for _, t in pairs(targets) do
 		if t ~= currentTarget then
 			local tPos = t.HumanoidRootPart.Position
 
 			local delta = tPos - currentTargetPos
 			if delta.Magnitude > 0.01 then
-				-- Vector from current target to candidate target
 				local dirToCandidate = delta.Unit
 
-				-- Convert this vector to Camera Space (Right/Left)
-				-- Dot product with Camera's Right Vector tells us if it's right (+) or left (-)
+				-- Its dot product with the camera's right vector is positive on the right.
 				local rightDot = camCFrame.RightVector:Dot(dirToCandidate)
 
-				-- Check if the candidate is on the requested side
 				local isOnCorrectSide = false
 				if direction > 0 and rightDot > 0 then
 					isOnCorrectSide = true
-				end -- Want Right, is Right
+				end
 				if direction < 0 and rightDot < 0 then
 					isOnCorrectSide = true
-				end -- Want Left, is Left
+				end
 
 				if isOnCorrectSide then
-					-- Calculate distance between targets to prioritize closer ones in that direction
+					-- Prefer the closest target on that side.
 					local distBetweenTargets = delta.Magnitude
 
 					if distBetweenTargets < bestAngle then
@@ -257,10 +224,6 @@ local function getDirectionalTarget(direction)
 
 	return bestCandidate
 end
-
---------------------------------------------------------------------------------
--- STATE MANAGEMENT
---------------------------------------------------------------------------------
 
 local function lockCamera(target)
 	if not target then
@@ -279,13 +242,8 @@ local function lockCamera(target)
 	reticleGui.Enabled = true
 	toggleShiftLockEvent:FireServer(false)
 
-	-- Publish the lock so the SERVER can see it. The lock used to live entirely on
-	-- this client (camera math only), so server-side combat had no idea who you were
-	-- aimed at. The running-attack lunge needs it.
-	--
-	-- This is an ObjectValue-style attribute, so it replicates. It is a HINT, not a
-	-- grant: the server re-validates range and legality before it will lunge at
-	-- anything, so a forged attribute buys an exploiter nothing.
+	-- Publish the lock target for the server's running-attack lunge. The server checks
+	-- range and validity again, so a forged attribute gains nothing.
 	local char = player.Character
 	if char then
 		char:SetAttribute("LockTarget", target.Name)
@@ -308,39 +266,27 @@ local function unlockCamera()
 		myChar:SetAttribute("LockTarget", nil)
 	end
 
-	-- Do NOT hand AutoRotate back to a character something else is driving. A
-	-- downed / carried / ragdolled body wants AutoRotate false; the downed system
-	-- will restore it on revive. Setting it true here would let a ragdoll spin.
+	-- Leave AutoRotate alone while another system owns the root. The downed system
+	-- restores it on revive, and setting it here would let a ragdoll spin.
 	local char = player.Character
 	if char and char:FindFirstChild("Humanoid") and not StateHandler.IsRootOwned(char) then
 		char.Humanoid.AutoRotate = true
 	end
 end
 
---------------------------------------------------------------------------------
--- UPDATE LOOP (CAMERA MATH)
---------------------------------------------------------------------------------
-
 RunService.RenderStepped:Connect(function()
 	if not isLockedOn or not currentTarget then
 		return
 	end
 
-	-- 0. Are WE still allowed to be locked on?
-	-- This gate is the whole fix for the downed / carried / grabbed spinning. The
-	-- loop below writes myRoot.CFrame every single frame. While we are ragdolled,
-	-- carried (AlignPosition + AlignOrientation own the root), being executed
-	-- (anchored), or welded to someone by Messatsu, that write fights whatever
-	-- else owns the part, at 60Hz. In the Messatsu case both players are welded
-	-- rigid AND both clients are writing CFrame, which detonates the solver and
-	-- throws positions to NaN. That is why the environment "disappeared": the
-	-- camera CFrame went non-finite, not a rendering bug.
+	-- The loop writes the root CFrame every frame. While another system owns the root,
+	-- that write would fight it, and with a Messatsu weld both clients writing CFrame
+	-- breaks the solver with NaN.
 	if not canSelfLock() then
 		unlockCamera()
 		return
 	end
 
-	-- 1. Target still valid? (dead, downed, carried, executed, despawned)
 	if not isValidTarget(currentTarget) then
 		unlockCamera()
 		return
@@ -363,58 +309,37 @@ RunService.RenderStepped:Connect(function()
 		return
 	end
 
-	-- 2. DEGENERATE GEOMETRY GUARD.
-	-- Every vector below is derived from the flat XZ separation between us and
-	-- the target. Stand directly on top of them and that separation goes to zero.
-	-- Vector3.zero.Unit is NaN, and CFrame.lookAt with a zero look direction is
-	-- undefined. Both used to be fed straight into myRoot.CFrame and camera.CFrame.
-	-- When we are too close, hold the last good frame instead of computing garbage.
+	-- Too close to the target: the horizontal direction would be NaN, so keep the last
+	-- good frame.
 	local flat = Vector3.new(toTarget.X, 0, toTarget.Z)
 	if flat.Magnitude < CONFIG.MinFlatDistance then
 		return
 	end
 
-	-- 3. Character Movement (Strafe Face)
-	-- Skipped entirely while ANOTHER system owns the root (ragdoll, carry, execution,
-	-- Messatsu grab). canSelfLock now lets a ragdolled player KEEP the lock, so this
-	-- check is the only thing left standing between the ragdoll physics and our
-	-- per-frame CFrame write. Note it is the strict IsRootOwned (no ignoreRagdoll).
-	-- The camera block below still runs, so a knocked-down player keeps the enemy
-	-- framed while they flop, and the strafe-face resumes the moment they get up.
+	-- Turn the character to face the target, unless another system owns the root. This
+	-- is the strict check, without ignoreRagdoll, so a ragdoll is never driven. The
+	-- camera still follows the target during a knockdown.
 	local hum = myChar:FindFirstChild("Humanoid")
 	if hum and not StateHandler.IsRootOwned(myChar) then
 		hum.AutoRotate = false
-		-- Face the enemy flat on Y axis
 		local lookPos = Vector3.new(targetRoot.Position.X, myRoot.Position.Y, targetRoot.Position.Z)
 		local goalRot = CFrame.lookAt(myRoot.Position, lookPos)
-		-- Smooth character rotation
 		myRoot.CFrame = myRoot.CFrame:Lerp(goalRot, 0.2)
 	end
 
-	-- 4. Camera Math (Smooth Over-The-Shoulder)
-
-	-- Step A: Determine desired Camera Position
-	-- We want the camera behind the player, but offset to the right
-	-- We calculate "Behind" based on the direction from Enemy to Player.
-	-- flat is guaranteed non-degenerate by the guard above.
+	-- Put the camera behind the player, away from the target, at ShoulderOffset.
 	local flatDir = -flat.Unit
 
-	-- Calculate Right Vector relative to that direction
 	local rightVec = flatDir:Cross(Vector3.new(0, 1, 0))
 
-	-- Assemble the target Position
-	-- Position = PlayerPos + (Back * Z_Offset) + (Right * X_Offset) + (Up * Y_Offset)
 	local camGoalPos = myRoot.Position
 		+ (flatDir * CONFIG.ShoulderOffset.Z)
 		+ (rightVec * CONFIG.ShoulderOffset.X)
 		+ (Vector3.new(0, 1, 0) * CONFIG.ShoulderOffset.Y)
 
-	-- Step B: Determine Look Position
 	local lookAtPos = targetRoot.Position + CONFIG.LockOnOffset
 
-	-- Step C: guard again before building the CFrame. Cheap insurance: if
-	-- anything upstream produced a non-finite number, bail rather than write NaN
-	-- into the camera, which is unrecoverable without a respawn.
+	-- A NaN in camera.CFrame cannot be recovered without a respawn, so check again.
 	if not isFiniteVector(camGoalPos) or not isFiniteVector(lookAtPos) then
 		return
 	end
@@ -424,22 +349,14 @@ RunService.RenderStepped:Connect(function()
 
 	local goalCFrame = CFrame.lookAt(camGoalPos, lookAtPos)
 
-	-- Step D: Smoothly Interpolate (Lerp)
-	-- This fixes the "Stiff" feeling. It blends current CFrame to Goal CFrame.
 	local blended = camera.CFrame:Lerp(goalCFrame, CONFIG.CameraSmoothness)
 	if isFiniteVector(blended.Position) then
 		camera.CFrame = blended
 	end
 end)
 
---------------------------------------------------------------------------------
--- REACTIVE UNLOCK
---------------------------------------------------------------------------------
-
--- Drop the lock the instant the server downs / grabs / carries us, rather than
--- waiting for the next RenderStepped tick to notice.
--- "Ragdolled" is intentionally NOT in this list. A knockdown keeps the lock. The
--- RenderStepped loop just stops driving the root until the ragdoll ends.
+-- Drop the lock the moment the server downs, grabs, or carries us. Ragdolled is not in
+-- the list: a knockdown keeps the lock.
 local function hookCharacter(char)
 	for _, key in ipairs({ "Downed", "Carried", "BeingExecuted", "Executing", "Carrying" }) do
 		char:GetAttributeChangedSignal(key):Connect(function()
@@ -461,20 +378,15 @@ player.CharacterAdded:Connect(function(char)
 	hookCharacter(char)
 end)
 
---------------------------------------------------------------------------------
--- INPUT HANDLING (CONTEXT SENSITIVE)
---------------------------------------------------------------------------------
-
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then
 		return
 	end
 
 	if input.KeyCode == CONFIG.Keybind then
-		keyPressTime = tick() -- Record when we pressed G
+		keyPressTime = tick()
 		isHoldingKey = true
 
-		-- A downed / carried / grabbed player cannot acquire a lock at all.
 		if not canSelfLock() then
 			if isLockedOn then
 				unlockCamera()
@@ -482,40 +394,33 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 			return
 		end
 
-		-- Determine intent based on Movement
 		if not isLockedOn then
-			-- Scenario 1: Not locked -> Lock onto closest
 			local target = getClosestTarget()
 			if target then
 				lockCamera(target)
 			end
 		else
-			-- Scenario 2: Already Locked. Check movement for switching.
+			-- Already locked: strafing left or right with G switches the target.
 			local moveDir = Vector3.new(0, 0, 0)
 			if player.Character and player.Character:FindFirstChild("Humanoid") then
 				moveDir = player.Character.Humanoid.MoveDirection
 			end
 
-			-- Convert MoveDirection to Camera Space to know if it's Left or Right
 			local relativeMove = camera.CFrame:VectorToObjectSpace(moveDir)
 
-			-- relativeMove.X > 0 is Right, < 0 is Left
-			-- Threshold of 0.5 ensures deliberate movement
+			-- X above 0.5 is a deliberate move right, below -0.5 left.
 			if relativeMove.X < -0.5 then
-				-- Holding Left -> Switch Left
-				local newTarget = getDirectionalTarget(-1) -- -1 = Left
+				local newTarget = getDirectionalTarget(-1)
 				if newTarget then
 					lockCamera(newTarget)
 				end
 			elseif relativeMove.X > 0.5 then
-				-- Holding Right -> Switch Right
-				local newTarget = getDirectionalTarget(1) -- 1 = Right
+				local newTarget = getDirectionalTarget(1)
 				if newTarget then
 					lockCamera(newTarget)
 				end
 			else
-				-- Standing Still (or moving forward/back only)
-				-- We wait for InputEnded to decide if this is a Tap (Unlock) or Hold (Unlock)
+				-- Not strafing: InputEnded decides whether this unlocks.
 			end
 		end
 	end
@@ -526,21 +431,13 @@ UserInputService.InputEnded:Connect(function(input)
 		isHoldingKey = false
 		local duration = tick() - keyPressTime
 
-		-- If we are locked on, and we just tapped G without moving sideways (handled in InputBegan),
-		-- OR if we held it down for a long time: Unlock.
+		-- Holding G for HoldToUnlockTime unlocks.
 		if isLockedOn then
-			-- We check Humanoid again to ensure we weren't trying to switch targets
 			local moveDir = Vector3.new(0, 0, 0)
 			if player.Character and player.Character:FindFirstChild("Humanoid") then
 				moveDir = player.Character.Humanoid.MoveDirection
 			end
 			local relativeMove = camera.CFrame:VectorToObjectSpace(moveDir)
-
-			-- Only unlock if we aren't strafing hard (which means we tried to switch targets)
-			-- OR if we held the button down for safety
-			--if (math.abs(relativeMove.X) < 0.5) or (duration > CONFIG.HoldToUnlockTime) then
-			--	unlockCamera()
-			--end
 
 			if duration > CONFIG.HoldToUnlockTime then
 				unlockCamera()
