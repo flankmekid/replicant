@@ -1,6 +1,7 @@
--- Dragon Slayer server M1 (thin). Twin of Deathbringer: same monastic-stance buff
--- and inverted GS swing dispatch, but its groundSlam reference is correct (fires),
--- and its damage calls use the 6-arg form. Shared flow comes from CombatCore.
+-- SPDX-License-Identifier: MIT
+--
+-- Dragon Slayer M1. Adds the greatsword swing FX, the ground slam on the running
+-- attack, and the weapon buff (through BuffService) to CombatCore.RunM1.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -9,7 +10,6 @@ local CombatCore = require(SSS.root.serverFramework.Combat._Shared.CombatCore)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 local damageCalculator = require(SSS.modules.damageCalculator)
 
--- Buff (Berserker Armor) centralized in BuffService (activated from SkillHandler).
 local BuffService = require(SSS.modules.BuffService)
 
 local function groundSlam(tool)
@@ -25,6 +25,8 @@ local function groundSlam(tool)
 	game.Debris:AddItem(slam, 2)
 end
 
+-- Greatswords play SlashRight on odd combo hits, the opposite of the comboMap
+-- convention, and a down slash on the running attack and the air attack.
 local function swingDispatch(char, combo)
 	local E = CombatCore.EmitSlash
 	if combo == 1 or combo == 3 or combo == 5 then
@@ -48,6 +50,11 @@ local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	BuffService.ApplyDamage(plr, char, targetChar, dmg, extraDmg, "Weapon")
 end
 
+-- M1.ServerCheck() - run the Dragon Slayer M1
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	CombatCore.RunM1(plr, WeaponConfig["Dragon Slayer"].server.m1, {
 		swingDispatch = swingDispatch,
