@@ -3,6 +3,7 @@
 -- Runs the server side of the M1, M2, and E attacks and resolves their hits. Weapon
 -- modules call RunM1, RunM2, or RunE with their WeaponConfig entry. Every hit goes
 -- through resolveHit, which handles dodge, clash, parry, block, guard break, and damage.
+-- The design reasons for the timing values are in docs/combat-design.md.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
