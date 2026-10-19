@@ -86,7 +86,6 @@ local LAUNCH_WINDOW = WeaponConfig.Uppercut.HangWindow
 
 local comboResetTime = 5
 local comboResetTasks = {}
-local playerM1Debounces = {}
 local playerM2Debounces = {}
 -- The attack in flight for each character. The clash check reads the other fighter's
 -- token from here.
@@ -860,7 +859,7 @@ function module.RunM1(plr, cfg, opts)
 		Debug = false,
 		DebounceTime = 0.5,
 	}
-	local Hitbox, connected = HitboxClass.new(hitboxParams)
+	local Hitbox = HitboxClass.new(hitboxParams)
 	Hitbox:WeldTo(humrp, cfg.hitboxOffset)
 	Hitbox:Start()
 
@@ -1357,7 +1356,6 @@ function module.RunE(plr, cfg, opts)
 end
 
 Players.PlayerRemoving:Connect(function(plr)
-	playerM1Debounces[plr] = nil
 	playerM2Debounces[plr] = nil
 	if comboResetTasks[plr] then
 		task.cancel(comboResetTasks[plr])

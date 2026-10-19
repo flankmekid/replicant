@@ -7,7 +7,6 @@ local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
-local Players = game:GetService("Players")
 
 local TweenService = game:GetService("TweenService")
 
@@ -120,7 +119,5 @@ module.Deactivated = function(plr)
 		vfx:Destroy()
 	end
 end
-
-Players.PlayerRemoving:Connect(function(plr) end)
 
 return module

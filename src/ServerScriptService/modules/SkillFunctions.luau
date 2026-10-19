@@ -1048,7 +1048,6 @@ function module.MantraPalm(player)
 		Debug = false,
 	} :: hitboxTypes.HitboxParams
 
-	local mana = player:FindFirstChild("PlayerStats"):FindFirstChild("Mana")
 	local Hitbox, connected = hitboxClass.new(hitboxParams)
 	local HRP = player.Character.HumanoidRootPart
 	local Glow1 = game.ReplicatedStorage.Magic.MonkGlow.Glow:Clone()
@@ -1541,7 +1540,6 @@ function module.Gohadoken(player)
 		Debug = false,
 	} :: hitboxTypes.HitboxParams
 
-	local mana = player:FindFirstChild("PlayerStats"):FindFirstChild("Mana")
 	local Hitbox, connected = hitboxClass.new(hitboxParams)
 	local HRP = player.Character.HumanoidRootPart
 	local Glow1 = game.ReplicatedStorage.Magic.PurpleGlow.Glow:Clone()
