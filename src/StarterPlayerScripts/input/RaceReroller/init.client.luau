@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- The race spin menu: rolls a race on the server, plays the spin animation, and shows
+-- the rolled race in a rotatable viewport with its rarity, description, and stats.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -9,46 +14,40 @@ local RaceConfig = require(ReplicatedStorage.modules:WaitForChild("RaceConfig"))
 
 local player = Players.LocalPlayer
 local PlayerGui = player:WaitForChild("PlayerGui")
-local RaceUI = PlayerGui:WaitForChild("MainMenu") -- Adjusted to your UI structure
+local RaceUI = PlayerGui:WaitForChild("MainMenu")
 local MainFrame = RaceUI:WaitForChild("MainFrame"):WaitForChild("Popups"):WaitForChild("Races")
 
--- [[ FRAME REFERENCES ]] --
 local LeftFrame = MainFrame:WaitForChild("LeftFrame")
 local MidFrame = MainFrame:WaitForChild("MiddleFrame")
 local RightFrame = MainFrame:WaitForChild("RightFrame")
 
--- Rolling Refs
 local RollButton = MidFrame:WaitForChild("RollButton")
 local RollingFrame = MidFrame:WaitForChild("RollingFrame")
--- If you have a counter, reference it here. Example:
--- local RollCounter = MidFrame:WaitForChild("RollCounter")
 
 local Labels = {
-	RollingFrame:WaitForChild("Label1"), -- Top
-	RollingFrame:WaitForChild("Label2"), -- Middle
-	RollingFrame:WaitForChild("Label3"), -- Bottom
+	RollingFrame:WaitForChild("Label1"), -- Top.
+	RollingFrame:WaitForChild("Label2"), -- Middle.
+	RollingFrame:WaitForChild("Label3"), -- Bottom.
 }
 
--- Viewport Refs
 local Viewport = LeftFrame:WaitForChild("Viewport")
 local WorldModel = Viewport:WaitForChild("WorldModel")
 local RaceNameLbl = LeftFrame:WaitForChild("RaceName")
 local RarityLbl = LeftFrame:WaitForChild("Rarity")
 local DescLbl = LeftFrame:WaitForChild("Description")
 
--- Stats Refs
 local StatsList = RightFrame:WaitForChild("StatsList")
 
--- [[ CONFIG ]] --
 local SPEED = 700
 local TOTAL_ROLLS = 40
 local LABEL_HEIGHT = Labels[1].Size.Y.Offset
+-- The label may have no pixel height yet, so fall back to a third of the frame.
 if LABEL_HEIGHT == 0 then
 	LABEL_HEIGHT = RollingFrame.AbsoluteSize.Y / 3
-end -- Failsafe
+end
 local Debounce = false
 
--- [[ STAT NAMES MAPPING ]] --
+-- Display names of the race stats.
 local StatNames = {
 	HPBoost = "Health Boost",
 	ManaBoost = "Max Mana Boost",
@@ -63,7 +62,6 @@ local StatNames = {
 	ManaWhenHit = "Regenerate Mana When Hit",
 }
 
--- [[ HELPER: COLOR LOOKUP ]] --
 local function GetRaceColor(raceName)
 	local raceData = RaceConfig.Races[raceName]
 	if not raceData then
@@ -77,7 +75,6 @@ local function GetRaceColor(raceName)
 	return Color3.fromRGB(255, 255, 255)
 end
 
--- [[ VIEWPORT LOGIC ]] --
 local viewportCam = Instance.new("Camera")
 Viewport.CurrentCamera = viewportCam
 viewportCam.Parent = Viewport
@@ -86,8 +83,8 @@ local currentRotation = 0
 local isDragging = false
 local lastMouseX = 0
 
+-- Shows a copy of the character in the viewport with the visuals of the race.
 local function UpdateViewport(character, raceName)
-	-- [[ 1. RESET ROTATION ]] --
 	currentRotation = 180
 
 	WorldModel:ClearAllChildren()
@@ -95,7 +92,6 @@ local function UpdateViewport(character, raceName)
 	local clone = character:Clone()
 	clone.Parent = WorldModel
 
-	-- [[ 2. CLEANUP CLONE ]] --
 	for _, v in pairs(clone:GetDescendants()) do
 		if
 			v:IsA("Script")
@@ -108,13 +104,13 @@ local function UpdateViewport(character, raceName)
 		end
 	end
 
-	-- [[ 3. FORCE APPLY VISUALS ]] --
+	-- Apply the race skin and hair colors to the copy, because the character may still
+	-- show the old race.
 	if raceName then
 		local data = RaceConfig.Races[raceName]
 		if data and data.Visuals then
 			local visuals = data.Visuals
 
-			-- [[ A. FORCE SKIN COLOR ]] --
 			if visuals.SkinColor then
 				for _, part in ipairs(clone:GetChildren()) do
 					if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
@@ -123,7 +119,6 @@ local function UpdateViewport(character, raceName)
 				end
 			end
 
-			-- [[ B. FORCE HAIR COLOR ]] --
 			if visuals.HairColor then
 				for _, acc in ipairs(clone:GetChildren()) do
 					if acc:IsA("Accessory") and acc.AccessoryType == Enum.AccessoryType.Hair then
@@ -144,7 +139,6 @@ local function UpdateViewport(character, raceName)
 		end
 	end
 
-	-- [[ 4. CAMERA SETUP ]] --
 	local root = clone:WaitForChild("HumanoidRootPart")
 	root.Anchored = true
 	root.CFrame = CFrame.new(Vector3.new(0, 0, 0))
@@ -152,7 +146,7 @@ local function UpdateViewport(character, raceName)
 	local cameraDist = 6
 	viewportCam.CFrame = CFrame.new(Vector3.new(0, 1, cameraDist), root.Position)
 
-	-- [[ 5. ROTATION BIND ]] --
+	-- Dragging rotates the copy.
 	RunService:UnbindFromRenderStep("RaceViewportRot")
 	RunService:BindToRenderStep("RaceViewportRot", Enum.RenderPriority.Camera.Value, function()
 		if clone and clone.Parent then
@@ -182,27 +176,23 @@ UserInputService.InputChanged:Connect(function(input)
 	end
 end)
 
--- [[ UI UPDATE LOGIC ]] --
 local function UpdateUI(raceName)
 	local data = RaceConfig.Races[raceName]
 	if not data then
 		return
 	end
 
-	-- Left Frame
 	RaceNameLbl.Text = raceName
 	RaceNameLbl.TextColor3 = GetRaceColor(raceName)
 	RarityLbl.Text = data.Rarity
 	RarityLbl.TextColor3 = GetRaceColor(raceName)
 	DescLbl.Text = data.Description or "No description."
 
-	-- Right Frame (Stats)
 	StatsList:ClearAllChildren()
 	local uiLayout = Instance.new("UIListLayout")
 	uiLayout.Padding = UDim.new(0, 5)
 	uiLayout.Parent = StatsList
 
-	-- List Number/Value Stats
 	for statKey, val in pairs(data.Stats) do
 		local displayVal = val
 		local displayName = StatNames[statKey] or statKey
@@ -219,7 +209,6 @@ local function UpdateUI(raceName)
 		lbl.Font = Enum.Font.RobotoMono
 		lbl.TextSize = 20
 
-		-- Custom formatting
 		if
 			type(val) == "number"
 			and (string.find(statKey, "Boost") or string.find(statKey, "Multiplier"))
@@ -240,8 +229,7 @@ local function UpdateUI(raceName)
 	end
 end
 
--- [[ ROLL ANIMATION ]] --
--- [[ GENERATE RACE LIST AUTOMATICALLY ]] --
+-- Every race name, for the spin.
 local r2 = {}
 for raceName, _ in pairs(RaceConfig.Races) do
 	table.insert(r2, raceName)
@@ -251,7 +239,7 @@ local function AnimateRoll(finalRace)
 	local counter = 0
 	local offset = 0
 
-	-- Hide outer labels for clean look during spin
+	-- Hide the outer labels during the spin.
 	Labels[1].TextTransparency = 1
 	Labels[3].TextTransparency = 1
 	Labels[2].TextTransparency = 0
@@ -270,12 +258,12 @@ local function AnimateRoll(finalRace)
 
 		offset += move
 
-		-- UI List Layout handles position, so we just logic-swap when offset hits threshold
+		-- The UIListLayout positions the labels, so only swap the names when the offset passes
+		-- a label height.
 		if offset >= LABEL_HEIGHT then
 			offset = 0
 			counter += 1
 
-			-- Shift visual logic
 			Labels[3].Text = Labels[2].Text
 			Labels[3].TextColor3 = Labels[2].TextColor3
 
@@ -295,7 +283,6 @@ local function AnimateRoll(finalRace)
 		if counter >= TOTAL_ROLLS + 2 then
 			conn:Disconnect()
 
-			-- Final State
 			Labels[1].TextTransparency = 1
 			Labels[3].TextTransparency = 1
 			Labels[2].Text = finalRace
@@ -309,24 +296,22 @@ local function AnimateRoll(finalRace)
 
 			UpdateUI(finalRace)
 
-			UpdateViewport(player.Character, finalRace) -- Sync the 3D model
+			UpdateViewport(player.Character, finalRace)
 
 			Debounce = false
 		end
 	end)
 end
 
--- [[ INITIALIZATION ]] --
 local function Init()
 	task.wait(1)
 	local pStats = player:WaitForChild("PlayerStats")
 	local currentRace = pStats:WaitForChild("Race").Value
 
-	-- Setup Initial Text
 	Labels[2].Text = currentRace
 	Labels[2].TextColor3 = GetRaceColor(currentRace)
 
-	-- Random fillers for hidden labels
+	-- Fill the hidden labels with random races.
 	Labels[1].Text = r2[math.random(1, #r2)]
 	Labels[1].TextColor3 = GetRaceColor(Labels[1].Text)
 	Labels[3].Text = r2[math.random(1, #r2)]
@@ -350,7 +335,6 @@ RollButton.MouseButton1Click:Connect(function()
 
 	local result = RollRaceFunction:InvokeServer()
 	if result == "NoSpins" then
-		print("Buy more spins!")
 		Debounce = false
 	else
 		AnimateRoll(result)
@@ -360,9 +344,9 @@ RollButton.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Update viewport when character respawns (after race change applied)
+-- After a respawn, show the new race once the appearance has loaded.
 player.CharacterAdded:Connect(function(char)
-	task.delay(1.5, function() -- Wait for appearance load
+	task.delay(1.5, function()
 		UpdateViewport(char, player:WaitForChild("PlayerStats"):WaitForChild("Race").Value)
 	end)
 end)
