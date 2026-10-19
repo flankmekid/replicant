@@ -1,13 +1,17 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Fades a soft light on the character's head in at night and out in the day.
+
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
--- Configuration
-local START_TIME = 17.9 -- Approx 5:54 PM
-local END_TIME = 6.3 -- Approx 6:18 AM
-local MAX_BRIGHTNESS = 1 -- How bright the light gets
-local FADE_DURATION = 3 -- How many seconds the fade takes
+-- The night window in ClockTime hours: from about 17:54 to about 06:18.
+local START_TIME = 17.9
+local END_TIME = 6.3
+local MAX_BRIGHTNESS = 1
+-- The fade length in seconds.
+local FADE_DURATION = 3
 
--- Setup Character and Light
 local character = script.Parent
 local head = character:WaitForChild("Head")
 
@@ -16,25 +20,24 @@ light.Name = "AutoFadeLight"
 light.Range = 18
 light.Color = Color3.fromRGB(205, 201, 255)
 light.Shadows = false
-light.Brightness = 0 -- Start at 0 so it can fade in if needed
+-- Start dark, so the light can fade in.
+light.Brightness = 0
 light.Parent = head
 
--- State tracking to prevent spamming animations
+-- Tween only when the state changes.
 local isLightOn = false
 
 local function updateLight()
 	local currentTime = Lighting.ClockTime
 
-	-- Determine if it should be night (Logic handles the midnight wrap-around)
+	-- The night window wraps past midnight.
 	local shouldBeOn = (currentTime >= START_TIME or currentTime <= END_TIME)
 
-	-- Only run the tween if the state has actually changed
 	if shouldBeOn ~= isLightOn then
 		isLightOn = shouldBeOn
 
 		local targetBrightness = shouldBeOn and MAX_BRIGHTNESS or 0
 
-		-- Create and play the animation
 		local tweenInfo =
 			TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
 		local tween = TweenService:Create(light, tweenInfo, { Brightness = targetBrightness })
@@ -42,8 +45,6 @@ local function updateLight()
 	end
 end
 
--- Run once immediately to set initial state
 updateLight()
 
--- Check continuously as time changes
 Lighting:GetPropertyChangedSignal("ClockTime"):Connect(updateLight)
