@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Client side of equipping the weapon. Tells the server so it can toggle the Equip
+-- state.
 local module = {}
 
 local Players = game:GetService("Players")
@@ -18,13 +22,15 @@ local function getEquippedTool()
 
 	local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
-	-- Crucial: Check if the tool is actually equipped (not just in Backpack/StarterGear)
 	if tool and tool.Parent == currentCharacter then
 		return tool.Name
 	end
 	return nil
 end
 
+-- Equip.Equip() - report an equip or unequip to the server
+--
+-- Return: nothing.
 function module.Equip()
 	ServerRemote:FireServer({
 		Type = "Combat",
