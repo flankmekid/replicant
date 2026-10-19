@@ -1,6 +1,12 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Every quest, keyed by quest ID: its text, type, progress goal, rewards, marker part,
+-- chain, and the class quest milestones.
+
 local QuestConfig = {}
 
--- Define Quests here. The Key is the QuestID.
+-- QuestConfig.Quests holds every quest, keyed by quest ID. TargetPartName is the name
+-- of the Workspace part that the quest marker points at.
 QuestConfig.Quests = {
 	["ArcQuest1"] = {
 		Title = "Onto Thronvast.",
@@ -8,7 +14,7 @@ QuestConfig.Quests = {
 		Type = "Main",
 		MaxProgress = 1,
 		LiturgyReward = 500,
-		TargetPartName = "ArcTutorialPart", -- Set to "CorruptedSamurai" if you have a marker part for them
+		TargetPartName = "ArcTutorialPart",
 		Repeatable = false,
 		NextQuest = nil,
 	},
@@ -18,7 +24,7 @@ QuestConfig.Quests = {
 		Type = "Side",
 		MaxProgress = 5,
 		LiturgyReward = 1000,
-		TargetPartName = "CorruptedSamurai", -- Set to "CorruptedSamurai" if you have a marker part for them
+		TargetPartName = "CorruptedSamurai",
 		Repeatable = true,
 		NextQuest = nil,
 	},
@@ -28,9 +34,9 @@ QuestConfig.Quests = {
 		Type = "Side",
 		MaxProgress = 5,
 		LiturgyReward = 1250,
-		TargetPartName = "FortDuskMarker", -- Ensure you have a part named this in Workspace for the marker
+		TargetPartName = "FortDuskMarker",
 		NextQuest = nil,
-		Repeatable = true, -- Set to false if you want it to be a one-time story quest
+		Repeatable = true,
 	},
 	["Delivery1"] = {
 		Title = "Aldric's Run",
@@ -99,7 +105,7 @@ QuestConfig.Quests = {
 		},
 	},
 
-	-- ── SWORD CLASS QUESTS ────────────────────────────────────────────────────
+	-- Sword class quests.
 
 	["ClassQuest_Sword_10"] = {
 		Title = "The Path of the Sword",
@@ -158,7 +164,7 @@ QuestConfig.Quests = {
 		Milestone = 25,
 	},
 
-	-- ── KATANA CLASS QUESTS ───────────────────────────────────────────────────
+	-- Katana class quests.
 
 	["ClassQuest_Katana_10"] = {
 		Title = "The Path of the Katana",
@@ -217,7 +223,7 @@ QuestConfig.Quests = {
 		Milestone = 25,
 	},
 
-	-- ── DAGGER CLASS QUESTS ───────────────────────────────────────────────────
+	-- Dagger class quests.
 
 	["ClassQuest_Dagger_10"] = {
 		Title = "The Path of the Dagger",
@@ -276,7 +282,7 @@ QuestConfig.Quests = {
 		Milestone = 25,
 	},
 
-	-- ── GREATSWORD CLASS QUESTS ───────────────────────────────────────────────
+	-- Greatsword class quests.
 
 	["ClassQuest_Greatsword_10"] = {
 		Title = "The Path of the Greatsword",
@@ -335,7 +341,7 @@ QuestConfig.Quests = {
 		Milestone = 25,
 	},
 
-	-- ── FISTS CLASS QUESTS ────────────────────────────────────────────────────
+	-- Fists class quests.
 
 	["ClassQuest_Fists_10"] = {
 		Title = "The Path of the Ascetic",
