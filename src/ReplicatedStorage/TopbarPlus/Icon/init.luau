@@ -1,9 +1,9 @@
 --!nonstrict
 --[[
-	
+
 	The majority of this code is an interface designed to make it easy for you to
 	work with TopbarPlus (most methods for instance reference :modifyTheme()).
-	The processing overhead mainly consists of applying themes and calculating 
+	The processing overhead mainly consists of applying themes and calculating
 	appearance (such as size and width of labels) which is handled in about
 	200 lines of code here and the Widget UI module. This has been achieved
 	in v3 by outsourcing a majority of previous calculations to inbuilt Roblox
@@ -17,14 +17,14 @@
 
 
 	My primary goals for the v3 re-write have been to:
-		
+
 	1. Improve code readability and organisation (reduced lines of code within
 	   Icon+IconController from 3200 to ~950, separated UI elements, etc)
-		
+
 	2. Improve ease-of-use (themes now actually make sense and can account
 	   for any modifications you want, converted to a package for
 	   quick installation and easy-comparisons of new updates, etc)
-	
+
 	3. Provide support for all key features of the new Roblox topbar
 	   while improving performance of the module (deferring and collecting
 	   changes then calling as a singular, utilizing inbuilt Roblox features
@@ -257,7 +257,7 @@ function Icon.new()
 	local widget = janitor:add(require(elements.Widget)(self, Icon))
 	self.widget = widget
 	self:setAlignment()
-	
+
 	-- It's important we set an order otherwise icons will not align
 	-- correctly within menus
 	totalCreatedIcons += 1
@@ -426,7 +426,7 @@ function Icon.new()
 			end
 		end
 	end)
-	
+
 	-- This closes/reopens the chat or playerlist if the icon is a dropdown
 	-- In the future I'd prefer to use the position+size of the chat
 	-- to determine whether to close dropdown (instead of non-right-set)
@@ -458,7 +458,7 @@ function Icon.new()
 			StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.PlayerList, true)
 		end
 	end)
-	
+
 	-- There's a rare occassion where the appearance is not
 	-- fully set to deselected so this ensures the icons
 	-- appearance is fully as it should be
@@ -468,7 +468,7 @@ function Icon.new()
 			self:refresh()
 		end
 	end)
-	
+
 	-- Call icon added
 	Icon.iconAdded:Fire(self)
 
@@ -731,17 +731,17 @@ Icon.disableStateOverlay = Icon.disableOverlay
 
 function Icon:setImage(imageId, iconState)
 	self:modifyTheme({"IconImage", "Image", imageId, iconState})
-	
+
 	-- This code ensures icon images are preloaded if they haven't been fetched yet
 	task.spawn(function()
 		local newIdContent = if tonumber(imageId) then `rbxassetid://{imageId}` else imageId
 		local initialAssetFetchStatus = ContentProvider:GetAssetFetchStatus(newIdContent)
-	
+
 		if initialAssetFetchStatus ~= Enum.AssetFetchStatus.Success then
 			pcall(ContentProvider.PreloadAsync, ContentProvider, { newIdContent })
 		end
 	end)
-		
+
 	return self
 end
 
@@ -1104,7 +1104,7 @@ end
 
 function Icon:convertLabelToNumberSpinner(numberSpinner, callback)
 	task.defer(function()
-		
+
 		local label = self:getInstance("IconLabel")
 		label.Transparency = 1
 		numberSpinner.Parent = label.Parent
@@ -1150,7 +1150,7 @@ function Icon:convertLabelToNumberSpinner(numberSpinner, callback)
 			end
 			return TotalSize, numOfDigits
 		end
-		
+
 		local function getLabelParentContainerXSize()
 			local firstParent = label.Parent
 			local nextParent = firstParent and firstParent.Parent
@@ -1220,11 +1220,11 @@ function Icon:convertLabelToNumberSpinner(numberSpinner, callback)
 		numberSpinner.Duration = 0.25
 		numberSpinner.Value = 10
 		task.wait(0.2)
-		
+
 		if typeof(callback) == "function" then
 			callback()
 		end
-		
+
 	end)
 	return self
 end

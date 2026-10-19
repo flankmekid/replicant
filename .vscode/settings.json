@@ -4,6 +4,16 @@
 	"luau-lsp.sourcemap.autogenerate": true,
 	"luau-lsp.sourcemap.rojoProjectFile": "default.project.json",
 	"luau-lsp.plugin.enabled": true,
+	"luau-lsp.ignoreGlobs": [
+		"**/TopbarPlus/**",
+		"**/SmartBone/**",
+		"**/CameraShaker/**",
+		"**/hitboxClass/**",
+		"**/PlayerModule/**",
+		"**/ProfileStore.luau",
+		"**/Promise.luau",
+		"**/ContextActionUtility.luau"
+	],
 	"stylua.searchBinaryInPATH": true,
 	"[luau]": {
 		"editor.defaultFormatter": "JohnnyMorganz.stylua",
