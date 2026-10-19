@@ -2,6 +2,7 @@
 --
 -- Default server E (dash attack) for weapons without their own E module. Looks up the
 -- equipped weapon in WeaponConfig and runs CombatCore.RunE.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

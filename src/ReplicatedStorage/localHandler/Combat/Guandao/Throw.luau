@@ -2,6 +2,7 @@
 --
 -- Client side of the weapon throw: sends the request, plays the grab animation at once,
 -- and plays the hit or whiff effects that the server replicates.
+
 local module = {}
 
 local Players = game:GetService("Players")

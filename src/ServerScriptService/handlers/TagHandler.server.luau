@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Typing "mb" in chat removes every combat tag the player handed out.
+
 local Players = game:GetService("Players")
 
 local CombatManager = require(game.ServerScriptService.modules.combatTagManager)

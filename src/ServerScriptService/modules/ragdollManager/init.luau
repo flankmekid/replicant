@@ -2,6 +2,7 @@
 --
 -- The server entry point for ragdolls. NPCs are ragdolled here, and players are told
 -- to ragdoll on their own client through the Ragdoll remote.
+
 local Manager = {}
 local M = require(script.RagdollModule)
 -- ragdollManager.Ragdoll() - ragdoll a character

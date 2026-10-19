@@ -2,6 +2,7 @@
 --
 -- Tanto M1. Sends hits through BuffService, so the Mystic Eyes buff applies, and
 -- otherwise runs CombatCore.RunM1.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

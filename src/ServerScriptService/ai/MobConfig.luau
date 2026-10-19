@@ -2,6 +2,7 @@
 --
 -- Stats, animations, and behavior settings for every mob and boss, keyed by the model
 -- name in ServerStorage.Mobs.
+
 local MobConfig = {}
 
 MobConfig.Mobs = {

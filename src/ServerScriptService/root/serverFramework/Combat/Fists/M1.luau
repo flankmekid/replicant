@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Fists M1. Runs CombatCore.RunM1 with the Fists config and no extra hooks.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

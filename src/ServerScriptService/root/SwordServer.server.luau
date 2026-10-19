@@ -2,6 +2,7 @@
 --
 -- Creates the ToolGrip Motor6Ds in both arms and connects them to the weapon parts
 -- that the client names through the ConnectM6D remotes.
+
 game.Players.PlayerAdded:Connect(function(plr)
 	plr.CharacterAdded:Connect(function(char)
 		local M6D = Instance.new("Motor6D")

@@ -3,6 +3,7 @@
 -- The only place that decides what happens when a hit lands on a blocking target:
 -- the facing check, the guard bar, chip damage, and frame advantage. The rules are in
 -- docs/combat-design.md.
+
 local RP = game:GetService("ReplicatedStorage")
 local SSS = game:GetService("ServerScriptService")
 

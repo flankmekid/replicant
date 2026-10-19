@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Turns Shift Lock on or off for a player when the lock-on asks for it.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local toggleEvent = ReplicatedStorage.remotes:WaitForChild("ToggleShiftLock")
 

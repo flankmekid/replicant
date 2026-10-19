@@ -2,6 +2,7 @@
 --
 -- Tells a player's client to show race-specific low-health messages while their HP is
 -- below the race threshold, and to stop when it rises above it.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 

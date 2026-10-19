@@ -2,6 +2,7 @@
 --
 -- Owns the combat tag of each player: who attacked them, when the tag expires, and the
 -- CombatLogExpiry attribute and HUD state that other scripts read.
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")

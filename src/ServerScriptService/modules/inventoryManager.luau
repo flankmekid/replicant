@@ -3,6 +3,7 @@
 -- Owns each player's inventory: the item grid, the 9-slot hotbar, and the equipment
 -- slots. It keeps the saved data, the physical tools, and the 3D equipment visuals in
 -- step, and sends the client UI every change.
+
 local InventoryManager = {}
 InventoryManager.__index = InventoryManager
 

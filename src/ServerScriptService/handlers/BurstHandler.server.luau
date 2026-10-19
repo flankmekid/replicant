@@ -3,6 +3,7 @@
 -- Checks the mana cost and cooldown of Burst (T) on the server, then runs
 -- SkillFunctions.Burst. Burst has its own handler instead of SkillHandler, because it
 -- must work while stunned. The reasons are in docs/combat-design.md.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 local Players = game:GetService("Players")

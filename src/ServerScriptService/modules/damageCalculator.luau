@@ -3,6 +3,7 @@
 -- Applies damage from every source: combat tags, stat scaling, the downed check, hit
 -- FX, damage numbers, the hit animation, and the default hitstun. The damage formula is
 -- in docs/combat-design.md.
+
 local module = {}
 
 local Players = game:GetService("Players")

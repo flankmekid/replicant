@@ -2,6 +2,7 @@
 --
 -- Shackles M2. A fist heavy attack with its own hit resolution instead of
 -- CombatCore.RunM2. In the air it is a faster kick for half damage.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

@@ -3,6 +3,7 @@
 -- Client side of the Shackles M2: checks the state, plays the ground or air
 -- animation and the air dash at once, and plays the effects that the server
 -- replicates.
+
 local module = {}
 
 local Players = game:GetService("Players")

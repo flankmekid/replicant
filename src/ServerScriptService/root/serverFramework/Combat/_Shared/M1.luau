@@ -2,6 +2,7 @@
 --
 -- Default server M1 for weapons without their own M1 module. Looks up the equipped
 -- weapon in WeaponConfig and runs CombatCore.RunM1.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

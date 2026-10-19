@@ -2,6 +2,7 @@
 --
 -- Replaces the body parts of every player's avatar with the default R6 parts, so all
 -- characters share one body shape.
+
 local Appearanceconnections = {}
 
 function overWriteCharacter(chr)

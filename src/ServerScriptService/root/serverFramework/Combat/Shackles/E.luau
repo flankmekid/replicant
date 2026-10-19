@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Shackles E. Adds mana on hit and half weapon XP to CombatCore.RunE.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

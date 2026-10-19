@@ -2,6 +2,7 @@
 --
 -- Caestus E. Adds fist particle FX on the left leg, mana on hit, and half weapon XP to
 -- CombatCore.RunE.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

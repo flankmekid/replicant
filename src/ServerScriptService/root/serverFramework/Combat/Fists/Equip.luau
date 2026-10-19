@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Server side of equipping and unequipping the weapon. Toggles the Equip state.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

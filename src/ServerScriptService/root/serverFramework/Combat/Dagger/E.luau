@@ -1,6 +1,7 @@
 -- SPDX-License-Identifier: MIT
 --
 -- Dagger E. A quick slash with its own hit resolution instead of CombatCore.RunE.
+
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")

@@ -2,6 +2,7 @@
 --
 -- Lets a player drop Liturgy in front of them as a pickup. The server checks the
 -- amount and the balance, because the client can send anything.
+
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 

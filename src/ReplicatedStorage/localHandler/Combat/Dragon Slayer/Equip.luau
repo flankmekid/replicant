@@ -2,6 +2,7 @@
 --
 -- Client side of equipping the weapon. Tells the server so it can toggle the Equip
 -- state.
+
 local module = {}
 
 local Players = game:GetService("Players")
