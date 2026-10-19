@@ -1,5 +1,6 @@
--- Shackles server M1 (thin). Live fist particle FX (per-combo body part) via the
--- onWindupStart hook; slashes come from the generic path (corrected comboMap). No buff.
+-- SPDX-License-Identifier: MIT
+--
+-- Shackles M1. Adds fist particle FX on each combo hit to CombatCore.RunM1.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -8,6 +9,8 @@ local CombatCore = require(SSS.root.serverFramework.Combat._Shared.CombatCore)
 local WeaponConfig = require(RP.modules.WeaponConfig)
 
 local WINDUP = WeaponConfig.Shackles.server.m1.windup
+-- The limb that glows for each move pattern: combo hits 1 to 5, then the running
+-- attack (6), the air attack (7), and the uppercut (8).
 local FX_PARTS = {
 	"Right Arm",
 	"Left Arm",
@@ -43,6 +46,11 @@ local function onWindupStart(char, movePattern)
 	end
 end
 
+-- M1.ServerCheck() - run the Shackles M1
+-- @plr: the player who pressed M1
+-- @data: the client payload. data.SubType is the movement state.
+--
+-- Return: nothing.
 function module.ServerCheck(plr, data)
 	CombatCore.RunM1(plr, WeaponConfig.Shackles.server.m1, {
 		onWindupStart = onWindupStart,

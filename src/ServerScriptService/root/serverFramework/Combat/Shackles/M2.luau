@@ -1,3 +1,7 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shackles M2. A fist heavy attack with its own hit resolution instead of
+-- CombatCore.RunM2. In the air it is a faster kick for half damage.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -26,13 +30,12 @@ local hitboxParams = {
 
 local DataManager = require(game.ServerScriptService.modules.dataManager)
 
--- M2 Specific Settings
 local dmg = 12
 local GUARD_BREAK = true
 local WINDUP_DELAY = 0.9
 local AERIAL_WINDUP = 0.4
-local HITBOX_DURATION = 0.2 -- How long the hitbox is active
-local POST_ATTACK_COOLDOWN = 3 -- The long cooldown after the attack finishes
+local HITBOX_DURATION = 0.2
+local POST_ATTACK_COOLDOWN = 3
 
 local v = {}
 
@@ -60,10 +63,14 @@ local function leftSwing(char)
 	game.Debris:AddItem(attachment, 2)
 end
 
-local playerM2Debounces = {} -- PER-PLAYER DEBOUNCE FIX (Critical)
+local playerM2Debounces = {}
 
 local aerial = false
 
+-- M2.ServerCheck() - run the Shackles M2
+-- @plr: the player who pressed M2
+--
+-- Return: nothing. Yields for the windup.
 function module.ServerCheck(plr)
 	local function getEquippedTool()
 		local currentCharacter = plr.Character
@@ -73,7 +80,6 @@ function module.ServerCheck(plr)
 
 		local tool = currentCharacter:FindFirstChildOfClass("Tool")
 
-		-- Crucial: Check if the tool is actually equipped (not just in Backpack/StarterGear)
 		if tool and tool.Parent == currentCharacter then
 			return tool.Name
 		end
@@ -155,23 +161,17 @@ function module.ServerCheck(plr)
 		end
 	end
 
-	-- SET DEBOUNCE AND STATE IMMEDIATELY.
-	-- The up-front CantAnything is the OLD long lock (windup + hitbox + 0.5). It gets
-	-- torn down and re-applied once the hitbox resolves, so the endlag depends on
-	-- whether the swing landed, exactly like the standard M2 in CombatCore. Shackles
-	-- is a standalone M2 that never routes through CombatCore, so the same fix has to
-	-- be duplicated here by hand.
+	-- Shackles does not use CombatCore, so it repeats the M2 endlag rule: the long lock
+	-- set here is replaced by a short endlag on a hit or a long one on a whiff.
 	local M2_ENDLAG_HIT = 0.1
-	local M2_ENDLAG_WHIFF = 0.65 -- +0.2, matches CombatCore's standard M2 whiff recovery
+	local M2_ENDLAG_WHIFF = 0.65
 	local didHit = false
 
 	StateHandler.SetState(char, "CantAnything", true, WINDUP_DELAY + HITBOX_DURATION + 0.5)
-	playerM2Debounces[plr] = true -- Start the per-player debounce
+	playerM2Debounces[plr] = true
 
-	-- HYPERARMOR: Shackles M2 is a guardbreak, so it is armored. Set the attribute
-	-- (SetStun no-ops on us for the window) and skip the interrupt cancel entirely so
-	-- the swing rides through a hit. Cleared on a fixed timer past the commit window so
-	-- every early-return path is covered without threading a flag through each.
+	-- Every Shackles M2 is a guard break and has armor. A timer clears the attribute, so
+	-- every early return is covered.
 	local hyperArmored = GUARD_BREAK and true or false
 	if hyperArmored then
 		char:SetAttribute("HyperArmor", true)
@@ -182,9 +182,8 @@ function module.ServerCheck(plr)
 		end)
 	end
 
-	-- Reactive interrupt: on stun/down during windup, cancel the dash mover
-	-- (sweep self-applied BodyVelocity on our HRP) and stop the swing animation.
-	-- Armored swings skip this so the interrupt can't cancel them.
+	-- A stun or a down during the windup removes the dash mover and stops the animation.
+	-- Armored swings ignore it.
 	local stopWatch = StateHandler.WatchInterrupt(char, 3, function()
 		if hyperArmored then
 			return
@@ -200,7 +199,6 @@ function module.ServerCheck(plr)
 		AnimationHandler.StopAnim(char, "ALL")
 	end)
 
-	-- FX handling
 	local NewShield2 = danger:Clone()
 	game.Debris:AddItem(NewShield2, 1)
 	local WeldCon = Instance.new("WeldConstraint", NewShield2)
@@ -208,7 +206,7 @@ function module.ServerCheck(plr)
 	v[plr] = NewShield2
 	local parrysfx = Instance.new("Sound")
 	parrysfx.Parent = char.Torso
-	parrysfx.SoundId = "rbxassetid://7100154577" --5763723309
+	parrysfx.SoundId = "rbxassetid://7100154577"
 	parrysfx.Volume = 0.5
 	parrysfx.RollOffMaxDistance = 60
 	parrysfx.RollOffMinDistance = 10
@@ -225,8 +223,7 @@ function module.ServerCheck(plr)
 	parrysfx:Play()
 	if not aerial then
 		task.delay(0.75, function()
-			-- Shackles M2 does not route through CombatCore, so it never read the
-			-- shared M2 value and still does not. Its own DashConfig entry.
+			-- Shackles has its own DashConfig entry, because it does not use CombatCore.
 			local m2Speed, m2Life = DashConfig.Get("ShacklesM2")
 			if m2Speed then
 				local BV = Instance.new("BodyVelocity", char.HumanoidRootPart)
@@ -241,8 +238,6 @@ function module.ServerCheck(plr)
 	end
 
 	Helper.SetSpeed(char, 4, 16)
-
-	-- Windup logic and speed reset
 
 	task.delay(1, function()
 		parrysfx:Destroy()
@@ -259,7 +254,7 @@ function module.ServerCheck(plr)
 		task.delay(0.2, function()
 			ReplicateRemote:FireAllClients({
 				Type = "Combat",
-				Action = "M2", -- FIXED
+				Action = "M2",
 				Func = "PunchSound",
 				FolderName = getEquippedTool(),
 			}, char)
@@ -274,15 +269,14 @@ function module.ServerCheck(plr)
 		task.delay(0.75, function()
 			ReplicateRemote:FireAllClients({
 				Type = "Combat",
-				Action = "M2", -- FIXED
+				Action = "M2",
 				Func = "PunchSound",
 				FolderName = getEquippedTool(),
 			}, char)
 		end)
-		task.wait(WINDUP_DELAY) -- Wait for the windup to complete
+		task.wait(WINDUP_DELAY)
 
-		-- INTERRUPT CHECK: stunned/downed during windup -> abort before the hitbox.
-		-- Armored (guardbreak) swings ignore this: they commit through a hit.
+		-- A stun or a down during the windup cancels the attack. Armored swings ignore it.
 		if not hyperArmored and StateHandler.IsInterrupted(char) then
 			stopWatch()
 			playerM2Debounces[plr] = nil
@@ -295,7 +289,7 @@ function module.ServerCheck(plr)
 			return
 		end
 
-		-- swing committed: stop watching so a later unrelated stun can't fire the watcher
+		-- The swing is committed, so a later stun must not trigger the watcher.
 		stopWatch()
 		leftSwing(char)
 	end
@@ -306,7 +300,6 @@ function module.ServerCheck(plr)
 	Hitbox:WeldTo(humrp, CFrame.new(1, -1, -3))
 	Hitbox:Start()
 
-	-- Set M2 state for the duration of the active hitbox
 	StateHandler.SetState(char, "M2", true, HITBOX_DURATION)
 
 	local alreadyHit = {}
@@ -324,7 +317,6 @@ function module.ServerCheck(plr)
 
 			local isPlayer = Players:GetPlayerFromCharacter(targetChar)
 
-			-- CHECK: Not self, Not already hit in this instance, Has Humanoid
 			if humanoid and (not isPlayer or isPlayer ~= plr) and not alreadyHit[targetChar] then
 				local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
 				local attackerHRP = char:FindFirstChild("HumanoidRootPart")
@@ -337,8 +329,6 @@ function module.ServerCheck(plr)
 				end
 
 				if StateHandler.GetState(targetChar, "Dodging") then
-					print("iframed lawl :p")
-
 					local _tp = game.Players:GetPlayerFromCharacter(targetChar)
 					local targetPlrData = _tp and _tp.PlayerStats
 					if
@@ -391,9 +381,8 @@ function module.ServerCheck(plr)
 
 					local dmgModule = require(game.ServerScriptService.modules.damageCalculator)
 					dmgModule.CalculateDamage(char, targetChar, dmg, extraDmg, false, "Weapon")
-					didHit = true -- landed: earns the shorter endlag below
+					didHit = true
 
-					--targetChar:FindFirstChild("Humanoid"):TakeDamage(dmg + extraDmg)
 					if targetChar.Humanoid.Health > 0 and targetChar.Humanoid.MaxHealth < 10000 then
 						DataManager.AddWeaponXP(
 							game.Players:GetPlayerFromCharacter(char),
@@ -427,7 +416,7 @@ function module.ServerCheck(plr)
 						Type = "Combat",
 						Action = "M2",
 						Func = "Parry",
-						FolderName = getEquippedTool(), -- FIXED Action to M2
+						FolderName = getEquippedTool(),
 					}, char, targetChar)
 
 					local parryE =
@@ -484,7 +473,7 @@ function module.ServerCheck(plr)
 				then
 					Hitbox:Destroy()
 				elseif StateHandler.GetState(targetChar, "Blocking") then
-					-- Route through BlockResolver (single chokepoint + guard bar).
+					-- BlockResolver applies the guard bar and returns the verdict.
 					local BlockResolver = require(game.ServerScriptService.modules.BlockResolver)
 					local verdict = BlockResolver.Resolve({
 						attacker = char,
@@ -560,12 +549,11 @@ function module.ServerCheck(plr)
 						game.Debris:AddItem(effect2, 0.7)
 					end
 				else
-					-- Normal Hit
 					ReplicateRemote:FireAllClients({
 						Type = "Combat",
 						Action = "M2",
 						Func = "Hit",
-						FolderName = getEquippedTool(), -- FIXED Action to M2
+						FolderName = getEquippedTool(),
 					}, char, targetChar)
 					doAttack(0, 15)
 				end
@@ -573,14 +561,12 @@ function module.ServerCheck(plr)
 		end
 	end)
 
-	task.delay(HITBOX_DURATION, function() -- Hitbox ends after its duration
+	task.delay(HITBOX_DURATION, function()
 		Hitbox:Destroy()
 		aerial = false
 
-		-- Release the long lock and re-apply only the endlag we want. On hit you get a
-		-- short recovery and can cancel Shackles M2 into M1 / E / a skill / a dash; on
-		-- whiff it stays punishing. The M2 cooldown (POST_ATTACK_COOLDOWN) is untouched,
-		-- so you still cannot chain M2 into M2.
+		-- On a hit the player can cancel into M1, E, a skill, or a dash. The M2 cooldown
+		-- still blocks M2 into M2.
 		local endlag = didHit and M2_ENDLAG_HIT or M2_ENDLAG_WHIFF
 		StateHandler.RemoveStates(char, "CantAnything")
 		if endlag > 0 then
@@ -588,13 +574,11 @@ function module.ServerCheck(plr)
 		end
 	end)
 
-	-- POST ATTACK COOLDOWN
 	task.delay(POST_ATTACK_COOLDOWN, function()
-		playerM2Debounces[plr] = nil -- Clear per-player debounce after cooldown
+		playerM2Debounces[plr] = nil
 	end)
 end
 
--- Cleanup when player leaves
 Players.PlayerRemoving:Connect(function(plr)
 	playerM2Debounces[plr] = nil
 end)

@@ -1,5 +1,6 @@
--- Shackles server E (thin). Mana gain on hit and half XP (no live FX). Dash flow
--- and resolution come from CombatCore.RunE.
+-- SPDX-License-Identifier: MIT
+--
+-- Shackles E. Adds mana on hit and half weapon XP to CombatCore.RunE.
 local module = {}
 
 local RP = game:GetService("ReplicatedStorage")
@@ -16,6 +17,10 @@ local function onDamage(plr, char, targetChar, dmg, extraDmg)
 	end
 end
 
+-- E.ServerCheck() - run the Shackles E
+-- @plr: the player who pressed E
+--
+-- Return: nothing.
 function module.ServerCheck(plr)
 	CombatCore.RunE(plr, WeaponConfig.Shackles.server.e, {
 		onDamage = onDamage,
