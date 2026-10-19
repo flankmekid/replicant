@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Routes every client action from the server remote to a handler module. The payload names
+-- the module by Type, folder, and Action, and the handler function by Func.
+
 local RP = game:GetService("ReplicatedStorage")
 local ServerRemote = RP.remotes.server
 local Players = game:GetService("Players")
@@ -20,7 +25,7 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	if actionType == "Combat" then
 		local combatTypeName = data.CombatType
 		if not combatTypeName then
-			warn(`[Server] Combat action received without CombatType.`)
+			warn(`[serverFramework] Combat action from {plr.Name} has no CombatType.`)
 			return
 		end
 		folderName = combatTypeName
@@ -28,7 +33,7 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 		local char = plr.Character
 
 		if not char then
-			warn(`[Server] Player character not found.`)
+			warn(`[serverFramework] Character of {plr.Name} not found.`)
 
 			return
 		end
@@ -36,7 +41,7 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 		local stringValueName = typeToStringValue[actionType]
 		local folderNameValue = plr:FindFirstChild(stringValueName)
 		if not folderNameValue then
-			warn(`[Server] Missing StringValue for {actionType}.`)
+			warn(`[serverFramework] {plr.Name} has no StringValue for {actionType}.`)
 			return
 		end
 		folderName = folderNameValue.Value
@@ -45,7 +50,7 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	local actionFolder = root:FindFirstChild(folderName)
 	local module = actionFolder and actionFolder:FindFirstChild(moduleName)
 
-	-- Combat fallback: weapons without a per-weapon override route to Combat._Shared
+	-- Most weapons have no module of their own for an action and use the shared one.
 	if (not module or not module:IsA("ModuleScript")) and actionType == "Combat" then
 		local sharedFolder = root:FindFirstChild("_Shared")
 		local sharedModule = sharedFolder and sharedFolder:FindFirstChild(moduleName)
@@ -56,7 +61,7 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	end
 
 	if not module or not module:IsA("ModuleScript") then
-		warn(`[Server] Module {actionType}/{folderName}/{moduleName} not found.`)
+		warn(`[serverFramework] No module {actionType}/{folderName}/{moduleName} ({plr.Name}).`)
 		return
 	end
 
@@ -69,14 +74,11 @@ ServerRemote.OnServerEvent:Connect(function(plr, data, ...)
 	local moduleTable = loadedModules[plr][actionType][folderName][moduleName]
 
 	if typeof(moduleTable[funcName]) == "function" then
-		-- Pass the payload table (data) as arg 2. The client fires a single table, so
-		-- the trailing ... is always empty; handlers that ignore data are unaffected,
-		-- and the ones that need the client's movement state (M1 ServerCheck reads
-		-- data.SubType) can get at it. This is the honest channel for Running/Sliding,
-		-- which as client-set attributes never replicate up to the server.
+		-- Handlers get the payload because it is the only way the server learns the client's
+		-- movement state. Running and Sliding are client-set attributes and do not replicate.
 		moduleTable[funcName](plr, data, ...)
 	else
-		warn(`Function "{funcName}" not found in module "{moduleName}"`)
+		warn(`[serverFramework] Function {moduleName}.{funcName} not found ({plr.Name}).`)
 	end
 end)
 
