@@ -15,6 +15,7 @@ local AnimationHandler = require(modules:WaitForChild("animationHandler"))
 local RagdollManager = require(SSSmodules:WaitForChild("ragdollManager"))
 local VFX = require(game.ServerScriptService.modules.VFXModule)
 local dmgCalculator = require(game.ServerScriptService.modules.damageCalculator)
+local FallTracker = require(game.ServerScriptService.modules.FallTracker)
 local SpeedService = require(SSSmodules:WaitForChild("SpeedService"))
 
 local RacialSkills = {}
@@ -1339,6 +1340,7 @@ function RacialSkills.Cruor(player: Player, character: Model)
 					grabAnim:Play()
 				end
 
+				FallTracker.Reset(tHRP.Parent)
 				tHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, -3) * CFrame.Angles(0, math.pi, 0)
 
 				local weld = Instance.new("WeldConstraint")
@@ -1819,6 +1821,7 @@ function RacialSkills.Ancestor(player: Player, character: Model)
 
 				grabbed = true
 
+				FallTracker.Reset(tHRP.Parent)
 				tHRP.CFrame = hrp.CFrame * CFrame.new(0, 0, -2) * CFrame.Angles(0, math.pi, 0)
 				local weld = Instance.new("WeldConstraint")
 				weld.Part0 = hrp

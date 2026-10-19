@@ -10,6 +10,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local SpireConfig = require(ReplicatedStorage.SpireSystem.SpireConfig)
 local DataManager = require(ServerScriptService.modules.dataManager)
+local FallTracker = require(ServerScriptService.modules.FallTracker)
 local SpireRemote = ReplicatedStorage.SpireSystem:WaitForChild("SpireAction")
 local SpireUpdate = ReplicatedStorage.SpireSystem:WaitForChild("SpireUpdate")
 local StateHandler = require(ReplicatedStorage.modules:WaitForChild("stateHandler"))
@@ -191,6 +192,7 @@ local function teleportToSpire(player, spireId)
 		return false, "Character not ready."
 	end
 
+	FallTracker.Reset(character)
 	root.CFrame = targetPart.CFrame * CFrame.new(0, 3, 6)
 	return true, nil
 end

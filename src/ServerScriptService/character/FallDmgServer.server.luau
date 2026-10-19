@@ -18,7 +18,7 @@ local rollDamageReduction = 0.75
 
 -- An R6 root part rests about 3 studs above the floor.
 local groundRayLength = 4.5
--- A larger height change in one step is a teleport, not a fall.
+-- A larger move in one step is a teleport that no script reported, not a fall.
 local teleportStep = 50
 -- The client reports its landing about when the server sees it. A report counts this many
 -- seconds around the server landing, and the server waits this long for it.
@@ -28,6 +28,7 @@ local reportWait = 0.3
 local ragdoll = require(game.ServerScriptService.modules.ragdollManager)
 local stateHandler = require(game.ReplicatedStorage.modules.stateHandler)
 local DownedManager = require(game.ServerScriptService.modules.DownedManager)
+local FallTracker = require(game.ServerScriptService.modules.FallTracker)
 
 local function calculateDamage(height)
 	if height < minFallDamageHeight then
@@ -154,8 +155,7 @@ local function onLanded(player, character, serverDistance)
 	applyFall(character, distance, isRolling)
 end
 
--- Layout: tracked[character] = { airborne, startY, lastY }.
-local tracked = setmetatable({}, { __mode = "k" })
+local tracked = FallTracker.tracked
 
 RunService.Heartbeat:Connect(function()
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -165,20 +165,29 @@ RunService.Heartbeat:Connect(function()
 			continue
 		end
 
-		local y = root.Position.Y
+		local pos = root.Position
+		local y = pos.Y
 		local t = tracked[character]
 		if not t then
-			t = { airborne = false, startY = y, lastY = y }
+			t = {}
 			tracked[character] = t
 		end
+		-- A new or reset entry starts from here.
+		if t.lastPos == nil then
+			t.airborne = false
+			t.startY = y
+			t.lastPos = pos
+		end
 
-		local teleported = math.abs(y - t.lastY) > teleportStep
-		t.lastY = y
+		local teleported = (pos - t.lastPos).Magnitude > teleportStep
+		t.lastPos = pos
 		local grounded, inWater = probeGround(character, root)
 
-		-- No fall counts in the menu, in a ragdoll, or across a teleport.
+		-- No fall counts in the menu, in a ragdoll, across a teleport, or just after a
+		-- script moved the character.
 		if
 			teleported
+			or (t.resetUntil and os.clock() < t.resetUntil)
 			or not player:GetAttribute("HasPressedPlay")
 			or stateHandler.GetState(character, "Ragdolled")
 		then

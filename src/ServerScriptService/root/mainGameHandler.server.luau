@@ -19,6 +19,7 @@ local StatScaling = require(ReplicatedStorage.modules:WaitForChild("StatScaling"
 local BuffService = require(ServerScriptService.modules:WaitForChild("BuffService"))
 local GuardBarService = require(ServerScriptService.modules:WaitForChild("GuardBarService"))
 local SpeedService = require(ServerScriptService.modules:WaitForChild("SpeedService"))
+local FallTracker = require(ServerScriptService.modules:WaitForChild("FallTracker"))
 
 local baseWalkspeed = 16
 local baseJumpHeight = 7.2
@@ -337,6 +338,7 @@ local function StartPositionTracker(player)
 end
 
 local function SafeTeleport(rootPart, cframe, description)
+	FallTracker.Reset(rootPart.Parent)
 	rootPart.Anchored = true
 	rootPart.CFrame = cframe
 	task.wait(0.1)
@@ -443,6 +445,7 @@ local function HandleCharacterLoad(player, character)
 	if player:GetAttribute("HasPressedPlay") == false then
 		local menuSpawn = workspace.spawnRoom:FindFirstChild(menuSpawnName)
 		if menuSpawn then
+			FallTracker.Reset(character)
 			rootPart.CFrame = CFrame.new(menuSpawn.Position + Vector3.new(0, 3, 0))
 			rootPart.Anchored = true
 			if not character:FindFirstChild("MenuProtection") then

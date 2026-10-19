@@ -18,6 +18,7 @@ local dataManager = require(ServerScriptService.modules.dataManager)
 local dmgCalculator = require(ServerScriptService.modules.damageCalculator)
 local ParryService = require(ServerScriptService.modules.parryService)
 local SpeedService = require(ServerScriptService.modules.SpeedService)
+local FallTracker = require(ServerScriptService.modules.FallTracker)
 
 local module = {}
 
@@ -2061,6 +2062,7 @@ function module.Messatsu(player)
 					end
 				end
 
+				FallTracker.Reset(humanoid.Parent)
 				humanoid.Parent.HumanoidRootPart.CFrame = character.HumanoidRootPart.CFrame
 
 				local weld = Instance.new("WeldConstraint")
@@ -2309,6 +2311,7 @@ function module.Kurai(player)
 
 	playSound(char, ReplicatedStorage.assets.sounds.katana.katanaLunge)
 
+	FallTracker.Reset(char)
 	root.CFrame = CFrame.new(targetPosition, targetPosition + forwardDir)
 
 	applyDashEffect(char)

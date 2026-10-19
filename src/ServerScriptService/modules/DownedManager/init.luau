@@ -12,6 +12,7 @@ local StateHandler = require(ReplicatedStorage.modules.stateHandler)
 local StatScaling = require(ReplicatedStorage.modules.StatScaling)
 local RagdollManager = require(ServerScriptService.modules.ragdollManager)
 local SpeedService = require(ServerScriptService.modules.SpeedService)
+local FallTracker = require(ServerScriptService.modules.FallTracker)
 
 local DownedManager = {}
 local DownedData = {}
@@ -318,6 +319,7 @@ function DownedManager.Revive(char)
 		local root = char:FindFirstChild("HumanoidRootPart")
 		if root then
 			local _, y, _ = root.CFrame:ToEulerAnglesYXZ()
+			FallTracker.Reset(char)
 			root.CFrame = CFrame.new(root.Position + Vector3.new(0, 2, 0)) * CFrame.Angles(0, y, 0)
 			root.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
 			root.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
@@ -581,6 +583,7 @@ function DownedManager.AttemptCarry(carrierChar, victimChar)
 			vHum:ChangeState(Enum.HumanoidStateType.Physics)
 		end
 
+		FallTracker.Reset(victimChar)
 		victimRoot.CFrame = carrierRoot.CFrame * CFrame.new(carryOffset) * CFrame.Angles(0, 0, 0)
 
 		-- The carrier owns the victim's physics, so the carry does not lag.
