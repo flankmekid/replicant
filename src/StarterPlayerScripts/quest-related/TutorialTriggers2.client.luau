@@ -1,3 +1,8 @@
+-- SPDX-License-Identifier: MIT
+--
+-- Shows the weapon selection hint and then the tutorial end hint when the player
+-- touches the tutorial triggers.
+
 local weapon1 = workspace:WaitForChild("triggers"):WaitForChild("weaponSelectionTrigger")
 local weapon2 = workspace:WaitForChild("triggers"):WaitForChild("weaponSelectionTrigger2")
 local wpntext = workspace:WaitForChild("triggers"):WaitForChild("weaponSelect")

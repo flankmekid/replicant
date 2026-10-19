@@ -1,8 +1,8 @@
--- ============================================================
--- TutorialController (LocalScript) -> StarterPlayerScripts
--- Uses the prebuilt TutorialGui in PlayerGui. No UI building here.
--- Handles: trigger touch (session-only yes/no) and shared open/close.
--- ============================================================
+-- SPDX-License-Identifier: MIT
+--
+-- The tutorial panel: shows a yes/no prompt when the player first touches the tutorial
+-- trigger, and gives the topbar script a TutorialState BindableFunction to open and
+-- close the panel. It uses the prebuilt TutorialGui.
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
@@ -21,7 +21,6 @@ local closeButton = panel:WaitForChild("Close")
 
 local BG_TRANSPARENCY = 0.35
 
--- ===== hover tweens wired at runtime =====
 local function wireHover(button)
 	button.MouseEnter:Connect(function()
 		TweenService:Create(button, TweenInfo.new(0.15), { BackgroundTransparency = 0.1 }):Play()
@@ -36,7 +35,6 @@ wireHover(yesButton)
 wireHover(noButton)
 wireHover(closeButton)
 
--- ===== shared open/close API (exposed via BindableEvents for the topbar script) =====
 local function showPrompt()
 	gui.Enabled = true
 	prompt.Visible = true
@@ -55,12 +53,12 @@ local function close()
 	panel.Visible = false
 end
 
--- expose controls to the topbar script through a shared folder
+-- The topbar script controls the panel through this function.
 local api = Instance.new("BindableFunction")
 api.Name = "TutorialState"
 api.OnInvoke = function(action)
 	if action == "toggle" then
-		-- toggle the panel only; ignores the yes/no prompt
+		-- Toggle only the panel, not the yes/no prompt.
 		if gui.Enabled and panel.Visible then
 			close()
 			return false
@@ -78,10 +76,9 @@ api.OnInvoke = function(action)
 end
 api.Parent = gui
 
--- the X syncs the topbar icon's visual state. READ_ME listens and deselects
--- the icon. note the X closes the panel directly below (not via this event),
--- because the panel can be opened from the touch prompt without the icon ever
--- being selected, in which case deselect() would be a no-op and never close it.
+-- The close button fires this so the topbar script deselects its icon. The button also
+-- closes the panel itself, because the panel can open from the touch prompt with the
+-- icon never selected.
 local requestClose = Instance.new("BindableEvent")
 requestClose.Name = "RequestClose"
 requestClose.Parent = gui
@@ -89,11 +86,11 @@ requestClose.Parent = gui
 yesButton.MouseButton1Click:Connect(showPanel)
 noButton.MouseButton1Click:Connect(close)
 closeButton.MouseButton1Click:Connect(function()
-	close() -- always close the panel, regardless of how it opened
-	requestClose:Fire() -- sync the topbar icon (no-op if it wasn't selected)
+	close()
+	requestClose:Fire()
 end)
 
--- ===== trigger touch (client-side, session-only) =====
+-- The trigger shows the prompt once per session.
 local triggers = workspace:WaitForChild("triggers")
 local trigger = triggers:WaitForChild("tutorialControlTrigger")
 

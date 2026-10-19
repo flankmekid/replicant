@@ -1,7 +1,7 @@
--- [[ VOID SHARD VISIBILITY ]]
--- Location: StarterPlayerScripts
--- Shows the shard only to players with SidurguErrand active at progress 0.
--- Controls transparency directly on the part. No BillboardGui.
+-- SPDX-License-Identifier: MIT
+--
+-- Moves Yuna into view, and hides the lantern blocker, for a player whose Lantern quest
+-- is at step 0 or 1, and handles her prompt.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -41,8 +41,6 @@ local function setVisible(visible)
 	end
 end
 
--- ── QUEST STATE CHECK ─────────────────────────────────────────────────────────
-
 local function checkState()
 	local success, state = pcall(function()
 		return QuestStateRequest:InvokeServer(quest_id)
@@ -53,13 +51,9 @@ local function checkState()
 	setVisible(state.active and state.progress == 0 or state.progress == 1)
 end
 
--- ── PICKUP ────────────────────────────────────────────────────────────────────
-
 prompt.Triggered:Connect(function()
 	PickupRemote:FireServer(quest_id)
 end)
-
--- ── REMOTE LISTENER ───────────────────────────────────────────────────────────
 
 QuestUpdate.OnClientEvent:Connect(function(action, payload)
 	if action == "New" and payload and payload.Id == quest_id then
@@ -73,7 +67,6 @@ QuestUpdate.OnClientEvent:Connect(function(action, payload)
 	end
 end)
 
--- ── INIT ──────────────────────────────────────────────────────────────────────
 setVisible(false)
 task.spawn(function()
 	player:WaitForChild("PlayerStats", 15)

@@ -1,7 +1,7 @@
--- [[ VOID SHARD VISIBILITY ]]
--- Location: StarterPlayerScripts
--- Shows the shard only to players with SidurguErrand active at progress 0.
--- Controls transparency directly on the part. No BillboardGui.
+-- SPDX-License-Identifier: MIT
+--
+-- Shows the Void-stone shard, with its pickup prompt, only to a player whose
+-- SidurguErrand quest is active at step 0.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,11 +17,10 @@ local SHARD_PART_NAME = "VoidStoneShard"
 
 local shardPart = workspace:WaitForChild(SHARD_PART_NAME, 10)
 if not shardPart then
-	warn("[VoidShard] Part not found: " .. SHARD_PART_NAME)
+	warn(`[VoidShardVisibility] Part {SHARD_PART_NAME} not found in Workspace.`)
 	return
 end
 
--- Create ProximityPrompt if not already present
 local prompt = shardPart:FindFirstChildWhichIsA("ProximityPrompt")
 if not prompt then
 	prompt = Instance.new("ProximityPrompt")
@@ -32,8 +31,6 @@ if not prompt then
 	prompt.RequiresLineOfSight = false
 	prompt.Parent = shardPart
 end
-
--- ── VISIBILITY ────────────────────────────────────────────────────────────────
 
 local glowLoop = nil
 
@@ -51,8 +48,6 @@ local function setVisible(visible)
 	end
 end
 
--- ── QUEST STATE CHECK ─────────────────────────────────────────────────────────
-
 local function checkState()
 	local success, state = pcall(function()
 		return QuestStateRequest:InvokeServer(QUEST_ID)
@@ -63,14 +58,10 @@ local function checkState()
 	setVisible(state.active and state.progress == 0)
 end
 
--- ── PICKUP ────────────────────────────────────────────────────────────────────
-
 prompt.Triggered:Connect(function()
 	setVisible(false)
 	PickupRemote:FireServer(QUEST_ID)
 end)
-
--- ── REMOTE LISTENER ───────────────────────────────────────────────────────────
 
 QuestUpdate.OnClientEvent:Connect(function(action, payload)
 	if action == "New" and payload and payload.Id == QUEST_ID then
@@ -84,7 +75,6 @@ QuestUpdate.OnClientEvent:Connect(function(action, payload)
 	end
 end)
 
--- ── INIT ──────────────────────────────────────────────────────────────────────
 setVisible(false)
 task.spawn(function()
 	player:WaitForChild("PlayerStats", 15)
