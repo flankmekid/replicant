@@ -1,11 +1,13 @@
--- sprinting
+-- SPDX-License-Identifier: MIT
+--
+-- Sprint on double-tap W: builds speed up to 1.75x the base WalkSpeed (faster with
+-- Stamina), slows at low HP, and adds the sprint FOV, camera bob, and arm trails.
 
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local camera = game.Workspace.CurrentCamera
 
--- // FOV CONFIGURATION //
 local BaseFOV = 80
 local SprintFOV = 85
 local FOVTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Quint, Enum.EasingDirection.Out)
@@ -19,8 +21,7 @@ local stateHandler =
 local StatScaling =
 	require(game.ReplicatedStorage:WaitForChild("modules"):WaitForChild("StatScaling"))
 
--- Canonical base walk speed (16 + stamina bonus). Used for both the stop-sprint
--- speed and the sprint floor so the stamina walkspeed bonus flows through.
+-- The base WalkSpeed with the Stamina bonus. Walking and sprinting both build on it.
 local function getBaseSpeed()
 	return StatScaling.GetBaseWalkSpeed(char)
 end
@@ -34,11 +35,11 @@ local airborneStates = {
 
 local LastTapped, Tapped = false, false
 local NotRun = 16
--- We don't define 'Normal' here anymore as a static variable
-local accelerationTime = 0.5 -- base; overridden per-sprint by stamina (see getAccelerationTime)
+-- The default momentum build-up time. Each sprint uses getAccelerationTime.
+local accelerationTime = 0.5
 
--- Stamina lowers momentum build-up time: 0.5s at 0 stamina down to ~0.25s,
--- with most of the gain by the velocity soft cap (level 20), continuing slightly to 50.
+-- Stamina lowers the momentum build-up time from 0.5 seconds to about 0.25, mostly by
+-- level 20 and a little more up to 50.
 local FAST_ACCEL = 0.25
 local function getAccelerationTime()
 	local stam = 0
@@ -49,11 +50,10 @@ local function getAccelerationTime()
 			stam = sf.Stamina.Value
 		end
 	end
-	local progress = StatScaling.GetVelocityProgress(stam) -- 0..1, soft-capped at 20
+	local progress = StatScaling.GetVelocityProgress(stam)
 	return 0.5 - (0.5 - FAST_ACCEL) * progress
 end
 
--- Bobbing & Particle Variables
 local bobbingSpeed = 12
 local bobbingIntensity = 0.3
 local bobTick = 0
@@ -74,12 +74,9 @@ end
 
 local function stopSprint()
 	LastTapped = false
-	-- Only restore the client-owned sprint boost back to base when NO server-owned
-	-- speed modifier is active. The server (SpeedService) authoritatively pins speed
-	-- for block/stun/downed/skill states and replicates it via these attributes; if we
-	-- blindly wrote getBaseSpeed() here we'd stomp that pin locally. The classic case:
-	-- sprint -> block. The RenderStepped loop calls stopSprint() on seeing Blocking, and
-	-- the old base-speed write left the player walking at full speed while blocking.
+	-- Restore the base speed only when no server speed modifier is active. The server
+	-- (SpeedService) pins the speed during block, stun, downed, and skill states, and
+	-- writing the base speed here would undo the pin, for example while blocking.
 	if
 		not char:GetAttribute("Blocking")
 		and not char:GetAttribute("Stunned")
@@ -99,7 +96,6 @@ local function stopSprint()
 
 	cleanupParticles()
 
-	-- // TWEEN CAMERA BACK TO NORMAL //
 	TweenService:Create(hum, TweenInfo.new(0.3), { CameraOffset = Vector3.new(0, 0, 0) }):Play()
 	TweenService:Create(camera, FOVTweenInfo, { FieldOfView = BaseFOV }):Play()
 end
@@ -125,12 +121,10 @@ UIS.InputBegan:Connect(function(input, isTyping)
 		if Tapped == false then
 			Tapped = true
 		else
-			-- // START SPRINT //
 			stateHandler.SetState(char, "Running", true, 999999999)
 			LastTapped = true
 			Tapped = false
 
-			-- // TWEEN CAMERA TO SPRINT FOV //
 			TweenService:Create(camera, FOVTweenInfo, { FieldOfView = SprintFOV }):Play()
 
 			Track1 = hum:LoadAnimation(script.Regular)
@@ -138,9 +132,7 @@ UIS.InputBegan:Connect(function(input, isTyping)
 			Track1:Play(0.25)
 
 			local sprintTimer = 0
-			local thisAccelTime = getAccelerationTime() -- stamina-scaled momentum build-up
-
-			-- We removed the static calculation of "Normal" here.
+			local thisAccelTime = getAccelerationTime()
 
 			conn = RunService.RenderStepped:Connect(function(dt)
 				if hum.MoveDirection.Magnitude > 0 then
@@ -161,30 +153,24 @@ UIS.InputBegan:Connect(function(input, isTyping)
 						return
 					end
 
-					-- // DYNAMIC SPEED CHECK //
-					-- NEW: Calculate health multiplier dynamically every frame
+					-- The sprint slows at low HP.
 					local hpPercentage = hum.Health / hum.MaxHealth
 					local healthMultiplier = ((hpPercentage <= 0.7) and 0.9)
 						or ((hpPercentage <= 0.5) and 0.85)
 						or ((hpPercentage <= 0.3) and 0.75)
 						or 1
 
-					-- Apply the health multiplier to whatever the max speed is.
-					-- Sprint cap builds on the canonical base (so stamina bonus carries through).
 					local baseNow = getBaseSpeed()
 					local CurrentMaxSpeed = (baseNow * 1.75) * healthMultiplier
 					if char:GetAttribute("MoveSpeedBuff") == true then
 						CurrentMaxSpeed = (baseNow * 2.25) * healthMultiplier
 					end
 
-					-- 1. MOMENTUM CALCULATION
 					sprintTimer = math.min(sprintTimer + dt, thisAccelTime)
-					local alpha = sprintTimer / thisAccelTime -- Progress: 0 to 1
+					local alpha = sprintTimer / thisAccelTime
 
-					-- Walkspeed scales from Walk to the DYNAMIC CurrentMaxSpeed
 					hum.WalkSpeed = baseNow + ((CurrentMaxSpeed - baseNow) * alpha)
 
-					-- 2. ANIMATION SPEED LOGIC
 					if airborneStates[hum:GetState()] then
 						Track1:AdjustSpeed(0.25)
 					else
@@ -192,12 +178,11 @@ UIS.InputBegan:Connect(function(input, isTyping)
 						Track1:AdjustSpeed(animSpeed)
 					end
 
-					-- 3. PARTICLE LOGIC
+					-- Show the arm trails at full speed.
 					if alpha >= 1 and not particlesSpawned then
 						particlesSpawned = true
 						local dashEff = rs.assets.Dash.Attachment
 
-						-- Left Arm Particles
 						leftParticle = dashEff:Clone()
 						leftParticle.Parent = char:FindFirstChild("Left Arm")
 							or char:FindFirstChild("LeftHand")
@@ -206,7 +191,6 @@ UIS.InputBegan:Connect(function(input, isTyping)
 							leftParticle.Trail.Attachment1 = leftParticle.Parent.LeftGripAttachment
 						end
 
-						-- Right Arm Particles
 						rightParticle = dashEff:Clone()
 						rightParticle.Parent = char:FindFirstChild("Right Arm")
 							or char:FindFirstChild("RightHand")
@@ -217,7 +201,6 @@ UIS.InputBegan:Connect(function(input, isTyping)
 						end
 					end
 
-					-- 4. CAMERA BOBBING
 					bobTick = bobTick + dt * bobbingSpeed
 					local currentIntensity = bobbingIntensity * alpha
 					local x = math.cos(bobTick * 0.5) * currentIntensity
