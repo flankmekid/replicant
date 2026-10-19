@@ -233,7 +233,7 @@ local function applyHitstop(plr, attackerChar, targetChar, action, duration)
 	end)
 end
 
--- Slash FX are disabled. Callers still pass their FX data, so the function stays.
+-- TODO: slash FX are disabled. Callers still pass their FX data, so the function stays.
 local function emitSlash(char, folderPath, slashChild, partName) end
 
 -- In comboMap, R plays SlashFXLeft, L plays SlashFXRight, and U plays SlashFXUp.
