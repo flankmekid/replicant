@@ -1,10 +1,9 @@
--- Burst (client): universal combo-breaker on the T key. Thin client: it only
--- reads intent and shows the cooldown HUD. All authority (mana, cooldown, the
--- i-frames, the hitbox) lives server-side in BurstHandler / SkillFunctions.Burst.
+-- SPDX-License-Identifier: MIT
 --
--- T was confirmed free on all equipped weapon Tools (the live inputHandlers in
--- ServerStorage.Weapons have their T/Throw bind commented out; only leftover
--- Workspace staging rigs still bound it, and those are not in the equip path).
+-- Client side of Burst, the universal combo breaker on T. It sends the request and
+-- shows the cooldown on the HUD. The server (BurstHandler and SkillFunctions.Burst)
+-- owns the cost, the cooldown, the i-frames, and the hitbox.
+
 local UserInputService = game:GetService("UserInputService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -16,8 +15,8 @@ local BurstRemote = ReplicatedStorage:WaitForChild("remotes"):WaitForChild("Burs
 local Player = Players.LocalPlayer
 local Char = Player.Character or Player.CharacterAdded:Wait()
 
--- Predictive local guard so we don't spam the server while it is on cooldown.
--- The server is still the authority; this just avoids obviously-doomed requests.
+-- A local copy of the cooldown, so the client does not send requests the server would
+-- reject. The server still decides.
 local localReadyAt = 0
 
 local function onInput(_, inputState)
@@ -28,8 +27,7 @@ local function onInput(_, inputState)
 	if not char then
 		return
 	end
-	-- Do not even attempt while Downed. Stunned is intentionally NOT blocked here:
-	-- bursting out of a combo (while Stunned) is the whole purpose.
+	-- Not while downed. Stunned is allowed, because breaking out of a combo is the point.
 	if char:GetAttribute("Downed") then
 		return
 	end
@@ -48,7 +46,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 end)
 
--- Server reply: arm the cooldown HUD only when the cast was actually committed.
+-- Show the cooldown only when the server accepted the burst.
 BurstRemote.OnClientEvent:Connect(function(payload)
 	if type(payload) ~= "table" or payload.Func ~= "BurstResponse" then
 		return
