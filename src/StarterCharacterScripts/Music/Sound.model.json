@@ -1,0 +1,9 @@
+{
+  "className": "Sound",
+  "properties": {
+    "RollOffMode": "InverseTapered",
+    "SerializedOverrides": {
+      "BinaryString": ""
+    }
+  }
+}

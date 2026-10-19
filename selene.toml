@@ -1,0 +1,13 @@
+std = "roblox"
+
+exclude = [
+	"src/ReplicatedStorage/TopbarPlus/**",
+	"src/ReplicatedStorage/modules/SmartBone/**",
+	"src/ReplicatedStorage/modules/CameraShaker/**",
+	"src/ReplicatedStorage/modules/hitboxClass/**",
+	"src/ReplicatedStorage/modules/ContextActionUtility.luau",
+	"src/ServerScriptService/modules/ProfileStore.luau",
+	"src/ServerScriptService/modules/Promise.luau",
+	"src/StarterPlayerScripts/PlayerModule/**",
+	"src/StarterCharacterScripts/Animate/**",
+]

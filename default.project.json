@@ -1,0 +1,100 @@
+{
+  "name": "REPLICANT",
+  "tree": {
+    "$className": "DataModel",
+    "Workspace": {
+      "$ignoreUnknownInstances": true,
+      "plrManager": {
+        "$className": "Folder",
+        "$ignoreUnknownInstances": true,
+        "alive": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true,
+          "$attributes": {
+            "Rojo_Id": "HitboxAliveFolder"
+          }
+        },
+        "projectiles": {
+          "$className": "Folder",
+          "$ignoreUnknownInstances": true,
+          "$attributes": {
+            "Rojo_Id": "HitboxProjectileFolder"
+          }
+        }
+      }
+    },
+    "ReplicatedStorage": {
+      "$properties": {
+        "SerializedOverrides": {
+          "BinaryString": ""
+        }
+      },
+      "$attributes": {
+        "Emitter2D_Version": 1.26
+      },
+      "$ignoreUnknownInstances": true,
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$properties": {
+        "SerializedOverrides": {
+          "BinaryString": ""
+        }
+      },
+      "$ignoreUnknownInstances": true,
+      "$path": "src/ServerScriptService"
+    },
+    "StarterPlayer": {
+      "StarterCharacterScripts": {
+        "$properties": {
+          "SerializedOverrides": {
+            "BinaryString": ""
+          }
+        },
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterCharacterScripts"
+      },
+      "StarterPlayerScripts": {
+        "$properties": {
+          "SerializedOverrides": {
+            "BinaryString": ""
+          }
+        },
+        "$ignoreUnknownInstances": true,
+        "$path": "src/StarterPlayerScripts"
+      },
+      "$properties": {
+        "AutoJumpEnabled": false,
+        "CameraMaxZoomDistance": 22.0,
+        "CharacterMaxSlopeAngle": 70.0,
+        "CharacterUseJumpPower": false,
+        "GameSettingsAvatar": "R6",
+        "HealthDisplayDistance": 0.0,
+        "NameDisplayDistance": 50.0,
+        "SerializedOverrides": {
+          "BinaryString": ""
+        },
+        "UseImprovedCharacterEvents": {
+          "Enum": 0
+        }
+      }
+    }
+  },
+  "syncbackRules": {
+    "ignoreTrees": [
+      "ReplicatedStorage/assets",
+      "ReplicatedStorage/NPCS",
+      "ReplicatedStorage/Magic",
+      "ReplicatedStorage/WeldTools",
+      "ReplicatedStorage/LensFlare",
+      "ReplicatedStorage/music",
+      "ReplicatedStorage/faces",
+      "ReplicatedStorage/effects",
+      "ReplicatedStorage/Skyboxes",
+      "ServerScriptService/modules/QuestServerBACKUP",
+      "StarterPlayer/StarterCharacterScripts/QuestClientBACKUP",
+      "StarterPlayer/StarterCharacterScripts/Movement/DashOLD",
+      "StarterPlayer/StarterCharacterScripts/LocalFootsteps"
+    ]
+  }
+}
